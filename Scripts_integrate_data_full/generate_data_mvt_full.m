@@ -4,14 +4,13 @@
 % a slim version of CIRCLES' v2.1 of the data, used in the team nature
 % paper submission, and saves it to json files.
 %
-% Generated json files will be saved in \{DATE}__MVT_Data_Slim folder.
+% Generated json files will be saved in \Data_{DATE}__MVT_Full folder.
 
 clearvars -except DAY_TO_PROCESS
 if ~exist('DAY_TO_PROCESS', 'var')
     global DAY_TO_PROCESS
-    DAY_TO_PROCESS = input('Enter the day of Nov. 2022 MVT to create macroscopic fields (from 16 to 18): ');
+    DAY_TO_PROCESS = input('Enter the day of Nov. 2022 MVT to generate full MVT data files (from 16 to 18): ');
 end
-mkdir(['2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Data_Slim']);
 %========================================================================
 % Parameters
 %========================================================================
@@ -43,7 +42,8 @@ processingOpts.laneChangeClippingOpts.CHANGEBUFFERTHRESH = 0.2;
 %========================================================================
 % Initilize
 %========================================================================
-dataFolderPath = fullfile(pwd,['2022-11-' num2str(DAY_TO_PROCESS) '__I24_Base_Data']);
+[parentDirectory, ~, ~] = fileparts(pwd);
+dataFolderPath = fullfile(parentDirectory,['Data_2022-11-' num2str(DAY_TO_PROCESS) '__I24_Base']);
 dayAbbrvs = ["mon","tue","wed","thu","fri"];
 dayAbbrv = dayAbbrvs(DAY_TO_PROCESS-13);
 dataFiles = dir([dataFolderPath '\*_' char(dayAbbrv) '_0_*.json']);
@@ -54,7 +54,7 @@ end
 % Load GPS and road grade data
 %========================================================================
 % Load road grade map
-gradeData = readmatrix('Eastbound_grade_fit.csv');
+gradeData = readmatrix([parentDirectory '\Models_Energy\Eastbound_grade_fit.csv']);
 % 0.225miles is the distance between mill creek origin (MM58.675) and MM58.9
 % the estimated origin of the road grade map
 gradeDataStart = gradeData(:,2);
@@ -64,11 +64,12 @@ gradeDataSlope = gradeData(:,4);
 gradeDataIntercept = gradeData(:,5);
 % GPS Data is assumed to be processed. Run create_data_GPS.m to produce processed GPS files
 fprintf('\nLoading and decoding AVs GPS data file ...'); tic
-dataGPS = jsondecode(fileread(fullfile('GPS_Data',['CIRCLES_GPS_10Hz_2022-11-' num2str(DAY_TO_PROCESS) '.json'])));
+dataGPS = jsondecode(fileread(fullfile(parentDirectory,['Data_GPS\CIRCLES_GPS_10Hz_2022-11-' num2str(DAY_TO_PROCESS) '.json'])));
 fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Process each I24 MOTION file 
 %========================================================================
+addpath([parentDirectory '\Models_Energy']);
 for fileNr = 1:24
     % Load MOTION data file
     filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
@@ -296,9 +297,11 @@ for fileNr = 1:24
     pause(5)
     fprintf('Done (%0.0fsec).\n',toc)
     fprintf('Encoding and Writing json file ... '),tic
-    fileStartT = (datetime(data(1).first_timestamp, 'convertfrom', 'posixtime', 'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
+    fileStartT = (datetime(data(1).first_timestamp, 'convertfrom', 'posixtime', ...
+        'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
     fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
-    filenameSave = ['2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Data_Slim\I-24MOTION_',fileStartT];
+    filenameSave = [parentDirectory '\Data_2022-11-' num2str(DAY_TO_PROCESS)...
+        '__MVT_Full\I-24MOTION_',fileStartT];
     jsonStr = jsonencode(data);
     clear data
     fid = fopen([filenameSave '.json'], 'w');
@@ -308,7 +311,7 @@ for fileNr = 1:24
     clear jsonStr
     toc
 end
-
+rmpath([parentDirectory '\Models_Energy']);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%% Local Functions Definitions %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
