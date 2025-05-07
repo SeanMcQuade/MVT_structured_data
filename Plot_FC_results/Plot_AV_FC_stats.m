@@ -6,13 +6,16 @@
 tic
 
 MAX_DIST = 350; % (m) maximum relative distance to an ego vehicle to be considered 
-XWINDOW = [MAX_DIST-122 7000]; %[MAX_DIST, 6700-MAX_DIST]; % (m) , [West to East] set to -1 to include the full testbed. Find max and min (samples.xpos) and subtract 400m
+XWINDOW = [MAX_DIST-122 7000]; % (m) , set to -1 to include the full testbed. Find max and min (samples.xpos) and subtract 400m
 
+%TWINDOWS = [0645, 0745; 0700, 0800; 0715, 0815; 0730, 0830; 0645, 0915; 0645, 0930];
+% 6:45 to 9:15 is a multiple of 15min that shows mean speed <20 m/s for all days with AV present
 TWINDOWS = [0645, 0915];%; 0700, 0730; 0730, 0800]; %windows of intrest 12/5/2024
 
 for i_t = 1:size(TWINDOWS,1)
 TWINDOW = TWINDOWS(i_t,:);
 min_spd_mean_only = 1; % (m/s) % minimum speed for samples (to remove ideling vehicles)
+min_spd_raw = 0;
 dist_to_a = round(linspace(-MAX_DIST,MAX_DIST,MAX_DIST*2/10+1));
 dist_to_a = [dist_to_a(1:floor(length(dist_to_a)/2)),-1,1,dist_to_a(floor(length(dist_to_a)/2)+2:end)];
 bin_d = (dist_to_a(1:end-1)+dist_to_a(2:end))/2;
@@ -21,6 +24,10 @@ fig_res = [1600 1000];
 %fig_scale = '-r384';
 fig_scale = '-r192';
 col = [0,0,1;1,0,0;0,.6,0]; %Plotting colors
+
+% binindices 
+% ind_unmasked_left = find(dist_to_a<-40);
+% ind_unmasked_right = find(dist_to_a>40);
 
 masking_dist = 30; % bins closer than this num meters are masked
 ind_unmasked_left = find(dist_to_a(2:end)<=-masking_dist);
@@ -33,14 +40,14 @@ indices_partitions{3} = ind_masked_right;
 indices_partitions{4} = ind_unmasked_right;
 
 %% load semi-filtered raw data      Uncomment line 26 to line 76 to create data files, 
-% %   uncomment 79 to load data.
+%   uncomment 79 to load data.
 test_days = [16,17,18];
 filenames = {'samples_for_distance_analysis_16','samples_for_distance_analysis_17', 'samples_for_distance_analysis_18'};
 for i=1:length(test_days) % three days, Wed thrus fri
     S = load(filenames{i});
 
     % filter data
-    if length(XWINDOW)>1  %!!!!! uncomment for filtering on testbed 
+    if length(XWINDOW)>1
         ind = S.samples_xpos >= XWINDOW(1) & S.samples_xpos <= XWINDOW(2);
     end
     if length(TWINDOW)>1
@@ -141,6 +148,7 @@ for ii = 1:length(t)
         x_min = -122;
         x_max = 7000;
         av_in_cell_ind = av.timestamp >= t_temp & av.timestamp <= t_temp +5 & av.x_position >= x_min & av.x_position <=   x_max; %Sulaiman suggestion to count only AVs in xwindow.
+        %av_in_cell_ind  = av.timestamp >= t_temp & av.timestamp <= t_temp +5 ;
         if isfield(av,"control_car") && ~isempty(av.control_car)
                 is_av_control = av.control_car(av_in_cell_ind);
         else
@@ -152,12 +160,9 @@ for ii = 1:length(t)
         end
         nAVs_temp = nAVs_temp +1;
     end
-    
-
     nAVs_active(ii) = nAVs_active_temp;
     nAVs(ii) = nAVs_temp;
 end
-%Average_nAVs_active(i)=mean(nAVs_active(nAVs_active~=0))
 %% Plotting bulk speed 
 lightblue = 1/2*[0,0,1]+1/2*[1,1,1];
 lightred = 1/2*[1,0,0]+1/2*[1,1,1];
@@ -168,9 +173,7 @@ plot_start_t = datetime(2022,11,test_days(i), str2num(Firsthour), str2num(Firstm
 plot_end_t = datetime(2022,11,test_days(i), str2num(Secondhour), str2num(Secondminutes),0, 'TimeZone' ,'America/Chicago');
 TT_before_ind = TT <= plot_start_t; TT_after_ind = TT <= plot_end_t; 
 TT_inside_ind = TT >= plot_start_t & TT <= plot_end_t;
-twindow_nAVs_active = nAVs_active(TT>plot_start_t)
-Avg_nAVs(i) = mean(twindow_nAVs_active(twindow_nAVs_active~=0))
-Max_nAVs(i) = max(twindow_nAVs_active(twindow_nAVs_active~=0))
+
 figure(1)
 subplot(3,3,3*i-2)
 hold on
@@ -239,7 +242,7 @@ subplot(3,3,5), set(gca,'Position',[posx(2),posy(2),posw])
 subplot(3,3,8), set(gca,'Position',[posx(2),posy(3),posw])
 
 if flag_save
-    fname = ['fig_nature_fuel_results_effective_only_',TWINDOWstr(1),TWINDOWstr(2),TWINDOWstr(3),'_',TWINDOWstr(6),TWINDOWstr(7),TWINDOWstr(8)];
+    fname = ['fig_nature_fuel_results_',TWINDOWstr(1),TWINDOWstr(2),TWINDOWstr(3),'_',TWINDOWstr(6),TWINDOWstr(7),TWINDOWstr(8)];
     set(gcf,'Position',[10 40 fig_res],'PaperPositionMode','auto')
     print(fname,'-dpng',fig_scale);
     savefig(fname)
@@ -274,7 +277,7 @@ stats_ary = {'mean FC','effective FC','median FC'};
 linestyle_ary = {'-','-','-'};
 linesize_ary = [2.5, 2.5, 2.5];
 
-ind_quantity_plotted = 2;% only plot the 2nd quantity: "effective" %[1,2,3]; %mean effective median
+ind_quantity_plotted = [1,2,3]; %mean effective median
 
 % for i = 1:length(stats_ary)% 
 for i = ind_quantity_plotted
@@ -289,7 +292,7 @@ end
 axis([-axx,axx,axy])
 grid on
 set(gca,'xtick',-300:100:300)
-legend(hl(ind_quantity_plotted),stats_ary{ind_quantity_plotted}) 
+legend(hl,stats_ary{ind_quantity_plotted}) %%%check
 title(['Fuel consumption (FC). ',datestr],'FontSize',fontsize)
 xlabel('Distance to nearest AV in same lane (m)','FontSize',fontsize)
 ylabel('Fuel consumption (g/m)','FontSize',fontsize)
@@ -314,8 +317,7 @@ plot([0,axx],[0,0],'k:','LineWidth',1.5)
 hold on
 grid on
 stats_ary = {'mean FC','effective FC','median FC'};
-ind_quantity_plotted = 2;% only plot the 2nd quantity: "effective" %[1,2,3]; %mean effective median
-for i = ind_quantity_plotted
+for i = 1:length(stats_ary)
     hl(i) = plot(AV_x4,-(AV_y4(i,:)./AV_y1(i,end:-1:1)-1)*100,linestyle_ary{i},'Color',col(i,:),'LineWidth',linesize_ary(i));
     plot(AV_x3,-(AV_y3(i,:)./AV_y2(i,end:-1:1)-1)*100,linestyle_ary{i},'Color',colb(i,:),'LineWidth',2)
     plot(AV_x4,S_regression(i,:),'--','Color',cold(i,:),'LineWidth',2.5);
@@ -325,7 +327,7 @@ axis ij
 grid on
 set(gca,'xtick',0:100:300)
 ytickformat('percentage')
-legend(hl(ind_quantity_plotted),stats_ary{ind_quantity_plotted},'Location','southeast')
+legend(hl,stats_ary,'Location','southeast')
 title('Fuel reduction ahead vs. behind AV','FontSize',fontsize) %changed from "behind vs ahead" 12/10/24
 xlabel('Distance to nearest AV in same lane (m)','FontSize',fontsize)
 ylabel('Fuel consumption reduction','FontSize',fontsize)
