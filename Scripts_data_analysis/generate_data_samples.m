@@ -72,7 +72,7 @@ end
 
 %% save the output file to .mat data file
 fprintf('\n Saving output file ... ');tic
-save(['samples_for_distance_analysis_' char(num2str(day_to_process)) '.mat'],'samples_*','-v7.3')
+save([parentDirectory '\Data_for_Data_Analysis\' 'samples_for_distance_analysis_' char(num2str(day_to_process)) '.mat'],'samples_*','-v7.3')
 fprintf('Done (%0.0fsec).\n',toc)
 
 

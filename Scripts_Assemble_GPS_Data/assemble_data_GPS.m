@@ -21,7 +21,7 @@ minMatchTime = 3; % [s] minimum matching time
 % Load, parse and preprocess AVs GPS data
 %========================================================================
 [parentDirectory, ~, ~] = fileparts(pwd);
-gpsFolderPath = fullfile(parentDirectory,'Data_GPS') ;
+gpsFolderPath = fullfile(parentDirectory,'\Data_GPS') ;
 if ~isfolder(gpsFolderPath)
     error('Folder %s does not exist.\n',gpsFolderPath)
 end
@@ -175,7 +175,7 @@ end
 %========================================================================
 fprintf('Adding controller status and preparing output data... ');tic
 avPingsData = readtable(fullfile(gpsFolderPath, ['veh_ping_202211' num2str(DAY_TO_PROCESS) '.csv']));
-avVINs = readtable([gpsDataFolder '/veh_vins.csv');
+avVINs = readtable([gpsFolderPath '\veh_vins.csv']);
 avConnectionStatus  = get_connection_status(avPingsData,avVINs);
 nAVs = length(dataGPS0);
 clear dataGPS

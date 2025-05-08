@@ -47,7 +47,7 @@ for iTWin = 1:length(TWINDOWS)
     testDays = [16, 17, 18];
     
     for i=1:length(testDays) % three days, Wed thrus fri
-        loadedData = load(['samples_for_distance_analysis_' ...
+        loadedData = load([parentDirectory '\Data_for_Data_Analysis\samples_for_distance_analysis_' ...
             char(num2str(testDays(i))) '.mat']);
         
         % filter data based on x position, time, and speed
@@ -138,14 +138,14 @@ for iTWin = 1:length(TWINDOWS)
     end
     
     % Calculate Mean Bulk speed and AVs for Wed. Thurs. and Fri.
-    strArray = ["fields_motion_16" "fields_motion_17" ...
-        "fields_motion_18"];
+    strArray = ["fields_motion_2022-11-16" "fields_motion_2022-11-17" ...
+        "fields_motion_2022-11-18"];
     TWINDOWSTR = num2str(TWINDOW);
     %%
     figure(1)
     clf
     for i=1:3 %wed. thurs. fri.
-        load([parentDirectory '\Scripts_Macroscopic_Fields\' char(strArray(i))])
+        load([parentDirectory '\Data_Macroscopic_Fields\' char(strArray(i))])
         filenameLoad = [parentDirectory ...
             '\Data_GPS\CIRCLES_GPS_10Hz_2022-11-' num2str(15+i) '.json'];
         data = jsondecode(fileread(filenameLoad));
