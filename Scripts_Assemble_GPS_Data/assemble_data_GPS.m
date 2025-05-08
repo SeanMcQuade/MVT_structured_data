@@ -7,7 +7,7 @@ if ~exist('DAY_TO_PROCESS', 'var')
     global DAY_TO_PROCESS
     DAY_TO_PROCESS = input('Enter the day of Nov. 2022 MVT to generate AVs GPS data files (from 16 to 18): ');
 end
-fprintf('Starting the creation of AV GPS data for %dth Nov. 2022\n', DAY_TO_PROCESS);
+fprintf('Starting the assembly of AV GPS data for %dth Nov. 2022\n', DAY_TO_PROCESS);
 
 %========================================================================
 % Parameters
@@ -20,7 +20,8 @@ minMatchTime = 3; % [s] minimum matching time
 %========================================================================
 % Load, parse and preprocess AVs GPS data
 %========================================================================
-gpsFolderPath = fullfile(pwd,'GPS_Data') ;
+[parentDirectory, ~, ~] = fileparts(pwd);
+gpsFolderPath = fullfile(parentDirectory,'\Data_GPS') ;
 if ~isfolder(gpsFolderPath)
     error('Folder %s does not exist.\n',gpsFolderPath)
 end
@@ -44,8 +45,8 @@ maxAVStart = max([dataGPS0([dataGPS0.ending_time]<dataTLimits(2)).ending_time]);
 maxFileNr = min(24,floor((maxAVStart-dataTLimits(1))/600)+1);
 
 % Find I24 MOTION data files in folder
-dataFolderPath = fullfile(pwd,['2022-11-' num2str(DAY_TO_PROCESS) ...
-    '__I24_Base_Data']) ;
+dataFolderPath = fullfile(parentDirectory,['Data_2022-11-' num2str(DAY_TO_PROCESS) ...
+    '__I24_Base']) ;
 if ~isfolder(dataFolderPath)
     error('Folder %s does not exist.\n',dataFolderPath)
 end
@@ -174,7 +175,8 @@ end
 %========================================================================
 fprintf('Adding controller status and preparing output data... ');tic
 avPingsData = readtable(fullfile(gpsFolderPath, ['veh_ping_202211' num2str(DAY_TO_PROCESS) '.csv']));
-avConnectionStatus  = get_connection_status(avPingsData);
+avVINs = readtable([gpsFolderPath '\veh_vins.csv']);
+avConnectionStatus  = get_connection_status(avPingsData,avVINs);
 nAVs = length(dataGPS0);
 clear dataGPS
 dataGPS(nAVs,1).av_id = [];
@@ -301,7 +303,7 @@ for vin = 1:length(vins)
     runNum = 0;
     % Load data file
     if ismember(vin,vinsWithFiles)
-        vehTable = readtable(['gps_data\circles_v2_1_car' num2str(vin) '.csv'],opts1);
+        vehTable = readtable([gpsDataFolder '\circles_v2_1_car' num2str(vin) '.csv'],opts1);
     else
         fprintf(['data file for car ' num2str(vin) ' not found \n'])
         continue
@@ -374,7 +376,7 @@ end
 function dataGPS0 = preproc_gps(dataGPS0,gpsDataFolder)
 nAVs = length(dataGPS0);
 lane_width = 12;
-avVINs = readtable([gpsDataFolder '/veh_vins.csv']);
+avVINs = readtable([gpsDataFolder '\veh_vins.csv']);
 for runIdx = 1:nAVs
     t10Hz = floor(dataGPS0(runIdx).timestamp(1)*10)/10:.1:ceil(dataGPS0(runIdx).timestamp(end)*10)/10;
     dataGPS0(runIdx).index = runIdx;
@@ -576,9 +578,8 @@ end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function avConnectionStatus  = get_connection_status(avPingsData)
+function avConnectionStatus  = get_connection_status(avPingsData,avVINs)
 avPingsData.av_id = 0*avPingsData.gpstime;
-avVINs = readtable('gps_data/veh_vins.csv');
 
 for i = 1:size(avVINs,1)
     VIN = avVINs(i,:).vin;

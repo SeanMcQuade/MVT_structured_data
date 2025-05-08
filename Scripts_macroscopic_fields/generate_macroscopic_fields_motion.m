@@ -1,7 +1,12 @@
 % Construct macroscopic fields based on I24-MOTION data files in the
 % same directory.
-% (C) 2023/09/22 by Benjamin Seibold
-
+% (C) Benjamin Seibold (edited by Sulaiman Almatrudi)
+clearvars -except DAY_TO_PROCESS
+if ~exist('DAY_TO_PROCESS', 'var')
+    global DAY_TO_PROCESS
+    DAY_TO_PROCESS = input(['Enter the day of Nov. 2022 MVT to generate'...
+        ' macroscopic fileds for (from 16 to 18): ']);
+end
 %========================================================================
 % Parameters
 %========================================================================
@@ -33,8 +38,10 @@ elseif strcmp(kernel,'Gaussian')
     fac = 1/(2*pi*wt*wx); % normalizing factor
 end
 % Find all data files in folder
-data_files = dir('I-24MOTION_????-??-??_??-??-??_reduced.mat');
-date_data = data_files(1).name(12:21); % date of the data files
+[parentDirectory, ~, ~] = fileparts(pwd);
+dataFolderPath = fullfile(parentDirectory,['Data_2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Slim']);
+data_files = dir([dataFolderPath '\I-24MOTION_slim_*.json']);
+date_data = ['2022-11-' num2str(DAY_TO_PROCESS)]; % date of the data files
 ax_t = [posixtime(datetime([date_data,' ',ax_t{1}],'TimeZone','America/Chicago')),...
     posixtime(datetime([date_data,' ',ax_t{2}],'TimeZone','America/Chicago'))];
 
@@ -71,11 +78,15 @@ end
 for file_j = 1:length(data_files) % loop over relevant files
     % Load data file
     filename = data_files(file_j).name;
-    fprintf('Loading %s ...',filename), tic
-    load(filename)
+    fprintf('Loading and decoding %s ...',filename), tic
+    data = jsondecode(fileread(filename));
     fprintf(' Done (%0.0fsec).\n',toc)
     % Find indices of trajectories in direction and relevant lane(s)
-    ind = find([data.direction]*direction>0&([data.lane_number]==lane|lane==0));
+    if isfield(data,'direction')
+        ind = find([data.direction]*direction>0&([data.lane_number]==lane|lane==0));
+    else
+        ind = find(([data.lane_number]==lane|lane==0));
+    end
     % Process trajectories
     fprintf('Processing %d trajectories ...',length(ind)), tic
     for j = ind % loop over used trajectories
@@ -169,7 +180,8 @@ end
 %========================================================================
 % Save fields
 %========================================================================
-filename = 'fields_motion.mat';
+filename = [parentDirectory '\Data_Macroscopic_Fields\fields_motion_2022-11-'...
+    num2str(DAY_TO_PROCESS)  '.mat'];
 fprintf('Saving file %s ...',filename), tic
 save(filename,'field','t','x','direction','lane')
 fprintf(' Done (%0.0fsec).\n',toc)
