@@ -12,7 +12,7 @@ flagSave = 1; % save figures
 
 [parentDirectory, ~, ~] = fileparts(pwd);
 
-for iTWin = 1:length(TWINDOWS)
+for iTWin = 1:size(TWINDOWS,1)
     TWINDOW = TWINDOWS(iTWin,:);
     minSpdMean = 1; % (m/s) % minimum speed for samples (to remove ideling vehicles)
     minSpdRaw = 0;
