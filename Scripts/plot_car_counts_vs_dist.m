@@ -1,4 +1,6 @@
-%this program counts the number of cars at dist from AV
+% script to plot number of bulk traffic vehicles near AVs for experiments run on the following dates:
+% 11/16/2022, 11/17/2022, and 11/18/2022 Authored by Sean McQuade. This script uses data in
+% ../Data/Data_for_Figures. This licensed under BSD-3 clause license: https://opensource.org/license/bsd-3-clause
 
 %% Load data from data_samples.mat
 test_days = [16,17,18];
@@ -18,7 +20,7 @@ col = [0,0,1;1,0,0;0,.6,0]; %Plotting colors
 
 filenames = {'samples_for_distance_analysis_16','samples_for_distance_analysis_17', 'samples_for_distance_analysis_18'};
 for i=1:length(test_days) % three days, Wed thrus fri
-    data_path = ['../Data_for_Figures/', filenames{i}];
+    data_path = ['../Data/Data_for_Figures/', filenames{i}];
     S = load(data_path);
 
 
