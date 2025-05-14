@@ -4,14 +4,13 @@
 % a slim version of CIRCLES' v2.1 of the data, used in the team nature
 % paper submission, and saves it to json files.
 %
-% Generated json files will be saved in \{DATE}__MVT_Data_Slim folder.
+% Generated json files will be saved in \Data_{DATE}__MVT_Full folder.
 
 clearvars -except DAY_TO_PROCESS
 if ~exist('DAY_TO_PROCESS', 'var')
     global DAY_TO_PROCESS
-    DAY_TO_PROCESS = input('Enter the day of Nov. 2022 MVT to create macroscopic fields (from 16 to 18): ');
+    DAY_TO_PROCESS = input('Enter the day of Nov. 2022 MVT to generate full MVT data files (from 16 to 18): ');
 end
-mkdir(['2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Data_Slim']);
 %========================================================================
 % Parameters
 %========================================================================
@@ -43,7 +42,8 @@ processingOpts.laneChangeClippingOpts.CHANGEBUFFERTHRESH = 0.2;
 %========================================================================
 % Initilize
 %========================================================================
-dataFolderPath = fullfile(pwd,['2022-11-' num2str(DAY_TO_PROCESS) '__I24_Base_Data']);
+[parentDirectory, ~, ~] = fileparts(pwd);
+dataFolderPath = fullfile(parentDirectory,['Data_2022-11-' num2str(DAY_TO_PROCESS) '__I24_Base']);
 dayAbbrvs = ["mon","tue","wed","thu","fri"];
 dayAbbrv = dayAbbrvs(DAY_TO_PROCESS-13);
 dataFiles = dir([dataFolderPath '\*_' char(dayAbbrv) '_0_*.json']);
@@ -54,7 +54,7 @@ end
 % Load GPS and road grade data
 %========================================================================
 % Load road grade map
-gradeData = readmatrix('Eastbound_grade_fit.csv');
+gradeData = readmatrix([parentDirectory '\Models_Energy\Eastbound_grade_fit.csv']);
 % 0.225miles is the distance between mill creek origin (MM58.675) and MM58.9
 % the estimated origin of the road grade map
 gradeDataStart = gradeData(:,2);
@@ -64,11 +64,12 @@ gradeDataSlope = gradeData(:,4);
 gradeDataIntercept = gradeData(:,5);
 % GPS Data is assumed to be processed. Run create_data_GPS.m to produce processed GPS files
 fprintf('\nLoading and decoding AVs GPS data file ...'); tic
-dataGPS = jsondecode(fileread(fullfile('GPS_Data',['CIRCLES_GPS_10Hz_2022-11-' num2str(DAY_TO_PROCESS) '.json'])));
+dataGPS = jsondecode(fileread(fullfile(parentDirectory,['Data_GPS\CIRCLES_GPS_10Hz_2022-11-' num2str(DAY_TO_PROCESS) '.json'])));
 fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Process each I24 MOTION file 
 %========================================================================
+addpath([parentDirectory '\Models_Energy']);
 for fileNr = 1:24
     % Load MOTION data file
     filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
@@ -76,8 +77,6 @@ for fileNr = 1:24
         fileNr); tic
     dataTemp = jsondecode(fileread(filenameLoad));
     fprintf('Done (%0.0fsec).\n',toc)
-    % remove eastbound trajectories
-    dataTemp = dataTemp([dataTemp.direction]<0); 
     % delete extra fields
     dataTemp = rmfield(dataTemp,{'flags','compute_node_id','fragment_ids','merged_ids',...
         'configuration_id','fine_vehicle_class','x_score','y_score','road_segment_ids'});
@@ -143,6 +142,52 @@ for fileNr = 1:24
             theta = -asin((gradeDataSlope(cellInd).*xNewLocal(:)/100+gradeDataIntercept(cellInd)/100));
         end
         data(i).road_grade_radians = theta;
+        
+         % Construct reference trajectories 
+        a2 = @(t1)(x(end)-x(1)-0.5*t1*v(1)-v(end)*t(end)+0.5*t1*v(end))/(-0.5*t(end)^2+0.5*t1*t(end));
+        a1 = @(t1) (v(end)+a2(t1)*(t1-t(end))-v(1))/t1;
+        t1 = (t(end)/2);
+        data(i).reference_a1_meters_per_second_per_second = a1(t1); 
+        data(i).reference_a2_meters_per_second_per_second = a2(t1);    
+        vRef = (v(1)+a1(t1)*t).*(t<=t1)+(v(end)+a2(t1)*(t-t(end))).*(t>t1);
+        aRef = a1(t1).*(t<=t1) + a2(t1).*(t>t1);
+        xRef = (x(1)+v(1)*t+a1(t1)*t.^2/2).*(t<=t1)+((x(end)-v(end)*t(end)...
+            +a2(t1)*t(end)^2/2)+v(end)*t+a2(t1)*(t/2-t(end)).*t).*(t>t1);
+
+        if any(vRef<0)
+            tt1 = (x(end)-x(1))/((v(1)+v(end))/2); tt2 = t(end)-tt1;
+            aa1 = -((v(1)+v(end))/2)/(x(end)-x(1))*v(1); 
+            aa2 = ((v(1)+v(end))/2)/(x(end)-x(1))*v(end);
+            data(i).reference_a1_meters_per_second_per_second = aa1; 
+            data(i).reference_a2_meters_per_second_per_second = aa2;
+            vRef = (v(1)+aa1*t).*(t<=tt1)+(0).*(t>tt1 & t<tt2)+(v(end)+aa2*(t-t(end))).*(t>tt2);
+            aRef = aa1.*(t<=tt1)+(0).*(t>tt1 & t<tt2)+aa2.*(t>tt2);
+            xRef = (x(1)+v(1)*t+aa1*t.^2/2).*(t<=tt1)+(x(1)+v(1)*tt1+aa1*tt1.^2/2).*(t>tt1 & t<tt2)...
+                +((x(end)-v(end)*t(end)+aa2*t(end)^2/2)+v(end)*t+aa2*(t/2-t(end)).*t).*(t>tt2);  
+        end
+
+        if veh.direction>0
+            xRef = data(i).x_position_meters(1) + xRef;
+        else
+            xRef = data(i).x_position_meters(1) - xRef;
+        end
+
+        xNew = xRef/1609.344 - 0.225;
+        cellInd = xNew*0;
+        for j=1:length(gradeDataPoints)
+            cellInd(xNew-gradeDataPoints(j)>=0)=j;
+        end
+        
+        cellInd = min(max(cellInd,1),length(gradeDataPoints)-1);
+        xNewLocal = min(max(xNew,gradeDataPoints(1)),gradeDataPoints(end));
+
+
+        if veh.direction>0
+            thetaRef = asin((gradeDataSlope(cellInd).*xNewLocal(:)/100+gradeDataIntercept(cellInd)/100));
+        else
+            thetaRef = -asin((gradeDataSlope(cellInd).*xNewLocal(:)/100+gradeDataIntercept(cellInd)/100));
+        end
+
         % Identify the class of vehicles, in the original data file
         % 0=sedan 1=midsize 2=van 3=pickup 4=semi 5=truck 6=motorcycle(not present in data)
         C = veh.coarse_vehicle_class;
@@ -174,7 +219,35 @@ for fileNr = 1:24
         data(i).total_fuel_consumed_gallons = (1/2839.0588)*data(i).total_fuel_consumed_grams;
         data(i).total_fuel_economy_mpg = ((data(i).total_distance_traversed_meters)/1609.34)./...
             (data(i).total_fuel_consumed_gallons);
-        
+
+        % Fuel consumption rate of drive on flat road
+        eval(sprintf(['[fSFlat,~,infeasibleFlat] = fuel_model_'...
+            vehType '_simplified(v,a,v*0,true);']))    
+
+        data(i).fuel_rate_flat_road_grams_per_second = fSFlat;
+        data(i).percent_infeasibility_flat_road = length(infeasibleFlat(infeasibleFlat>0))/length(infeasibleFlat)*100; % percentage of infeasible drive
+        data(i).total_fuel_consumed_flat_road_grams = integrate(t,fSFlat); % total fuel 
+        data(i).total_fuel_consumed_flat_road_gallons = (1/2839.0588)*data(i).total_fuel_consumed_flat_road_grams;
+        data(i).total_fuel_economy_flat_road_mpg = ((data(i).total_distance_traversed_meters)/1609.34)./(data(i).total_fuel_consumed_flat_road_gallons);
+
+
+        % Fuel consumption rate of reference drive on road
+        eval(sprintf(['[fSRef,~,infeasibleRef] = fuel_model_'...
+            vehType '_simplified(vRef,aRef,thetaRef,true);']))
+
+        data(i).reference_fuel_rate_grams_per_second = fSRef;
+        data(i).percent_reference_infeasibility = length(infeasibleRef(infeasibleRef>0))/...
+            length(infeasibleRef)*100;  
+        data(i).total_reference_fuel_consumed_grams = integrate(t,fSRef); % total reference fuel 
+
+       % Fuel consumption rate of reference drive on flat road
+        eval(sprintf(['[fSRefFlat,~,infeasibleRef_flat] = fuel_model_'...
+            vehType '_simplified(vRef,aRef,vRef*0,true);']))
+
+        data(i).reference_fuel_rate_flat_road_grams_per_second = fSRefFlat;
+        data(i).percent_reference_infeasibility_flat_road = ...
+            length(infeasibleRef_flat(infeasibleRef_flat>0))/length(infeasibleRef_flat)*100;  
+        data(i).total_reference_fuel_consumed_flat_road_grams = integrate(t,fSRefFlat); 
         % Distance to av engaged US
         if ~isempty(distToAvsData(i).AvIdUSEng)
             data(i).upstream_engaged_av_id = distToAvsData(i).AvIdUSEng;
@@ -224,9 +297,11 @@ for fileNr = 1:24
     pause(5)
     fprintf('Done (%0.0fsec).\n',toc)
     fprintf('Encoding and Writing json file ... '),tic
-    fileStartT = (datetime(data(1).first_timestamp, 'convertfrom', 'posixtime', 'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
+    fileStartT = (datetime(data(1).first_timestamp, 'convertfrom', 'posixtime', ...
+        'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
     fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
-    filenameSave = ['2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Data_Slim\I-24MOTION_slim_',fileStartT];
+    filenameSave = [parentDirectory '\Data_2022-11-' num2str(DAY_TO_PROCESS)...
+        '__MVT_Full\I-24MOTION_',fileStartT];
     jsonStr = jsonencode(data);
     clear data
     fid = fopen([filenameSave '.json'], 'w');
@@ -236,7 +311,7 @@ for fileNr = 1:24
     clear jsonStr
     toc
 end
-
+rmpath([parentDirectory '\Models_Energy']);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%% Local Functions Definitions %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -246,10 +321,15 @@ data(1,n) = struct('trajectory_id', [],'timestamp',[],'x_position_meters',[],'y_
     'coarse_vehicle_class',[],'direction',[],'first_timestamp',[],'last_timestamp',[],...
     'starting_x',[],'ending_x',[],'length',[],'width',[],'height',[],...
     'total_distance_traversed_meters',[],'speed_meters_per_second',[],'acceleration_meters_per_second_per_second',[],...
-    'road_grade_radians',[],'lane_number',[],'energy_model',[],'fuel_rate_grams_per_second',[],...
+    'road_grade_radians',[],'lane_number',[],'reference_a1_meters_per_second_per_second',[],...
+    'reference_a2_meters_per_second_per_second',[],'energy_model',[],'fuel_rate_grams_per_second',[],...
     'percent_infeasibility',[],'total_fuel_consumed_grams',[],'total_fuel_consumed_gallons',[],...
-    'total_fuel_economy_mpg',[],'fuel_rate_flat_road_grams_per_second',[],'downstream_av_id',[],...
-    'distance_to_downstream_av_meters',[],'downstream_engaged_av_id',[],...
+    'total_fuel_economy_mpg',[],'fuel_rate_flat_road_grams_per_second',[],'percent_infeasibility_flat_road',[],...
+    'total_fuel_consumed_flat_road_grams',[],'total_fuel_consumed_flat_road_gallons',[],'total_fuel_economy_flat_road_mpg',[],...
+    'reference_fuel_rate_grams_per_second',[],'percent_reference_infeasibility',[],'total_reference_fuel_consumed_grams',[],...
+    'reference_fuel_rate_flat_road_grams_per_second',[],'percent_reference_infeasibility_flat_road',[],...
+    'total_reference_fuel_consumed_flat_road_grams',[],...
+    'downstream_av_id',[],'distance_to_downstream_av_meters',[],'downstream_engaged_av_id',[],...
     'distance_to_downstream_engaged_av_meters',[]);
 end
 
