@@ -1,31 +1,31 @@
 % Script to process AV GPS data from the MVT and produce JSON file for a
-% test day in the same directory.
-% (C) 2025/04/15 by Sulaiman Almatrudi
+% test day.
+% (C) 2025 by Sulaiman Almatrudi
 
 clearvars -except DAY_TO_PROCESS
 if ~exist('DAY_TO_PROCESS', 'var')
     global DAY_TO_PROCESS
-    DAY_TO_PROCESS = input('Enter the day of Nov. 2022 MVT to generate AVs GPS data files (from 16 to 18): ');
+    DAY_TO_PROCESS = input(['Enter the day of Nov. 2022 MVT to generate AVs '...
+        'GPS data files (from 16 to 18): ']);
 end
 fprintf('Starting the assembly of AV GPS data for %dth Nov. 2022\n', DAY_TO_PROCESS);
-
 %========================================================================
 % Parameters
 %========================================================================
-%%%% Threshold choices for matching AVs GPS to I24 MOTION trajectories 
+%%%% Threshold choices for matching AVs GPS to I24 MOTION trajectories
 maxMatchDist = 6; %[m] maximum distance between AVs GPS trajectories and potential matching I24 trajectories
-maxMatchSpdDiff = 2; % [m/s] maximum speed difference 
-maxMatchLaneDiff = 0.5; %[lane] % maximum estimated lane difference 
-minMatchTime = 3; % [s] minimum matching time 
+maxMatchSpdDiff = 2; % [m/s] maximum speed difference
+maxMatchLaneDiff = 0.5; %[lane] % maximum estimated lane difference
+minMatchTime = 3; % [s] minimum matching time
 %========================================================================
 % Load, parse and preprocess AVs GPS data
 %========================================================================
 [parentDirectory, ~, ~] = fileparts(pwd);
-gpsFolderPath = fullfile(parentDirectory,'\Data_GPS') ;
+gpsFolderPath = fullfile(parentDirectory,'\Data\Data_GPS') ;
 if ~isfolder(gpsFolderPath)
     error('Folder %s does not exist.\n',gpsFolderPath)
 end
-% Parse av files 
+% Parse av files
 fprintf('Parsing AV data... ') ; tic
 dataGPS0 = parse_gps_data(gpsFolderPath);
 nAVruns = length(dataGPS0);
@@ -45,7 +45,7 @@ maxAVStart = max([dataGPS0([dataGPS0.ending_time]<dataTLimits(2)).ending_time]);
 maxFileNr = min(24,floor((maxAVStart-dataTLimits(1))/600)+1);
 
 % Find I24 MOTION data files in folder
-dataFolderPath = fullfile(parentDirectory,['Data_2022-11-' num2str(DAY_TO_PROCESS) ...
+dataFolderPath = fullfile(parentDirectory,['Data\Data_2022-11-' num2str(DAY_TO_PROCESS) ...
     '__I24_Base']) ;
 if ~isfolder(dataFolderPath)
     error('Folder %s does not exist.\n',dataFolderPath)
@@ -153,7 +153,7 @@ for fileNr = minFileNr:maxFileNr
 
         end
     end
-fprintf('Done (%0.0fsec).\n',toc)
+    fprintf('Done (%0.0fsec).\n',toc)
 end
 matchedSegments(d:end) = [];
 % Calculate median offset between GPS and I24 matched signals
@@ -174,7 +174,8 @@ end
 % Add controller status and clean data structure
 %========================================================================
 fprintf('Adding controller status and preparing output data... ');tic
-avPingsData = readtable(fullfile(gpsFolderPath, ['veh_ping_202211' num2str(DAY_TO_PROCESS) '.csv']));
+avPingsData = readtable(fullfile(gpsFolderPath, ['veh_ping_202211' ...
+    num2str(DAY_TO_PROCESS) '.csv']));
 avVINs = readtable([gpsFolderPath '\veh_vins.csv']);
 avConnectionStatus  = get_connection_status(avPingsData,avVINs);
 nAVs = length(dataGPS0);
@@ -231,7 +232,7 @@ for avInd =1:nAVs
 end
 
 % Clip trajectories at testbed limits and prepare data for writitng
-XLIMS = [-400 2.54e4] *0.3048; % testbed limits 
+XLIMS = [-400 2.54e4] *0.3048; % testbed limits
 gpsDataFields = string(fieldnames(dataGPS));
 for avInd = 1:length(dataGPS)
     inTestBed = dataGPS(avInd).x_position > XLIMS(1) & dataGPS(avInd).x_position < XLIMS(2);
@@ -602,84 +603,84 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function veh1  = get_control_car_status(veh)
-    veh1 = veh;
-    if veh.speed == 0 % calculate speed from position if can speed is unavailable
-        x = veh.x_position(:);
-        vehSpeed0 = (x(2:end) - x(1:end-1))./(x(2:end) - x(1:end-1));
-        vehSpeed0 = round(abs([vehSpeed0;vehSpeed0(end)])*2)/2;
-        paddedSpeed = [zeros(5,1);vehSpeed0;zeros(5,1)];
-        vehSpeed = movmedian(paddedSpeed,10);
-        vehSpeed = vehSpeed(6:end-5);
-    end
-    vehSpeed = veh.speed(:);
-    tempControlCarStatus = -1*ones(size(veh.controller_engaged));
-    controlActive = veh.controller_engaged(:);
-    shiftedIndControlActive = [controlActive(2:end);controlActive(end)];
-    indActiveMoving = controlActive & vehSpeed~=0;
-    tempControlCarStatus(indActiveMoving) = 1;
-    indNotActiveMoving = ~controlActive & vehSpeed~=0;
-    tempControlCarStatus(indNotActiveMoving) = 0;
-    indActiveStopped = controlActive & vehSpeed==0;
-    indActiveStopped = find(indActiveStopped);
+veh1 = veh;
+if veh.speed == 0 % calculate speed from position if can speed is unavailable
+    x = veh.x_position(:);
+    vehSpeed0 = (x(2:end) - x(1:end-1))./(x(2:end) - x(1:end-1));
+    vehSpeed0 = round(abs([vehSpeed0;vehSpeed0(end)])*2)/2;
+    paddedSpeed = [zeros(5,1);vehSpeed0;zeros(5,1)];
+    vehSpeed = movmedian(paddedSpeed,10);
+    vehSpeed = vehSpeed(6:end-5);
+end
+vehSpeed = veh.speed(:);
+tempControlCarStatus = -1*ones(size(veh.controller_engaged));
+controlActive = veh.controller_engaged(:);
+shiftedIndControlActive = [controlActive(2:end);controlActive(end)];
+indActiveMoving = controlActive & vehSpeed~=0;
+tempControlCarStatus(indActiveMoving) = 1;
+indNotActiveMoving = ~controlActive & vehSpeed~=0;
+tempControlCarStatus(indNotActiveMoving) = 0;
+indActiveStopped = controlActive & vehSpeed==0;
+indActiveStopped = find(indActiveStopped);
 
-    if ~isempty(indActiveStopped)
-        for k = 1:length(indActiveStopped)
-            tempIndActiveStopped = indActiveStopped(k);
-            tempIndEndActiveStopped = find(controlActive);
-            tempIndEndActiveStopped = tempIndEndActiveStopped(find(tempIndEndActiveStopped > tempIndActiveStopped,1))-1;
-            if isempty(tempIndEndActiveStopped) ; tempIndEndActiveStopped = length(veh.timestamp);end
+if ~isempty(indActiveStopped)
+    for k = 1:length(indActiveStopped)
+        tempIndActiveStopped = indActiveStopped(k);
+        tempIndEndActiveStopped = find(controlActive);
+        tempIndEndActiveStopped = tempIndEndActiveStopped(find(tempIndEndActiveStopped > tempIndActiveStopped,1))-1;
+        if isempty(tempIndEndActiveStopped) ; tempIndEndActiveStopped = length(veh.timestamp);end
 
-            if sum(vehSpeed(tempIndActiveStopped:tempIndEndActiveStopped)>0) < min(10,tempIndEndActiveStopped-tempIndActiveStopped+2)
-                tempControlCarStatus(tempIndActiveStopped:tempIndEndActiveStopped) = 1;
+        if sum(vehSpeed(tempIndActiveStopped:tempIndEndActiveStopped)>0) < min(10,tempIndEndActiveStopped-tempIndActiveStopped+2)
+            tempControlCarStatus(tempIndActiveStopped:tempIndEndActiveStopped) = 1;
 
-            else
-                tempControlCarStatus(tempIndActiveStopped:tempIndEndActiveStopped) = 0;
-            end
+        else
+            tempControlCarStatus(tempIndActiveStopped:tempIndEndActiveStopped) = 0;
         end
     end
+end
 
-    tempControlCarStatus(indActiveStopped) = 1;
-    indNotActiveStopped = find(~controlActive(1:end-1) & vehSpeed(1:end-1)~=0 & vehSpeed(2:end)==0);
-    if ~isempty(indNotActiveStopped)
-        for k = 1:length(indNotActiveStopped)
-            tempIndNotActiveStopped = indNotActiveStopped(k);
-            tempIndEndNotActiveStopped = find(controlActive | vehSpeed~=0);
-            tempIndEndNotActiveStopped = tempIndEndNotActiveStopped(find(tempIndEndNotActiveStopped > tempIndNotActiveStopped,1))-1;
-            if isempty(tempIndEndNotActiveStopped) ; tempIndEndNotActiveStopped = length(veh.timestamp);end
+tempControlCarStatus(indActiveStopped) = 1;
+indNotActiveStopped = find(~controlActive(1:end-1) & vehSpeed(1:end-1)~=0 & vehSpeed(2:end)==0);
+if ~isempty(indNotActiveStopped)
+    for k = 1:length(indNotActiveStopped)
+        tempIndNotActiveStopped = indNotActiveStopped(k);
+        tempIndEndNotActiveStopped = find(controlActive | vehSpeed~=0);
+        tempIndEndNotActiveStopped = tempIndEndNotActiveStopped(find(tempIndEndNotActiveStopped > tempIndNotActiveStopped,1))-1;
+        if isempty(tempIndEndNotActiveStopped) ; tempIndEndNotActiveStopped = length(veh.timestamp);end
 
-            tempControlCarStatus(tempIndNotActiveStopped:tempIndEndNotActiveStopped) = 0;
+        tempControlCarStatus(tempIndNotActiveStopped:tempIndEndNotActiveStopped) = 0;
+    end
+end
+
+if sum(tempControlCarStatus==-1)>0
+
+    accelerationB = vehSpeed(2:end)-vehSpeed(1:end-1);
+    accelerationF = [accelerationB;accelerationB(end)];
+    accelerationB = [accelerationB(1); accelerationB];
+
+    indActiveStoppedStart = find(controlActive & vehSpeed==0 & accelerationB < 0 );
+    indActiveStoppedEnd = find((controlActive|[controlActive(2:end);controlActive(end)]) & vehSpeed==0 & accelerationF > 0);
+    for ii = 1:length(indActiveStoppedStart)
+        tempIndStart = indActiveStoppedStart(ii);
+        if ii>length(indActiveStoppedEnd)
+            tempIndEnd = length(vehSpeed) - 1;
+        else
+            tempIndEnd = indActiveStoppedEnd(ii);
+        end
+        if controlActive(tempIndEnd+1)
+            tempControlCarStatus(tempIndStart:tempIndEnd) = ones(tempIndEnd-tempIndStart+1,1);
+        else
+            tempControlCarStatus(tempIndStart:tempIndEnd) = zeros(tempIndEnd-tempIndStart+1,1);
         end
     end
+end
+tempControlCarStatus(tempControlCarStatus==-1) = 0 ;
 
-    if sum(tempControlCarStatus==-1)>0
-
-        accelerationB = vehSpeed(2:end)-vehSpeed(1:end-1);
-        accelerationF = [accelerationB;accelerationB(end)];
-        accelerationB = [accelerationB(1); accelerationB];
-
-        indActiveStoppedStart = find(controlActive & vehSpeed==0 & accelerationB < 0 );
-        indActiveStoppedEnd = find((controlActive|[controlActive(2:end);controlActive(end)]) & vehSpeed==0 & accelerationF > 0);
-        for ii = 1:length(indActiveStoppedStart)
-            tempIndStart = indActiveStoppedStart(ii);
-            if ii>length(indActiveStoppedEnd)
-                tempIndEnd = length(vehSpeed) - 1;
-            else
-                tempIndEnd = indActiveStoppedEnd(ii);
-            end
-            if controlActive(tempIndEnd+1)
-                tempControlCarStatus(tempIndStart:tempIndEnd) = ones(tempIndEnd-tempIndStart+1,1);
-            else
-                tempControlCarStatus(tempIndStart:tempIndEnd) = zeros(tempIndEnd-tempIndStart+1,1);
-            end
-        end
-    end
-    tempControlCarStatus(tempControlCarStatus==-1) = 0 ; 
-
-    tempLast30 = [];
-    for k =1:length(veh.timestamp)
-        tempLast30(k,1) = logical(sum(tempControlCarStatus(max(1,k-300):k))>0);
-    end
-    veh1.control_car = tempControlCarStatus;
-    veh1.control_last30 = tempLast30;
+tempLast30 = [];
+for k =1:length(veh.timestamp)
+    tempLast30(k,1) = logical(sum(tempControlCarStatus(max(1,k-300):k))>0);
+end
+veh1.control_car = tempControlCarStatus;
+veh1.control_last30 = tempLast30;
 end
 

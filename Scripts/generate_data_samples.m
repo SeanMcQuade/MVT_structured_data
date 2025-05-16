@@ -1,6 +1,7 @@
 % Run to generate data samples in .mat format for generating fuel consumption figures.
-% (C) 11/8/2024 by Sulaiman Almatrudi for CIRCLES energy team; further adapted by Sean McQuade for CIRCLES scenario team.
-% This licensed under BSD-3 clause license: https://opensource.org/license/bsd-3-clause
+% (C) 2025 by Sulaiman Almatrudi for CIRCLES energy team; 
+% further adapted by Sean McQuade for CIRCLES scenario team.
+% This is licensed under BSD-3 clause license: https://opensource.org/license/bsd-3-clause
 tic
 DAYS_TO_PROCESS = [16,17,18]; % /NOV/2022 Enter 16, 17, or 18 here.
 

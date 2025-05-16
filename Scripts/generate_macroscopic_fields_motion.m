@@ -1,6 +1,5 @@
-% Construct macroscopic fields based on I24-MOTION data files in the
-% same directory.
-% (C) Benjamin Seibold (edited by Sulaiman Almatrudi)
+% Construct macroscopic fields based on I24-MOTION data files 
+% (C) 2025 Benjamin Seibold (edited by Sulaiman Almatrudi)
 clearvars -except DAY_TO_PROCESS
 if ~exist('DAY_TO_PROCESS', 'var')
     global DAY_TO_PROCESS
@@ -39,8 +38,9 @@ elseif strcmp(kernel,'Gaussian')
 end
 % Find all data files in folder
 [parentDirectory, ~, ~] = fileparts(pwd);
-dataFolderPath = fullfile(parentDirectory,['Data_2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Slim']);
-data_files = dir([dataFolderPath '\I-24MOTION_slim_*.json']);
+dataFolderPath = fullfile(parentDirectory,'Data',...
+    ['Data_2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Slim']);
+data_files = dir(fullfile(dataFolderPath ,'I-24MOTION_slim_*.json'));
 date_data = ['2022-11-' num2str(DAY_TO_PROCESS)]; % date of the data files
 ax_t = [posixtime(datetime([date_data,' ',ax_t{1}],'TimeZone','America/Chicago')),...
     posixtime(datetime([date_data,' ',ax_t{2}],'TimeZone','America/Chicago'))];
@@ -180,8 +180,8 @@ end
 %========================================================================
 % Save fields
 %========================================================================
-filename = [parentDirectory '\Data_Macroscopic_Fields\fields_motion_2022-11-'...
-    num2str(DAY_TO_PROCESS)  '.mat'];
+filename = fullfile(parentDirectory ,'Data','Data_for_Figures',...
+    ['fields_motion_2022-11-' num2str(DAY_TO_PROCESS)  '.mat']);
 fprintf('Saving file %s ...',filename), tic
 save(filename,'field','t','x','direction','lane')
 fprintf(' Done (%0.0fsec).\n',toc)

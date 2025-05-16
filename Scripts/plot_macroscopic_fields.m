@@ -1,7 +1,6 @@
-% Construct macroscopic fields based on I24-MOTION data files in the
-% same directory.
-% Specific for Nature
-% (C) Benjamin Seibold (edited by Sulaiman Almatrudi)
+% Plot macroscopic fields based on I24-MOTION data for Nature.
+% (C) 2025 Benjamin Seibold (edited by Sulaiman Almatrudi)
+
 clearvars -except DAY_TO_PROCESS
 if ~exist('DAY_TO_PROCESS', 'var')
     global DAY_TO_PROCESS
@@ -13,8 +12,7 @@ end
 %========================================================================
 direction = -1; % -1=Westbound, 1=Eastbound
 lane = 0; % 0=all lanes
-%plot_fields = {'Rho','Q','F','F0','U','Phi','Phi0','Psi','Psi0'};
-plot_fields = {'U'};
+plot_fields = {'Rho','Q','F','F0','U','Phi','Phi0','Psi','Psi0'};
 flag_save_figures = 1; % if true, save figure into png file
 flag_plot_av_trajectories = 1; % if true, overlay fields with AV traces
 skip_t_plot = 1; % sub-sample trajectories for plotting
@@ -24,13 +22,13 @@ subfield_name_x = 'x_position';
 % Load data files
 %========================================================================
 [parentDirectory, ~, ~] = fileparts(pwd);
-filename = [ parentDirectory '\Data_Macroscopic_Fields\fields_motion_2022-11-'...
+filename = [ parentDirectory '\Data\Data_for_Figures\fields_motion_2022-11-'...
      num2str(DAY_TO_PROCESS) '.mat'];
 fprintf('Loading %s ...',filename), tic
 load(filename)
 fprintf(' Done (%0.0fsec).\n',toc)
 if flag_plot_av_trajectories
-    data_files = dir([parentDirectory '\Data_GPS\CIRCLES_GPS_10Hz_2022-11-'...
+    data_files = dir([parentDirectory '\Data\Data_GPS\CIRCLES_GPS_10Hz_2022-11-'...
          num2str(DAY_TO_PROCESS)  '.json']);
     filename = data_files(1).name; % if multiple files, use first one
     fprintf('Loading %s ...',filename), tic
@@ -74,8 +72,6 @@ for i = 1:length(plot_fields)
     figure
     Val = field.value.(field_plot)'*field.factor.(field_plot);
     % Interpolate field for plotting
-    %tq = (t(floor([1:.5:end]))+t(ceil([1:.5:end])))/2;
-    %xq = (x(floor([1:.5:end]))+x(ceil([1:.5:end])))/2;
     tq = linspace(min(t),max(t),4*(length(t)-1)+1);
     xq = linspace(min(x),max(x),4*(length(x)-1)+1);
     [T,X] = meshgrid(t,x);
@@ -83,8 +79,7 @@ for i = 1:length(plot_fields)
     Valq = interp2(T,X,Val,Tq,Xq);
     % Plot interpolated field
     imagesc(tq,xq/1000,Valq)
-    %clim([0,prctile(Val(:),99)]) % max out slightly below maximum
-    clim([0,0.20])
+    clim([0,prctile(Val(:),99)]) % max out slightly below maximum
     skip_t_data = round(length(t)/n_xticks);
     set(gca,'xtick',t(1:skip_t_data:end),'xticklabel',...
         string(datetime(t_local(1:skip_t_data:end),'Format','HH:mm:ss')))
@@ -149,7 +144,6 @@ for i = 1:length(plot_fields)
         filename = [parentDirectory '\Figures\' filename,'_nature_zoom_large'];
         fprintf('Save figure in %s ...',filename), tic
         set(gcf,'Position',[10 50 fig_res_zoom],'PaperPositionMode','auto')
-        %set(gca,'Position',[.045 .093 .852 .866])
         set(gca,'Position',[.045 .093 .858 .866])
         set(gca,'FontSize',20)
         print(filename,'-dpng','-r384');

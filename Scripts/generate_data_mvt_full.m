@@ -1,15 +1,17 @@
-% save_i24motiondata_v2_point_1_slim - (C) CIRCLES Energy team, 4/15/2025
+% save_i24motiondata_v2_point_1_slim
+% (C) 2025 CIRCLES Energy team 
 %
 % This script process v2.0 of the I-24 MOTION data from the MVT to generate
 % a slim version of CIRCLES' v2.1 of the data, used in the team nature
 % paper submission, and saves it to json files.
 %
-% Generated json files will be saved in \Data_{DATE}__MVT_Full folder.
+% Generated json files will be saved in .\Data\Data_{DATE}__MVT_Full folder.
 
 clearvars -except DAY_TO_PROCESS
 if ~exist('DAY_TO_PROCESS', 'var')
     global DAY_TO_PROCESS
-    DAY_TO_PROCESS = input('Enter the day of Nov. 2022 MVT to generate full MVT data files (from 16 to 18): ');
+    DAY_TO_PROCESS = input(['Enter the day of Nov. 2022 MVT to generate full'... 
+        'MVT data files (from 16 to 18): ']);
 end
 %========================================================================
 % Parameters
@@ -43,10 +45,11 @@ processingOpts.laneChangeClippingOpts.CHANGEBUFFERTHRESH = 0.2;
 % Initilize
 %========================================================================
 [parentDirectory, ~, ~] = fileparts(pwd);
-dataFolderPath = fullfile(parentDirectory,['Data_2022-11-' num2str(DAY_TO_PROCESS) '__I24_Base']);
+dataFolderPath = fullfile(parentDirectory,'Data',...
+    ['Data_2022-11-' num2str(DAY_TO_PROCESS) '__I24_Base']);
 dayAbbrvs = ["mon","tue","wed","thu","fri"];
 dayAbbrv = dayAbbrvs(DAY_TO_PROCESS-13);
-dataFiles = dir([dataFolderPath '\*_' char(dayAbbrv) '_0_*.json']);
+dataFiles = dir(fullfile(dataFolderPath, ['*_' char(dayAbbrv) '_0_*.json']));
 if length(dataFiles) < 24
     error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.',DAY_TO_PROCESS)
 end
@@ -54,7 +57,7 @@ end
 % Load GPS and road grade data
 %========================================================================
 % Load road grade map
-gradeData = readmatrix([parentDirectory '\Models_Energy\Eastbound_grade_fit.csv']);
+gradeData = readmatrix(fullfile(parentDirectory,'Models_Energy','Eastbound_grade_fit.csv'));
 % 0.225miles is the distance between mill creek origin (MM58.675) and MM58.9
 % the estimated origin of the road grade map
 gradeDataStart = gradeData(:,2);
@@ -64,12 +67,13 @@ gradeDataSlope = gradeData(:,4);
 gradeDataIntercept = gradeData(:,5);
 % GPS Data is assumed to be processed. Run create_data_GPS.m to produce processed GPS files
 fprintf('\nLoading and decoding AVs GPS data file ...'); tic
-dataGPS = jsondecode(fileread(fullfile(parentDirectory,['Data_GPS\CIRCLES_GPS_10Hz_2022-11-' num2str(DAY_TO_PROCESS) '.json'])));
+dataGPS = jsondecode(fileread(fullfile(parentDirectory,...
+    ['Data\Data_GPS\CIRCLES_GPS_10Hz_2022-11-' num2str(DAY_TO_PROCESS) '.json'])));
 fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Process each I24 MOTION file 
 %========================================================================
-addpath([parentDirectory '\Models_Energy']);
+addpath(fullfile(parentDirectory, 'Models_Energy'));
 for fileNr = 1:24
     % Load MOTION data file
     filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
@@ -300,8 +304,8 @@ for fileNr = 1:24
     fileStartT = (datetime(data(1).first_timestamp, 'convertfrom', 'posixtime', ...
         'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
     fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
-    filenameSave = [parentDirectory '\Data_2022-11-' num2str(DAY_TO_PROCESS)...
-        '__MVT_Full\I-24MOTION_',fileStartT];
+    filenameSave = fullfile(parentDirectory,'Data',...
+        ['Data_2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Full\I-24MOTION_',fileStartT]);
     jsonStr = jsonencode(data);
     clear data
     fid = fopen([filenameSave '.json'], 'w');
@@ -311,7 +315,7 @@ for fileNr = 1:24
     clear jsonStr
     toc
 end
-rmpath([parentDirectory '\Models_Energy']);
+rmpath(fullfile(parentDirectory ,'Models_Energy'));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%% Local Functions Definitions %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -341,10 +345,9 @@ function [dataLanes] = assign_lanes(baseFileName,laneIdentificationOpts)
 % Function that takes in original I24 v2 data and outputs lane identification at
 % each time step for all trajectories and adjusted y_position (ft)
 %
-% Input: baseFileName: json file name [char array] or data file [struct].
+% Input: baseFileName: json file name [char array] or data file     [struct].
 %        laneIdentificationOpts: Constants set for processing lane identification (refer to head of the script)
 %
-% Example: assign_lanes('2022-11-14_I-24MOTION_00.json')
 %
 % Output: dataLanes: struct with two fields:
 %       lane: assigned lane for all trajectories at each timestep
@@ -371,14 +374,20 @@ end
 % sample data
 N = length(data);
 xWest = []; yWest = [];
+xEast = []; yEast = [];
 for i=1:N
     veh = data(i);
     t = veh.timestamp;
     ts = t(2)-t(1);
     ss = ceil(1 / ts); %sample at 1 Hz
     if (t(end)-t(1))>5     %sample only trajectories > 5s , each second
-        xWest = [xWest, veh.x_position(1 :ss: end)'];
-        yWest = [yWest, veh.y_position(1 :ss: end)'];
+        if direction == -1   %westbound 
+            xWest = [xWest, veh.x_position(1 :ss: end)'];
+            yWest = [yWest, veh.y_position(1 :ss: end)'];
+        else                %eastbound    
+            xEast = [xEast, veh.x_position(1 :ss: end)'];
+            yEast = [yEast, veh.y_position(1 :ss: end)'];
+        end
     end
 end
 
@@ -391,17 +400,22 @@ Y_UP_LIM = laneIdentificationOpts.Y_UP_LIM;
 Y_LOW_LIM = laneIdentificationOpts.Y_LOW_LIM;
 upBoundY = LANEWIDTH*Y_UP_LIM;
 lowBoundY = LANEWIDTH*Y_LOW_LIM;
-
+yEast = -yEast;
 %remove outliers from the sampled data based on bounds
 xWest = xWest(yWest<=upBoundY & yWest>=lowBoundY);
 yWest = yWest(yWest<=upBoundY & yWest>=lowBoundY);
+xEast = xEast(yEast<=upBoundY & yEast>=lowBoundY);
+yEast = yEast(yEast<=upBoundY & yEast>=lowBoundY);
 
 xCellsWest = linspace(min(xWest),max(xWest),Nr_XCELLS+1);
+xCellsEast = linspace(min(xEast),max(xEast),Nr_XCELLS+1);
 
 drivingLineWest = zeros(1,Nr_XCELLS);
+drivingLineEast = zeros(1,Nr_XCELLS);
 
 for i = 1:Nr_XCELLS    
     yCellWest = yWest(xCellsWest(i)<xWest&xWest<=xCellsWest(i+1)) - LANEWIDTH/2; % points in this cell
+    yCellEast = yEast(xCellsEast(i)<xEast&xEast<=xCellsEast(i+1)) - LANEWIDTH/2; % points in this cell
     
     if length(yCellWest) > MINCELLSAMPLES
         p_j_w = cos(2*pi*yCellWest/LANEWIDTH); q_j_w = sin(2*pi*yCellWest/LANEWIDTH); %mapping shift to unit circle
@@ -410,15 +424,25 @@ for i = 1:Nr_XCELLS
     else
         drivingLineWest(i) = 0;
     end
+
+    if length(yCellEast) > MINCELLSAMPLES
+        p_j_e = cos(2*pi*yCellEast/LANEWIDTH); q_j_e = sin(2*pi*yCellEast/LANEWIDTH); %mapping shift to unit circle
+        dle_t = atan2(mean(q_j_e), mean(p_j_e))*LANEWIDTH/2/pi;   %find mean shift
+        drivingLineEast(i) = dle_t;
+    else
+        drivingLineEast(i) = 0;
+    end
     
 end
 
 xCellsWest = xCellsWest(1:end-1);
+xCellsEast = xCellsEast(1:end-1);
 
 
 %%% Lane assignment
 %set shifting factors used for y-position correction
-Se = laneIdentificationOpts.Se; Ce = laneIdentificationOpts.Ce; Sw = laneIdentificationOpts.Sw; Cw = laneIdentificationOpts.Cw;
+Se = laneIdentificationOpts.Se; Ce = laneIdentificationOpts.Ce; 
+Sw = laneIdentificationOpts.Sw; Cw = laneIdentificationOpts.Cw;
 dataLanes = struct([]);
 for i = 1: N
     veh = data(i);
@@ -428,12 +452,13 @@ for i = 1: N
     lane = zeros(size(y));
     n = length(laneTemp);
     
-    drivingLine = drivingLineWest;
-    xCells = xCellsWest;
-    
     % correct for wiggle in y
-    
-    dataLanes(i).y_corr = Sw * (y  - interp1(xCellsWest,drivingLineWest,x,'linear','extrap')) + Cw;
+    if veh.direction > 0
+        dataLanes(i).y_corr = - (Se * (y  - interp1(xCellsEast,drivingLineEast,x,'linear','extrap')) + Ce);
+    else
+        dataLanes(i).y_corr = Sw * (y  - interp1(xCellsWest,drivingLineWest,x,'linear','extrap')) + Cw;
+    end
+
     
     laneTemp = ((abs(dataLanes(i).y_corr) - LANEWIDTH/2) ./LANEWIDTH) ;
     laneTemp = max(0,min(5,(laneTemp)));

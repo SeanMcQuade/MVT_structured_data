@@ -1,15 +1,17 @@
-% save_i24motiondata_v2_point_1_slim - (C) CIRCLES Energy team, 4/15/2025
+% save_i24motiondata_v2_point_1_slim
+% (C) 2025 CIRCLES Energy team
 %
 % This script process v2.0 of the I-24 MOTION data from the MVT to generate
 % a slim version of CIRCLES' v2.1 of the data, used in the team nature
 % paper submission, and saves it to json files.
 %
-% Generated json files will be saved in \{DATE}__MVT_Data_Slim folder.
+% Generated json files will be saved in .\Data\{DATE}__MVT_Data_Slim folder.
 
 clearvars -except DAY_TO_PROCESS
 if ~exist('DAY_TO_PROCESS', 'var')
     global DAY_TO_PROCESS
-    DAY_TO_PROCESS = input('Enter the day of Nov. 2022 MVT to generate slim MVT data files (from 16 to 18): ');
+    DAY_TO_PROCESS = input(['Enter the day of Nov. 2022 MVT to generate slim'...
+        'MVT data files (from 16 to 18): ');
 end
 %========================================================================
 % Parameters
@@ -43,18 +45,21 @@ processingOpts.laneChangeClippingOpts.CHANGEBUFFERTHRESH = 0.2;
 % Initilize
 %========================================================================
 [parentDirectory, ~, ~] = fileparts(pwd);
-dataFolderPath = fullfile(parentDirectory,['Data_2022-11-' num2str(DAY_TO_PROCESS) '__I24_Base']);
+dataFolderPath = fullfile(parentDirectory,'Data',...
+    ['Data_2022-11-' num2str(DAY_TO_PROCESS) '__I24_Base']);
 dayAbbrvs = ["mon","tue","wed","thu","fri"];
 dayAbbrv = dayAbbrvs(DAY_TO_PROCESS-13);
-dataFiles = dir([dataFolderPath '\*_' char(dayAbbrv) '_0_*.json']);
+dataFiles = dir(fullfile(dataFolderPath ,['*_' char(dayAbbrv) '_0_*.json']));
 if length(dataFiles) < 24
-    error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.',DAY_TO_PROCESS)
+    error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.'...
+        ,DAY_TO_PROCESS)
 end
 %========================================================================
 % Load GPS and road grade data
 %========================================================================
 % Load road grade map
-gradeData = readmatrix([parentDirectory '\Models_Energy\Eastbound_grade_fit.csv']);
+gradeData = readmatrix(fullfile(parentDirectory,...
+    'Models_Energy','Eastbound_grade_fit.csv'));
 % 0.225miles is the distance between mill creek origin (MM58.675) and MM58.9
 % the estimated origin of the road grade map
 gradeDataStart = gradeData(:,2);
@@ -64,12 +69,13 @@ gradeDataSlope = gradeData(:,4);
 gradeDataIntercept = gradeData(:,5);
 % GPS Data is assumed to be processed. Run create_data_GPS.m to produce processed GPS files
 fprintf('\nLoading and decoding AVs GPS data file ...'); tic
-dataGPS = jsondecode(fileread(fullfile('GPS_Data',['CIRCLES_GPS_10Hz_2022-11-' num2str(DAY_TO_PROCESS) '.json'])));
+dataGPS = jsondecode(fileread(fullfile('Data','GPS_Data',...
+    ['CIRCLES_GPS_10Hz_2022-11-' num2str(DAY_TO_PROCESS) '.json'])));
 fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Process each I24 MOTION file 
 %========================================================================
-addpath([parentDirectory '\Models_Energy']);
+addpath(fullfule(parentDirectory, 'Models_Energy'));
 for fileNr = 1:24
     % Load MOTION data file
     filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
@@ -170,7 +176,8 @@ for fileNr = 1:24
             vehType '_simplified(v,a,theta,true);']))
         
         data(i).fuel_rate_grams_per_second = fS;
-        data(i).percent_infeasibility = length(infeasible(infeasible>0))/length(infeasible)*100; % percentage of infeasible drive
+        data(i).percent_infeasibility = length(infeasible(infeasible>0))/...
+            length(infeasible)*100; % percentage of infeasible drive
         data(i).total_fuel_consumed_grams = integrate(t,fS); % total fuel
         data(i).total_fuel_consumed_gallons = (1/2839.0588)*data(i).total_fuel_consumed_grams;
         data(i).total_fuel_economy_mpg = ((data(i).total_distance_traversed_meters)/1609.34)./...
@@ -216,7 +223,8 @@ for fileNr = 1:24
         
         for iField =2:length(dataFields)
             if isnumeric(data(i).(string(dataFields(iField))))
-                data(i).(string(dataFields(iField))) = round(data(i).(string(dataFields(iField))),4,'decimals');
+                data(i).(string(dataFields(iField))) = round(data(i).(...
+                    string(dataFields(iField))),4,'decimals');
             end
         end
         
@@ -225,10 +233,11 @@ for fileNr = 1:24
     pause(5)
     fprintf('Done (%0.0fsec).\n',toc)
     fprintf('Encoding and Writing json file ... '),tic
-    fileStartT = (datetime(data(1).first_timestamp, 'convertfrom', 'posixtime', 'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
+    fileStartT = (datetime(data(1).first_timestamp, 'convertfrom', 'posixtime',...
+        'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
     fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
-    filenameSave = [parentDirectory '\Data_2022-11-' num2str(DAY_TO_PROCESS)...
-        '__MVT_Slim\I-24MOTION_slim_',fileStartT];    
+    filenameSave = fullfile(parentDirectory, 'Data',...
+        ['Data_2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Slim\I-24MOTION_slim_',fileStartT]);    
     jsonStr = jsonencode(data);
     clear data
     fid = fopen([filenameSave '.json'], 'w');
@@ -238,7 +247,7 @@ for fileNr = 1:24
     clear jsonStr
     toc
 end
-rmpath([parentDirectory '\Models_Energy']);
+rmpath(fullfule(parentDirectory, 'Models_Energy'));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%% Local Functions Definitions %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -340,7 +349,7 @@ xCellsWest = xCellsWest(1:end-1);
 
 %%% Lane assignment
 %set shifting factors used for y-position correction
-Se = laneIdentificationOpts.Se; Ce = laneIdentificationOpts.Ce; Sw = laneIdentificationOpts.Sw; Cw = laneIdentificationOpts.Cw;
+Sw = laneIdentificationOpts.Sw; Cw = laneIdentificationOpts.Cw;
 dataLanes = struct([]);
 for i = 1: N
     veh = data(i);
@@ -350,8 +359,6 @@ for i = 1: N
     lane = zeros(size(y));
     n = length(laneTemp);
     
-    drivingLine = drivingLineWest;
-    xCells = xCellsWest;
     
     % correct for wiggle in y
     
@@ -392,7 +399,8 @@ function newData = clip_lane_changes(data,dataLanes,opts)
 %
 
 LANECHANGETHRSH = opts.LANECHANGETHRSH;         % Threshold to identify lane change as a multiplier of lane width
-MAXLANECHANGERATE = opts.MAXLANECHANGERATE;     % Threshold for maximum rate of change in the identified lane for which trajectory is assumed to not change lane as a multiplier of lane width
+MAXLANECHANGERATE = opts.MAXLANECHANGERATE;     % Threshold for maximum rate of change in the identified lane for which 
+                                                % trajectory is assumed to not change lane as a multiplier of lane width
 MINCLIPTIME = opts.MINCLIPTIME;                 % Minimum duration for a clipped trajectory in seconds
 CHANGEBUFFERTHRESH = opts.CHANGEBUFFERTHRESH;   % Buffer threshold to ensure full lane change as a multiplier of lane width
 
@@ -532,7 +540,8 @@ for i = 1:num_trajs
     tempX = 0.3048*(tempX-309804.125);
     tempLane = veh.lane;
     tempDir = veh.direction;
-    avsOnRoad = find([dataGPS.assigned_lane]==tempLane& [dataGPS.direction] == tempDir & tempT(1)< [dataGPS.last_timestamp] & tempT(end)>[dataGPS.first_timestamp]);
+    avsOnRoad = find([dataGPS.assigned_lane]==tempLane& [dataGPS.direction] ==...
+        tempDir & tempT(1)< [dataGPS.last_timestamp] & tempT(end)>[dataGPS.first_timestamp]);
     
     if ~isempty(avsOnRoad)
         
