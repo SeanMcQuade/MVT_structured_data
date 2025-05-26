@@ -454,6 +454,7 @@ for i = 1: N
     
     % correct for wiggle in y
     if veh.direction > 0
+        y = -y;
         dataLanes(i).y_corr = - (Se * (y  - interp1(xCellsEast,drivingLineEast,x,'linear','extrap')) + Ce);
     else
         dataLanes(i).y_corr = Sw * (y  - interp1(xCellsWest,drivingLineWest,x,'linear','extrap')) + Cw;

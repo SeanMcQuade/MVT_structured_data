@@ -11,7 +11,7 @@ end
 % Parameters
 %========================================================================
 direction = -1; % -1=Westbound, 1=Eastbound
-lane = 0; % 0=all lanes
+lane = 0; % 0= all lanes
 plot_fields = {'Rho','Q','F','F0','U','Phi','Phi0','Psi','Psi0'};
 flag_save_figures = 1; % if true, save figure into png file
 flag_plot_av_trajectories = 1; % if true, overlay fields with AV traces
@@ -131,8 +131,6 @@ for i = 1:length(plot_fields)
     end
 
     % Conduct zoom
-    %xlim(axx+diff(axx)*[0.42 -0.17])
-    %xlim(axx+diff(axx)*[100.8 -40.8]/240)
     xlim(axx+diff(axx)*[100 -40]/240) % 07:40-09:20
     if flag_save_figures % save figure
         filename = sprintf('fig_field_%s_%s_%s_motion_%s',...
