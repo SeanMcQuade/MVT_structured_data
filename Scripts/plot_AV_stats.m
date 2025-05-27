@@ -6,18 +6,19 @@
 % https://opensource.org/license/bsd-3-clause
 
 clear
-
-statsToPlotChoice = ["effective"]; % select or multiple stats to plot from ["mean" "median" effective"]
+% select or multiple stats to plot from ["mean" "median" effective"]
+%statsToPlotChoice = ["effective"];  %reproduces Fig 2
+statsToPlotChoice = ["effective","mean","median"]; %reproduces Fig. SM 3 
 MAXDIST = 350; % (m) maximum relative distance to an ego vehicle to be considered
 XWINDOW = [MAXDIST-122 7000]; % (m) , [West to East] set to -1 to include the full testbed.
 AVLOCBUFFER = 1; % (m) buffer around 0 distance from av within which data is not considered.
-TWINDOW = [0645, 0915]; % time windows of intrest in military time
+TWINDOW = [0645, 0915]; % time window of intrest in military time
 flagSave = true; % save figures
 minSpdRaw = 0; %(m/s) minimum speed to filter for all samples
 minSpdMean = 1; % (m/s) minimum speed for samples when calculating the mean fuel consumption
 
 figRes = [1600 1000];
-figScale = '-r192';
+figScale = '-r384';
 plotCol = [0,0,1;1,0,0;0,.6,0]; %Plotting colors
 
 [parentDirectory, ~, ~] = fileparts(pwd);
@@ -310,6 +311,34 @@ if flagSave
     print(fname,'-dpng',figScale);
     savefig(fname)
 end
+
+figure(2)
+axx = 350;
+axy = [0, 1400000]; % [400000, 1400000]
+equispacedBins = fix(binCenters);
+weekDaysStr = ["Wednesday","Thursday","Friday"];
+for i =1:length(testDays)
+    subplot(3,1,i)
+    countsTemp = binCounts(i,:);
+    countsTemp(floor(length(countsTemp))+1) = [];
+    bar(equispacedBins,countsTemp )
+    hold on
+    plot([0,0],axy,'k:','LineWidth',1.5)
+    plot([-30,-30],axy,'r:','LineWidth',2.5)
+    plot([30,30],axy,'r:','LineWidth',2.5)
+    title(weekDaysStr(i),'FontSize',fontsize)
+    xlabel('Distance to nearest AV in same lane (m)','FontSize',fontsize)
+    ylabel('number of data points','FontSize',fontsize)
+    axis([-axx,axx,axy])
+
+    text(axx*.2,axy(1)+diff(axy)*.8,'behind AV','FontSize',fontsize,...
+        'HorizontalAlignment','left','VerticalAlignment','bottom')
+    text(-axx*.2,axy(1)+diff(axy)*.8,'ahead of AV','FontSize',fontsize,...
+        'HorizontalAlignment','right','VerticalAlignment','bottom')
+    hold off
+    set(gca,'fontsize',18)
+end
+
 fprintf('Done (%0.0fsec).\n',toc)
 
 

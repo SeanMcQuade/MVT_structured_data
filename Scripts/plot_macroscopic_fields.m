@@ -12,11 +12,12 @@ end
 %========================================================================
 direction = -1; % -1=Westbound, 1=Eastbound
 lane = 0; % 0= all lanes
-plot_fields = {'Rho','Q','F','F0','U','Phi','Phi0','Psi','Psi0'};
-flag_save_figures = 1; % if true, save figure into png file
-flag_plot_av_trajectories = 1; % if true, overlay fields with AV traces
-skip_t_plot = 1; % sub-sample trajectories for plotting
-subfield_name_x = 'x_position';
+plotFields = {'Rho','Q','F','F0','U','Phi','Phi0','Psi','Psi0'};
+flagSaveFigures = 1; % if true, save figure into png file
+flagPlotAvTrajectories = 1; % if true, overlay fields with AV traces
+skipTPlot = 1; % sub-sample trajectories for plotting
+subfieldNameX = 'x_position';
+timeZoomWindow = [0610 0950]; % time window of intrest to zoom into in military time
 
 %========================================================================
 % Load data files
@@ -27,10 +28,10 @@ filename = [ parentDirectory '\Data\Data_for_Figures\fields_motion_2022-11-'...
 fprintf('Loading %s ...',filename), tic
 load(filename)
 fprintf(' Done (%0.0fsec).\n',toc)
-if flag_plot_av_trajectories
-    data_files = dir([parentDirectory '\Data\Data_GPS\CIRCLES_GPS_10Hz_2022-11-'...
+if flagPlotAvTrajectories
+    dataFiles = dir([parentDirectory '\Data\Data_GPS\CIRCLES_GPS_10Hz_2022-11-'...
          num2str(DAY_TO_PROCESS)  '.json']);
-    filename = data_files(1).name; % if multiple files, use first one
+    filename = dataFiles(1).name; % if multiple files, use first one
     fprintf('Loading %s ...',filename), tic
     fid = fopen(filename);
     data = fread(fid,inf);
@@ -47,30 +48,30 @@ end
 %========================================================================
 % Plot results
 %========================================================================
-fig_res = [2500 800]; fig_res_zoom = [1250 800];
+figRes = [2500 800]; figResZoom = [1250 800];
 n_xticks = 16; % number of time ticks
 close all
-for i = 1:length(plot_fields)
-    field_plot = plot_fields{i};
+for i = 1:length(plotFields)
+    fieldPlot = plotFields{i};
     if direction<0
-        direction_name = 'Westbound';
-        direction_fname = 'west';
+        directionName = 'Westbound';
+        directionFname = 'west';
     else
-        direction_name = 'Eastound';
-        direction_fname = 'east';
+        directionName = 'Eastound';
+        directionFname = 'east';
     end
     if lane>0
-        lane_name = sprintf('lane %d',lane);
-        lane_fname = sprintf('lane%d',lane);
+        laneName = sprintf('lane %d',lane);
+        laneFname = sprintf('lane%d',lane);
     else
-        lane_name = 'all lanes';
-        lane_fname = 'laneall';
+        laneName = 'all lanes';
+        laneFname = 'laneall';
     end
     fprintf('Produce figure ...'), tic
     t_local = datetime(t,'ConvertFrom','posixtime',...
         'TimeZone','America/Chicago');
     figure
-    Val = field.value.(field_plot)'*field.factor.(field_plot);
+    Val = field.value.(fieldPlot)'*field.factor.(fieldPlot);
     % Interpolate field for plotting
     tq = linspace(min(t),max(t),4*(length(t)-1)+1);
     xq = linspace(min(x),max(x),4*(length(x)-1)+1);
@@ -83,22 +84,22 @@ for i = 1:length(plot_fields)
     skip_t_data = round(length(t)/n_xticks);
     set(gca,'xtick',t(1:skip_t_data:end),'xticklabel',...
         string(datetime(t_local(1:skip_t_data:end),'Format','HH:mm:ss')))
-    [~,weekday_name] = weekday(t_local(1),'long');
+    [~,weekdayName] = weekday(t_local(1),'long');
     title(sprintf('%s (%s) on %s %s: %s',...
-        direction_name,lane_name,weekday_name,...
+        directionName,laneName,weekdayName,...
         datetime(t_local(1),'Format','d-MMM-y'),...
-        field.name.(field_plot)))
-    hl = colorbar; hl.Label.String = field.unit.(field_plot);
-    if flag_plot_av_trajectories
+        field.name.(fieldPlot)))
+    hl = colorbar; hl.Label.String = field.unit.(fieldPlot);
+    if flagPlotAvTrajectories
         hold on
         for j = ind % add trajectories
             ind_e = find(data(j).controller_engaged'==0);
-            traj_t = data(j).timestamp(ind_e(1:skip_t_plot:end));
-            traj_x = data(j).(subfield_name_x)(ind_e(1:skip_t_plot:end));
+            traj_t = data(j).timestamp(ind_e(1:skipTPlot:end));
+            traj_x = data(j).(subfieldNameX)(ind_e(1:skipTPlot:end));
             plot(traj_t,traj_x/1000,'w.','MarkerSize',3)
             ind_e = find(data(j).controller_engaged'==1);
-            traj_t = data(j).timestamp(ind_e(1:skip_t_plot:end));
-            traj_x = data(j).(subfield_name_x)(ind_e(1:skip_t_plot:end));
+            traj_t = data(j).timestamp(ind_e(1:skipTPlot:end));
+            traj_x = data(j).(subfieldNameX)(ind_e(1:skipTPlot:end));
             plot(traj_t,traj_x/1000,'r.','MarkerSize',3)
         end
         hl = [plot(0,0,'r.','MarkerSize',26);...
@@ -111,38 +112,26 @@ for i = 1:length(plot_fields)
     fprintf(' Done (%0.0fsec).\n',toc)
 
     % Conduct zoom
+    lowHour = floor(timeZoomWindow(1)/100); 
+    lowMinutes = mod(timeZoomWindow(1),100);
+    lowShift = min(240,max(0,(lowHour - 6)*60 + lowMinutes)) ;
+    upHour = floor(timeZoomWindow(2)/100); 
+    upMinutes = mod(timeZoomWindow(2),100);
+    upShift = max(-240,min(0,(upHour - 6)*60 + upMinutes)-240) ;
     axx = xlim;
-    xlim(axx+diff(axx)*[10 -10]/240) % 06:10-09:50
-    if flag_save_figures % save figure
+    xlim(axx+diff(axx)*[lowShift upShift]/240) 
+    if flagSaveFigures % save figure
         filename = sprintf('fig_field_%s_%s_%s_motion_%s',...
             datetime(t_local(1),'Format','yyyyMMdd'),...
-            direction_fname,lane_fname,field_plot);
-        if flag_plot_av_trajectories
+            directionFname,laneFname,fieldPlot);
+        if flagPlotAvTrajectories
             filename = [filename,'_av'];
         end
         filename = [parentDirectory '\Figures\' filename,'_nature_large'];
         fprintf('Save figure in %s ...',filename), tic
-        set(gcf,'Position',[10 50 fig_res],'PaperPositionMode','auto')
+        set(gcf,'Position',[10 50 figRes],'PaperPositionMode','auto')
         %set(gca,'Position',[.023 .093 .901 .866])
         set(gca,'Position',[.023 .093 .929 .866])
-        set(gca,'FontSize',20)
-        print(filename,'-dpng','-r384');
-        fprintf(' Done (%0.0fsec).\n',toc)
-    end
-
-    % Conduct zoom
-    xlim(axx+diff(axx)*[100 -40]/240) % 07:40-09:20
-    if flag_save_figures % save figure
-        filename = sprintf('fig_field_%s_%s_%s_motion_%s',...
-            datetime(t_local(1),'Format','yyyyMMdd'),...
-            direction_fname,lane_fname,field_plot);
-        if flag_plot_av_trajectories
-            filename = [filename,'_av'];
-        end
-        filename = [parentDirectory '\Figures\' filename,'_nature_zoom_large'];
-        fprintf('Save figure in %s ...',filename), tic
-        set(gcf,'Position',[10 50 fig_res_zoom],'PaperPositionMode','auto')
-        set(gca,'Position',[.045 .093 .858 .866])
         set(gca,'FontSize',20)
         print(filename,'-dpng','-r384');
         fprintf(' Done (%0.0fsec).\n',toc)

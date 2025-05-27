@@ -100,7 +100,7 @@ for fileNr = minFileNr:maxFileNr
         for ii2 = 1:length(possTrajsMatch)
             traj = dataTemp(possTrajsMatch(ii2));
             trajLane =  dataLanes(possTrajsMatch(ii2)).lane;
-            trajX = (traj.x_position-309804.125);
+            trajX = (traj.x_position-309804.0625);
             trajT = traj.timestamp;
             trajV = diff(trajX)./diff(trajT);
             trajV = [trajV(1);trajV]*0.3048;
@@ -296,6 +296,7 @@ for iFile = 1:nrFiles
     tempVin =  tempVin(tempVin>='0' & tempVin<='9');
     vinsWithFiles(iFile) = str2double(tempVin);
 end
+fprintf(['\n' num2str(nrFiles) ' vehicles GPS files found...\n'])
 
 %========================================================================
 % Load and parse GPS data for each AV for the specified day
@@ -306,7 +307,6 @@ for vin = 1:length(vins)
     if ismember(vin,vinsWithFiles)
         vehTable = readtable([gpsDataFolder '\circles_v2_1_car' num2str(vin) '.csv'],opts1);
     else
-        fprintf(['data file for car ' num2str(vin) ' not found \n'])
         continue
     end
     % Filter data for the day

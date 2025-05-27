@@ -10,8 +10,8 @@
 clearvars -except DAY_TO_PROCESS
 if ~exist('DAY_TO_PROCESS', 'var')
     global DAY_TO_PROCESS
-    DAY_TO_PROCESS = input(['Enter the day of Nov. 2022 MVT to generate slim'...
-        'MVT data files (from 16 to 18): ');
+    DAY_TO_PROCESS = input(['Enter the day of Nov. 2022 to generate slim '...
+        'MVT data files (from 16 to 18): ']);
 end
 %========================================================================
 % Parameters
@@ -60,8 +60,6 @@ end
 % Load road grade map
 gradeData = readmatrix(fullfile(parentDirectory,...
     'Models_Energy','Eastbound_grade_fit.csv'));
-% 0.225miles is the distance between mill creek origin (MM58.675) and MM58.9
-% the estimated origin of the road grade map
 gradeDataStart = gradeData(:,2);
 gradeDataEnd = gradeData(:,3);
 gradeDataPoints = [gradeDataStart; gradeDataEnd(end)];
@@ -69,13 +67,13 @@ gradeDataSlope = gradeData(:,4);
 gradeDataIntercept = gradeData(:,5);
 % GPS Data is assumed to be processed. Run create_data_GPS.m to produce processed GPS files
 fprintf('\nLoading and decoding AVs GPS data file ...'); tic
-dataGPS = jsondecode(fileread(fullfile('Data','GPS_Data',...
+dataGPS = jsondecode(fileread(fullfile(parentDirectory,'Data','Data_GPS',...
     ['CIRCLES_GPS_10Hz_2022-11-' num2str(DAY_TO_PROCESS) '.json'])));
 fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Process each I24 MOTION file 
 %========================================================================
-addpath(fullfule(parentDirectory, 'Models_Energy'));
+addpath(fullfile(parentDirectory, 'Models_Energy'));
 for fileNr = 1:24
     % Load MOTION data file
     filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
@@ -114,7 +112,7 @@ for fileNr = 1:24
         %lane number of the vehicle: 1 leftmost lane(HOV) , 4 right most lane. 0 off the highway, 5 on/off ramp.
         data(i).lane_number = veh.lane; 
         % shift x position to v2 local coordinate system (origin: Mill Creek Bridge) and convert to meters.
-        data(i).x_position_meters = 0.3048*(veh.x_position-309804.125); 
+        data(i).x_position_meters = 0.3048*(veh.x_position-309804.0625); 
         data(i).y_position_corrected_meters = veh.y_position*0.3048; % convert to meters after correction and clipping
         data(i).starting_x = data(i).x_position_meters(1);
         data(i).ending_x = data(i).x_position_meters(end);
@@ -131,13 +129,9 @@ for fileNr = 1:24
         data(i).speed_meters_per_second = v;
         data(i).acceleration_meters_per_second_per_second = a;
         % approximate road grade theta
-        % shift = 6.01*1609.344 + 309804.5*0.3048; % approx distance between symernia and origin in nashville city 
-        % (6.01mil is distance between Sym and mm60 and 309804.5 is distance
-        % from mm to origin of I24motion system near Nashville city)
-        % xNew = shift-0.3048*veh.x_position;     
-        % position of vehicles wrt to symernia origin (end of Sam Ridely Pkwy on ramp)
-        % xNew = x_position_meters_symernia;
-        xNew = data(i).x_position_meters/1609.344 - 0.225;
+        % 0.225miles is the distance between mill creek origin (MM58.675) and 
+        % MM58.9 the estimated origin of the road grade map
+        xNew = data(i).x_position_meters/1609.344 - 0.225; 
         cellInd = xNew*0;
         for j=1:length(gradeDataPoints)
             cellInd(xNew-gradeDataPoints(j)>=0)=j;
