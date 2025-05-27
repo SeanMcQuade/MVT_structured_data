@@ -377,6 +377,7 @@ xWest = []; yWest = [];
 xEast = []; yEast = [];
 for i=1:N
     veh = data(i);
+    direction = veh.direction;
     t = veh.timestamp;
     ts = t(2)-t(1);
     ss = ceil(1 / ts); %sample at 1 Hz
