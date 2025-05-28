@@ -79,7 +79,7 @@ for file_j = 1:length(data_files) % loop over relevant files
     % Load data file
     filename = data_files(file_j).name;
     fprintf('Loading and decoding %s ...',filename), tic
-    data = jsondecode(fileread(filename));
+    data = jsondecode(fileread(fullfile(data_files(file_j).folder,filename)));
     fprintf(' Done (%0.0fsec).\n',toc)
     % Find indices of trajectories in direction and relevant lane(s)
     if isfield(data,'direction')

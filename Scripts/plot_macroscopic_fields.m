@@ -12,7 +12,7 @@ end
 %========================================================================
 direction = -1; % -1=Westbound, 1=Eastbound
 lane = 0; % 0= all lanes
-plotFields = {'Rho','Q','F','F0','U','Phi','Phi0','Psi','Psi0'};
+plotFields = {'Rho','Q','F','U','Phi','Psi'};
 flagSaveFigures = 1; % if true, save figure into png file
 flagPlotAvTrajectories = 1; % if true, overlay fields with AV traces
 skipTPlot = 1; % sub-sample trajectories for plotting
@@ -23,17 +23,17 @@ timeZoomWindow = [0610 0950]; % time window of intrest to zoom into in military 
 % Load data files
 %========================================================================
 [parentDirectory, ~, ~] = fileparts(pwd);
-filename = [ parentDirectory '\Data\Data_for_Figures\fields_motion_2022-11-'...
+filename = fullfile(parentDirectory ,'Data','Data_for_Figures',['fields_motion_2022-11-'...
      num2str(DAY_TO_PROCESS) '.mat'];
 fprintf('Loading %s ...',filename), tic
 load(filename)
 fprintf(' Done (%0.0fsec).\n',toc)
 if flagPlotAvTrajectories
-    dataFiles = dir([parentDirectory '\Data\Data_GPS\CIRCLES_GPS_10Hz_2022-11-'...
+    dataFiles = dir(fullfile(parentDirectory, 'Data','Data_GPS',['CIRCLES_GPS_10Hz_2022-11-'...
          num2str(DAY_TO_PROCESS)  '.json']);
     filename = dataFiles(1).name; % if multiple files, use first one
     fprintf('Loading %s ...',filename), tic
-    fid = fopen(filename);
+    fid = fopen(fullfile(parentDirectory, 'Data','Data_GPS',Filename));
     data = fread(fid,inf);
     fclose(fid);
     fprintf(' Done (%0.0fsec).\n',toc)
@@ -93,11 +93,11 @@ for i = 1:length(plotFields)
     if flagPlotAvTrajectories
         hold on
         for j = ind % add trajectories
-            ind_e = find(data(j).controller_engaged'==0);
+            ind_e = find(data(j).control_car'==0);
             traj_t = data(j).timestamp(ind_e(1:skipTPlot:end));
             traj_x = data(j).(subfieldNameX)(ind_e(1:skipTPlot:end));
             plot(traj_t,traj_x/1000,'w.','MarkerSize',3)
-            ind_e = find(data(j).controller_engaged'==1);
+            ind_e = find(data(j).control_car'==1);
             traj_t = data(j).timestamp(ind_e(1:skipTPlot:end));
             traj_x = data(j).(subfieldNameX)(ind_e(1:skipTPlot:end));
             plot(traj_t,traj_x/1000,'r.','MarkerSize',3)
