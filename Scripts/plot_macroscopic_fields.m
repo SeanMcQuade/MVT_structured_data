@@ -18,22 +18,29 @@ flagPlotAvTrajectories = 1; % if true, overlay fields with AV traces
 skipTPlot = 1; % sub-sample trajectories for plotting
 subfieldNameX = 'x_position';
 timeZoomWindow = [0610 0950]; % time window of intrest to zoom into in military time
-
+% Set maximum value limit for plotting ,  set to 0 to defualt to 99th
+% percentile of the field vaules to be plotted
+colorbarLimit.Rho = 220; % (veh/km)
+colorbarLimit.Q =  8000; % (veh/hr)
+colorbarLimit.F =  0.25; % (g/s)
+colorbarLimit.U =  35; % (m/s)
+colorbarLimit.Phi =  4.5; % (g/s)
+colorbarLimit.Psi =  0.22; % (g/m)
 %========================================================================
 % Load data files
 %========================================================================
 [parentDirectory, ~, ~] = fileparts(pwd);
 filename = fullfile(parentDirectory ,'Data','Data_for_Figures',['fields_motion_2022-11-'...
-     num2str(DAY_TO_PROCESS) '.mat'];
+     num2str(DAY_TO_PROCESS) '.mat']);
 fprintf('Loading %s ...',filename), tic
 load(filename)
 fprintf(' Done (%0.0fsec).\n',toc)
 if flagPlotAvTrajectories
     dataFiles = dir(fullfile(parentDirectory, 'Data','Data_GPS',['CIRCLES_GPS_10Hz_2022-11-'...
-         num2str(DAY_TO_PROCESS)  '.json']);
+         num2str(DAY_TO_PROCESS)  '.json']));
     filename = dataFiles(1).name; % if multiple files, use first one
     fprintf('Loading %s ...',filename), tic
-    fid = fopen(fullfile(parentDirectory, 'Data','Data_GPS',Filename));
+    fid = fopen(fullfile(parentDirectory, 'Data','Data_GPS',filename));
     data = fread(fid,inf);
     fclose(fid);
     fprintf(' Done (%0.0fsec).\n',toc)
@@ -80,7 +87,12 @@ for i = 1:length(plotFields)
     Valq = interp2(T,X,Val,Tq,Xq);
     % Plot interpolated field
     imagesc(tq,xq/1000,Valq)
-    clim([0,prctile(Val(:),99)]) % max out slightly below maximum
+    cMax = colorbarLimit.(fieldPlot);
+    if cMax > 0 
+        caxis([0,cMax]) 
+    else
+        caxis([0,prctile(Val(:),99)]) % max out slightly below maximum
+    end
     skip_t_data = round(length(t)/n_xticks);
     set(gca,'xtick',t(1:skip_t_data:end),'xticklabel',...
         string(datetime(t_local(1:skip_t_data:end),'Format','HH:mm:ss')))
@@ -117,7 +129,7 @@ for i = 1:length(plotFields)
     lowShift = min(240,max(0,(lowHour - 6)*60 + lowMinutes)) ;
     upHour = floor(timeZoomWindow(2)/100); 
     upMinutes = mod(timeZoomWindow(2),100);
-    upShift = max(-240,min(0,(upHour - 6)*60 + upMinutes)-240) ;
+    upShift = max(-240,max(0,(upHour - 6)*60 + upMinutes)-240) ;
     axx = xlim;
     xlim(axx+diff(axx)*[lowShift upShift]/240) 
     if flagSaveFigures % save figure
@@ -127,11 +139,11 @@ for i = 1:length(plotFields)
         if flagPlotAvTrajectories
             filename = [filename,'_av'];
         end
-        filename = [parentDirectory '\Figures\' filename,'_nature_large'];
+        filename = [filename,'_nature_large'];
+        filename = fullfile(parentDirectory, 'Figures',filename);
         fprintf('Save figure in %s ...',filename), tic
         set(gcf,'Position',[10 50 figRes],'PaperPositionMode','auto')
-        %set(gca,'Position',[.023 .093 .901 .866])
-        set(gca,'Position',[.023 .093 .929 .866])
+        set(gca,'Position',[.023 .093 .92 .866])
         set(gca,'FontSize',20)
         print(filename,'-dpng','-r384');
         fprintf(' Done (%0.0fsec).\n',toc)

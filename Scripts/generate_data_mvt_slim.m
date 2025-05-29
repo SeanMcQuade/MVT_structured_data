@@ -59,7 +59,7 @@ end
 %========================================================================
 % Load road grade map
 gradeData = readmatrix(fullfile(parentDirectory,...
-    'Models_Energy','Eastbound_grade_fit.csv'));
+    'Models','Eastbound_grade_fit.csv'));
 gradeDataStart = gradeData(:,2);
 gradeDataEnd = gradeData(:,3);
 gradeDataPoints = [gradeDataStart; gradeDataEnd(end)];
@@ -73,7 +73,7 @@ fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Process each I24 MOTION file 
 %========================================================================
-addpath(fullfile(parentDirectory, 'Models_Energy'));
+addpath(fullfile(parentDirectory, 'Models'));
 for fileNr = 1:24
     % Load MOTION data file
     filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
@@ -241,7 +241,7 @@ for fileNr = 1:24
     clear jsonStr
     toc
 end
-rmpath(fullfile(parentDirectory, 'Models_Energy'));
+rmpath(fullfile(parentDirectory, 'Models'));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%% Local Functions Definitions %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

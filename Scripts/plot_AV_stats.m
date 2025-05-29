@@ -6,9 +6,7 @@
 % https://opensource.org/license/bsd-3-clause
 
 clear
-% select or multiple stats to plot from ["mean" "median" effective"]
-%statsToPlotChoice = ["effective"];  %reproduces Fig 2
-statsToPlotChoice = ["effective","mean","median"]; %reproduces Fig. SM 3 
+statsToPlotChoices = ["effective","mean","median"];
 MAXDIST = 350; % (m) maximum relative distance to an ego vehicle to be considered
 XWINDOW = [MAXDIST-122 7000]; % (m) , [West to East] set to -1 to include the full testbed.
 AVLOCBUFFER = 1; % (m) buffer around 0 distance from av within which data is not considered.
@@ -151,7 +149,8 @@ fprintf('Done (%0.0fsec).\n',toc)
 % Calculate Mean Bulk speed and AVs for Wed. Thurs. and Fri.
 strArray = ["fields_motion_2022-11-16" "fields_motion_2022-11-17" ...
     "fields_motion_2022-11-18"];
-if length(TWINDOWSTR) > 1
+
+if length(TWINDOW) > 1
     TWINDOWSTR = num2str(TWINDOW);
 else
     TWINDOW = [0600,1000];
@@ -160,8 +159,8 @@ end
 %%
 
 fprintf('Loading and processing GPS and field data... ') ; tic
-figure(1)
-clf
+uTempMean = [];
+nAVsActive = [];
 for i=1:3 %wed. thurs. fri.
     fieldFilename = fullfile(parentDirectory,'Data' ,'Data_for_Figures',...
         char(strArray(i)));
@@ -170,7 +169,7 @@ for i=1:3 %wed. thurs. fri.
         'Data_GPS',['CIRCLES_GPS_10Hz_2022-11-' num2str(15+i) '.json']);
     data = jsondecode(fileread(GPSFilename));
     tStep = floor(mean(diff(t)));
-    uTempMean = [];
+    
     for ii = 1:length(t)
         tTemp = t(ii);
         uTempV = field.value.U(ii,:)*field.factor.U;
@@ -179,7 +178,7 @@ for i=1:3 %wed. thurs. fri.
         uTempV = uTempV(~isnan(uTempV));
         
         totalRhoTemp = sum(rhoTempV);
-        uTempMean(ii) = sum(uTempV .* rhoTempV)/totalRhoTemp;
+        uTempMean(i,ii) = sum(uTempV .* rhoTempV)/totalRhoTemp;
         
         avsOnTheRoad = data([data.direction] == -1 & [data.first_timestamp] ...
             <= tTemp & [data.last_timestamp] >= tTemp + tStep);
@@ -205,140 +204,170 @@ for i=1:3 %wed. thurs. fri.
             end
             nAvsTemp = nAvsTemp +1;
         end
-        nAVsActive(ii) = nAvsActiveTemp;
-        nAVs(ii) = nAvsTemp;
+        nAVsActive(i,ii) = nAvsActiveTemp;
+        nAVs(i,ii) = nAvsTemp;
     end
     % Plotting bulk speed
     LIGHTBLUE = 1/2*[0,0,1]+1/2*[1,1,1];
     LIGHTRED = 1/2*[1,0,0]+1/2*[1,1,1];
     FONTSIZE = 14;
-    
-    firstHour = floor(TWINDOW(1)/100); firstMinutes = mod(TWINDOW(1),100);
-    secondHour = floor(TWINDOW(2)/100); secondMinutes = mod(TWINDOW(2),100);
-    tCST = datetime(t, 'convertfrom', 'posixtime', 'Format', 'HH:mm:ss.SSS',...
+    tCST(i,:) = datetime(t, 'convertfrom', 'posixtime', 'Format', 'HH:mm:ss.SSS',...
         'TimeZone' ,'America/Chicago') ;
-    plotStartT = datetime(2022,11,testDays(i), firstHour, firstMinutes ,0,...
-        'TimeZone' ,'America/Chicago');
-    plotEndT = datetime(2022,11,testDays(i), secondHour, secondMinutes,0, ...
-        'TimeZone' ,'America/Chicago');
-    tWindowNAvsActive = nAVsActive(tCST>plotStartT);
     
-    figure(1)
-    subplot(3,3,3*i-2)
-    hold on
-    yyaxis right
-    hold on %plot number of AVs
-    plot(tCST(tCST <= plotStartT), nAVsActive(tCST <= plotStartT),...
-        'Color',LIGHTRED,'LineStyle','-','LineWidth',1.5)
-    plot(tCST(tCST >= plotEndT), nAVsActive(tCST >= plotEndT),...
-        'Color',LIGHTRED,'LineStyle','-','LineWidth',1.5)
-    plot(tCST(tCST >= plotStartT & tCST <= plotEndT), ...
-        nAVsActive(tCST >= plotStartT & tCST <= plotEndT),'r-','LineWidth',1.5)
-    plot([plotStartT plotStartT],[0,55],'k:','LineWidth',1.5) %vertical lines
-    plot([plotEndT plotEndT],[0,55],'k:','LineWidth',1.5)
-    ylabel('Number of active AVs')
-    set(gca,'YColor','r');
-    grid on
-    axx = [plotStartT - minutes(30), plotEndT + minutes(30)];
-    axy = [0,55];
-    title('Traffic state and AV deployment vs. time')
-    text(plotStartT + minutes(2),(axy(2) - axy(1))*0.9,'start time','FontSize',FONTSIZE)
-    text(plotEndT - minutes(47),(axy(2) - axy(1))*0.9,'end time','FontSize',FONTSIZE)
-    set(gca,'FontSize',FONTSIZE)
-    xlim(axx)
-    ylim(axy)
-    
-    yyaxis left
-    plot(tCST(tCST <= plotStartT), uTempMean(tCST <= plotStartT),'Color',...
-        LIGHTBLUE,'LineStyle','-','LineWidth',2)
-    plot(tCST(tCST >= plotEndT), uTempMean(tCST >= plotEndT),'Color',...
-        LIGHTBLUE,'LineStyle','-','LineWidth',2)
-    plot(tCST(tCST >= plotStartT & tCST <= plotEndT),...
-        uTempMean(tCST >= plotStartT & tCST <= plotEndT),'Color','b',...
-        'LineStyle','-','LineWidth',2)
-    ylabel('Mean speed (m/s)')
-    ylim([0,32])
-    meanBulkSpeedInWindow(i) = mean(uTempMean(tCST >= plotStartT & tCST <= plotEndT));
-    hold off
     
 end
 fprintf('Done (%0.0fsec).\n',toc)
-
+%%
 % Plot in 3x3 grid
 fprintf('Plotting stats... ') ; tic
 figure(1);
+clf
 timeString = [num2str(firstHour), ':', num2str(firstMinutes), ' to ',...
     num2str(secondHour), ':', num2str(secondMinutes)];
 dateStrAry = {['Wed Nov 16, time ' timeString],['Thu Nov 17, time ' timeString],...
     ['Fri Nov 18, time ' timeString]};
-
-for i=1:length(testDays)
-    hold on
-    dateStr = dateStrAry{i};
-    [partitionedStatsPerDay{1},partitionedStatsPerDay{2},partitionedStatsPerDay{3},...
-        partitionedStatsPerDay{4}] = partitionedStats{i,:};
-    subplot(3,3,3*i-1)
-    plot_two_sided(dateStr,plotCol,partitionedStatsPerDay,wRegLeft{i},...
-        wRegRight{i}, binCenters, indicesPartitions,statsToPlotChoice)
-    subplot(3,3,3*i)
-    plot_one_sided(dateStr,plotCol,partitionedStatsPerDay,sRegression{i},...
-        binCenters, indicesPartitions,statsToPlotChoice)
+if length(statsToPlotChoices) == 3
+    figsToProduce = [2,3];
+else
+    figsToProduce = 2 ;
 end
+for figInd = figsToProduce
+    if figInd == 2
+        statsToPlotChoice = statsToPlotChoices(1);
+    else
+        statsToPlotChoice = statsToPlotChoices;
+    end
+    
+    for i=1:length(testDays)
+        firstHour = floor(TWINDOW(1)/100); firstMinutes = mod(TWINDOW(1),100);
+        secondHour = floor(TWINDOW(2)/100); secondMinutes = mod(TWINDOW(2),100);
+        
+        plotStartT = datetime(2022,11,testDays(i), firstHour, firstMinutes ,0,...
+            'TimeZone' ,'America/Chicago');
+        plotEndT = datetime(2022,11,testDays(i), secondHour, secondMinutes,0, ...
+            'TimeZone' ,'America/Chicago');
+        tWindowNAvsActive = nAVsActive(i,tCST(i,:)>plotStartT);
+        
+        subplot(3,3,3*i-2)
+        hold on
+        yyaxis right
+        hold on %plot number of AVs
+        plot(tCST(i,tCST(i,:) <= plotStartT), nAVsActive(i,tCST(i,:) <= plotStartT),...
+            'Color',LIGHTRED,'LineStyle','-','LineWidth',1.5)
+        plot(tCST(i,tCST(i,:) >= plotEndT), nAVsActive(i,tCST(i,:) >= plotEndT),...
+            'Color',LIGHTRED,'LineStyle','-','LineWidth',1.5)
+        plot(tCST(i,tCST(i,:) >= plotStartT & tCST(i,:) <= plotEndT), ...
+            nAVsActive(i,tCST(i,:) >= plotStartT & tCST(i,:) <= plotEndT),'r-','LineWidth',1.5)
+        plot([plotStartT plotStartT],[0,55],'k:','LineWidth',1.5) %vertical lines
+        plot([plotEndT plotEndT],[0,55],'k:','LineWidth',1.5)
+        ylabel('Number of active AVs')
+        set(gca,'YColor','r');
+        grid on
+        axx = [plotStartT - minutes(30), plotEndT + minutes(30)];
+        axy = [0,55];
+        title('Traffic state and AV deployment vs. time')
+        text(plotStartT + minutes(2),(axy(2) - axy(1))*0.9,'start time','FontSize',FONTSIZE)
+        text(plotEndT - minutes(47),(axy(2) - axy(1))*0.9,'end time','FontSize',FONTSIZE)
+        set(gca,'FontSize',FONTSIZE)
+        xlim(axx)
+        ylim(axy)
 
-
-% Adjust subfig placements and size
-posX = [.05,.355,.76];
-posY = [.74,0,.07]; posY(2) = (posY(1)+posY(3))/2;
-posS = [.21,.22]; posW = [.34, posS(2)];
-subplot(3,3,3), set(gca,'Position',[posX(3),posY(1),posS])
-subplot(3,3,6), set(gca,'Position',[posX(3),posY(2),posS])
-subplot(3,3,9), set(gca,'Position',[posX(3),posY(3),posS])
-
-subplot(3,3,1), set(gca,'Position',[posX(1),posY(1),posS])
-subplot(3,3,4), set(gca,'Position',[posX(1),posY(2),posS])
-subplot(3,3,7), set(gca,'Position',[posX(1),posY(3),posS])
-
-subplot(3,3,2), set(gca,'Position',[posX(2),posY(1),posW])
-subplot(3,3,5), set(gca,'Position',[posX(2),posY(2),posW])
-subplot(3,3,8), set(gca,'Position',[posX(2),posY(3),posW])
-fprintf('Done (%0.0fsec).\n',toc)
-
-if flagSave
-    fname = fullfile(parentDirectory,'Figures', ['fig_3_fuel_results_',...
-        char(strjoin(statsToPlotChoice(:),'_')), ...
-        '_',char(num2str(TWINDOW(1))),'_',char(num2str(TWINDOW(2)))]);
-    set(gcf,'Position',[10 40 figRes],'PaperPositionMode','auto')
-    print(fname,'-dpng',figScale);
-    savefig(fname)
+        yyaxis left
+        plot(tCST(i,tCST(i,:) <= plotStartT), uTempMean(i,tCST(i,:) <= plotStartT),'Color',...
+            LIGHTBLUE,'LineStyle','-','LineWidth',2)
+        plot(tCST(i,tCST(i,:) >= plotEndT), uTempMean(i,tCST(i,:) >= plotEndT),'Color',...
+            LIGHTBLUE,'LineStyle','-','LineWidth',2)
+        plot(tCST(i,tCST(i,:) >= plotStartT & tCST(i,:) <= plotEndT),...
+            uTempMean(i,tCST(i,:) >= plotStartT & tCST(i,:) <= plotEndT),'Color','b',...
+            'LineStyle','-','LineWidth',2)
+        ylabel('Mean speed (m/s)')
+        ylim([0,32])
+        meanBulkSpeedInWindow(i) = mean(uTempMean(i,tCST(i,:) >= plotStartT & tCST(i,:) <= plotEndT));
+        hold off
+        hold on
+        dateStr = dateStrAry{i};
+        [partitionedStatsPerDay{1},partitionedStatsPerDay{2},partitionedStatsPerDay{3},...
+            partitionedStatsPerDay{4}] = partitionedStats{i,:};
+        subplot(3,3,3*i-1)
+        cla
+        plot_two_sided(dateStr,plotCol,partitionedStatsPerDay,wRegLeft{i},...
+            wRegRight{i}, binCenters, indicesPartitions,statsToPlotChoice)
+        subplot(3,3,3*i)
+        cla
+        plot_one_sided(dateStr,plotCol,partitionedStatsPerDay,sRegression{i},...
+            binCenters, indicesPartitions,statsToPlotChoice)
+    end
+    
+    
+    % Adjust subfig placements and size
+    posX = [.05,.355,.76];
+    posY = [.74,0,.07]; posY(2) = (posY(1)+posY(3))/2;
+    posS = [.21,.22]; posW = [.34, posS(2)];
+    subplot(3,3,3), set(gca,'Position',[posX(3),posY(1),posS])
+    subplot(3,3,6), set(gca,'Position',[posX(3),posY(2),posS])
+    subplot(3,3,9), set(gca,'Position',[posX(3),posY(3),posS])
+    
+    subplot(3,3,1), set(gca,'Position',[posX(1),posY(1),posS])
+    subplot(3,3,4), set(gca,'Position',[posX(1),posY(2),posS])
+    subplot(3,3,7), set(gca,'Position',[posX(1),posY(3),posS])
+    
+    subplot(3,3,2), set(gca,'Position',[posX(2),posY(1),posW])
+    subplot(3,3,5), set(gca,'Position',[posX(2),posY(2),posW])
+    subplot(3,3,8), set(gca,'Position',[posX(2),posY(3),posW])
+    fprintf('Done (%0.0fsec).\n',toc)
+    
+    if flagSave
+        fname = fullfile(parentDirectory,'Figures', ['fig_' num2str(figInd)...
+            '_fuel_results_',...
+            char(strjoin(statsToPlotChoice(:),'_')), ...
+            '_',char(num2str(TWINDOW(1))),'_',char(num2str(TWINDOW(2)))]);
+        set(gcf,'Position',[10 40 figRes],'PaperPositionMode','auto')
+        print(fname,'-dpng',figScale);
+        savefig(fname)
+    end
 end
-
+%%
 figure(2)
+clf
+fontSize = 18;
 axx = 350;
 axy = [0, 1400000]; % [400000, 1400000]
 equispacedBins = fix(binCenters);
+equispacedBins(floor(length(equispacedBins)/2)+1) = [];
 weekDaysStr = ["Wednesday","Thursday","Friday"];
 for i =1:length(testDays)
     subplot(3,1,i)
     countsTemp = binCounts(i,:);
-    countsTemp(floor(length(countsTemp))+1) = [];
+    countsTemp(floor(length(countsTemp)/2)+1) = [];
     bar(equispacedBins,countsTemp )
     hold on
     plot([0,0],axy,'k:','LineWidth',1.5)
     plot([-30,-30],axy,'r:','LineWidth',2.5)
     plot([30,30],axy,'r:','LineWidth',2.5)
-    title(weekDaysStr(i),'FontSize',fontsize)
-    xlabel('Distance to nearest AV in same lane (m)','FontSize',fontsize)
-    ylabel('number of data points','FontSize',fontsize)
+    title(weekDaysStr(i),'FontSize',fontSize)
+    if i ==2
+        xlabel('Distance to nearest AV in same lane (m)','FontSize',fontSize)
+        ylabel('number of data points','FontSize',fontSize)
+    end
+    
     axis([-axx,axx,axy])
-
-    text(axx*.2,axy(1)+diff(axy)*.8,'behind AV','FontSize',fontsize,...
+    
+    text(axx*.2,axy(1)+diff(axy)*.8,'behind AV','FontSize',fontSize,...
         'HorizontalAlignment','left','VerticalAlignment','bottom')
-    text(-axx*.2,axy(1)+diff(axy)*.8,'ahead of AV','FontSize',fontsize,...
+    text(-axx*.2,axy(1)+diff(axy)*.8,'ahead of AV','FontSize',fontSize,...
         'HorizontalAlignment','right','VerticalAlignment','bottom')
     hold off
     set(gca,'fontsize',18)
 end
-
+if flagSave
+        fname = fullfile(parentDirectory,'Figures', ['fig_SM' num2str(2)...
+            '_vehicle_samples_counts_',...
+            char(strjoin(statsToPlotChoice(:),'_')), ...
+            '_',char(num2str(TWINDOW(1))),'_',char(num2str(TWINDOW(2)))]);
+        set(gcf,'Position',[10 40 figRes],'PaperPositionMode','auto')
+        print(fname,'-dpng',figScale);
+        savefig(fname)
+end
 fprintf('Done (%0.0fsec).\n',toc)
 
 
