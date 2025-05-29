@@ -219,9 +219,12 @@ end
 fprintf('Done (%0.0fsec).\n',toc)
 %%
 % Plot in 3x3 grid
+
 fprintf('Plotting stats... ') ; tic
 figure(1);
 clf
+firstHour = floor(TWINDOW(1)/100); firstMinutes = mod(TWINDOW(1),100);
+secondHour = floor(TWINDOW(2)/100); secondMinutes = mod(TWINDOW(2),100);
 timeString = [num2str(firstHour), ':', num2str(firstMinutes), ' to ',...
     num2str(secondHour), ':', num2str(secondMinutes)];
 dateStrAry = {['Wed Nov 16, time ' timeString],['Thu Nov 17, time ' timeString],...
@@ -239,8 +242,6 @@ for figInd = figsToProduce
     end
     
     for i=1:length(testDays)
-        firstHour = floor(TWINDOW(1)/100); firstMinutes = mod(TWINDOW(1),100);
-        secondHour = floor(TWINDOW(2)/100); secondMinutes = mod(TWINDOW(2),100);
         
         plotStartT = datetime(2022,11,testDays(i), firstHour, firstMinutes ,0,...
             'TimeZone' ,'America/Chicago');
@@ -271,7 +272,7 @@ for figInd = figsToProduce
         set(gca,'FontSize',FONTSIZE)
         xlim(axx)
         ylim(axy)
-
+        
         yyaxis left
         plot(tCST(i,tCST(i,:) <= plotStartT), uTempMean(i,tCST(i,:) <= plotStartT),'Color',...
             LIGHTBLUE,'LineStyle','-','LineWidth',2)
@@ -360,13 +361,13 @@ for i =1:length(testDays)
     set(gca,'fontsize',18)
 end
 if flagSave
-        fname = fullfile(parentDirectory,'Figures', ['fig_SM' num2str(2)...
-            '_vehicle_samples_counts_',...
-            char(strjoin(statsToPlotChoice(:),'_')), ...
-            '_',char(num2str(TWINDOW(1))),'_',char(num2str(TWINDOW(2)))]);
-        set(gcf,'Position',[10 40 figRes],'PaperPositionMode','auto')
-        print(fname,'-dpng',figScale);
-        savefig(fname)
+    fname = fullfile(parentDirectory,'Figures', ['fig_SM' num2str(2)...
+        '_vehicle_samples_counts_',...
+        char(strjoin(statsToPlotChoice(:),'_')), ...
+        '_',char(num2str(TWINDOW(1))),'_',char(num2str(TWINDOW(2)))]);
+    set(gcf,'Position',[10 40 figRes],'PaperPositionMode','auto')
+    print(fname,'-dpng',figScale);
+    savefig(fname)
 end
 fprintf('Done (%0.0fsec).\n',toc)
 
