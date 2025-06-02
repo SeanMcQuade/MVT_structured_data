@@ -3,7 +3,7 @@
 - [Plot data and results.](#tag2)
 
 `markdown
-[Visit GitHub](https://github.com/)
+[Visit the CIRCLES consortium website]([https://github.com/](https://circles-consortium.github.io/))
 [Link to another Markdown file](./another-file.md)
 `
 
