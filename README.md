@@ -4,7 +4,7 @@
 
 [Visit the CIRCLES consortium website](https://circles-consortium.github.io/)
 
-[This repository can be used under the BSD3 license](https://opensource.org/license/bsd-3-clause)
+[This repository is licensed under the BSD3 license](https://opensource.org/license/bsd-3-clause)
 
 ## Tag1
 Generate data
