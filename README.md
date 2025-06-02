@@ -3,7 +3,7 @@
 - [Plot data and results.](#tag2)
 
 `markdown
-[Visit the CIRCLES consortium website]([https://github.com/](https://circles-consortium.github.io/))
+[Visit the CIRCLES consortium website](https://circles-consortium.github.io/)
 `
 
 ## Tag1
