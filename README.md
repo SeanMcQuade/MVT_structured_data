@@ -1,4 +1,4 @@
-# Tags
+# Contents
 - [Generate data.](#tag1)
 - [Plot data and results.](#tag2)
 
@@ -6,8 +6,8 @@
 
 [This repository is licensed under the BSD3 license](https://opensource.org/license/bsd-3-clause)
 
-## Tag1
+## Scripts to generate the integrated data set.
 Generate data
 
-## Tag2
+## Scripts to plot figures from the article.
 Plot data
