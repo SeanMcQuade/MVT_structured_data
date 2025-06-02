@@ -1,6 +1,6 @@
 # Tags
-- [Tag1](#tag1)
-- [Tag2](#tag2)
+- [Generate data.](#tag1)
+- [Plot data and results.](#tag2)
 
 `markdown
 [Visit GitHub](https://github.com/)
