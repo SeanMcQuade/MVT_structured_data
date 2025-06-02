@@ -1,6 +1,7 @@
-﻿Copyright <2025> <CIRCLES consortium>
 
 `markdown
+﻿Copyright <2025> <CIRCLES consortium>
+
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
 
