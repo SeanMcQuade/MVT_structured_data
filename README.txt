@@ -2,9 +2,8 @@
 This load files from Data_GPS and saves assembled GPS.json into Data_2022-11-??__I24_Base for each day.
 
 2. Then generate the full or slimmed integrated data in the respective folder. This puts GPS data, I-24 data, and energy models together to make an integrated data set.
-"Scripts_Integrate_Data_Full" or "Scripts_Integrate_Data_Slim"
-in each, there is one script that does the following: (integrate_mvt_data.m) load files from Data_2022-11-??__I24_Base and saves into Data_2022-11-??_MVT_Slim (Full)
-and it copies the GPS data file from Data_2022-11-??__I24_Base into Data_2022-11-??_MVT_Slim (Full)
+"Scripts/generate_Data_Full" or "Scripts/generate_Data_Slim" are scripts that do the following: load files from Data_2022-11-??__I24_Base and saves into Data/2022-11-??_MVT_Slim or Data/2022-11-??_MVT_Full
+
 
 In that process, the file integrate_mvt_data.m uses the energy model functions in the folder 'Models_energy.' The GPS data from step 1. is needed for plotting as well as for MVT data assembly in step 2.
 Scripts_Macroscopic_Fields .m file inside loads data only from one directory 'Data_2022-11-??_MVT_Slim'
