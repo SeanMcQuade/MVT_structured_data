@@ -231,7 +231,7 @@ for fileNr = 1:24
         'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
     fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
     filenameSave = fullfile(parentDirectory, 'Data',...
-        ['Data_2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Slim\I-24MOTION_slim_',fileStartT]);    
+        ['Data_2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Slim'],['I-24MOTION_slim_',fileStartT]);    
     jsonStr = jsonencode(data);
     clear data
     fid = fopen([filenameSave '.json'], 'w');

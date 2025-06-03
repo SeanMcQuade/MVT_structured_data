@@ -22,7 +22,7 @@ flag_plot_field = 0; % if true, plot one field in the end
 flag_plot_trajectories = 0; % if true, overlay field with trajectory
 skip_t_plot = 20; % sub-sample trajectories for plotting
 kernel = 'box';
-created_fields = {'Rho','Q','F','F0','U','Phi','Phi0','Psi','Psi0'};
+created_fields = {'Rho','Q','F','U','Phi','Psi'};
 subfield_name_x = 'x_position_meters';
 
 %========================================================================
@@ -36,14 +36,27 @@ elseif strcmp(kernel,'Gaussian')
     ht = wt*3; hx = wx*3; % make box size 3 times the std
     fac = 1/(2*pi*wt*wx); % normalizing factor
 end
+
 % Find all data files in folder
 [parentDirectory, ~, ~] = fileparts(pwd);
-dataFolderPath = fullfile(parentDirectory,'Data',...
-    ['Data_2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Slim']);
-data_files = dir(fullfile(dataFolderPath ,'I-24MOTION_slim_*.json'));
-date_data = ['2022-11-' num2str(DAY_TO_PROCESS)]; % date of the data files
-ax_t = [posixtime(datetime([date_data,' ',ax_t{1}],'TimeZone','America/Chicago')),...
-    posixtime(datetime([date_data,' ',ax_t{2}],'TimeZone','America/Chicago'))];
+dataFolder = fullfile(parentDirectory,'Data',...
+    ['Data_2022-11-' char(num2str(DAY_TO_PROCESS)) '__MVT_Slim']);
+I24FilesInDir = dir(fullfile(dataFolder,['I-24*' char(num2str(DAY_TO_PROCESS)) '*.json']));
+nrFiles = length(I24FilesInDir);
+if nrFiles < 24
+    dataFolder = fullfile(parentDirectory,'Data',...
+        ['Data_2022-11-' char(num2str(DAY_TO_PROCESS)) '__MVT_Full']);
+    I24FilesInDir = dir(fullfile(dataFolder,...
+        ['I-24*' char(num2str(DAY_TO_PROCESS)) '*.json']));
+    nrFiles = length(I24FilesInDir);
+    if nrFiles < 24
+        error(['Processed I-24 data files not found. Please generate files'...
+        ' by running generate_data_mvt_slim.m first.'])
+    end
+end
+dateStr = ['2022-11-' num2str(DAY_TO_PROCESS)]; % date of the data files
+ax_t = [posixtime(datetime([dateStr,' ',ax_t{1}],'TimeZone','America/Chicago')),...
+    posixtime(datetime([dateStr,' ',ax_t{2}],'TimeZone','America/Chicago'))];
 
 %========================================================================
 % Create grid in (t,x) plane and initialize fields
@@ -75,11 +88,11 @@ end
 %========================================================================
 % Go through files/trajectories and successively increment fields
 %========================================================================
-for file_j = 1:length(data_files) % loop over relevant files
+for file_j = 1:length(I24FilesInDir) % loop over relevant files
     % Load data file
-    filename = data_files(file_j).name;
+    filename = I24FilesInDir(file_j).name;
     fprintf('Loading and decoding %s ...',filename), tic
-    data = jsondecode(fileread(fullfile(data_files(file_j).folder,filename)));
+    data = jsondecode(fileread(fullfile(I24FilesInDir(file_j).folder,filename)));
     fprintf(' Done (%0.0fsec).\n',toc)
     % Find indices of trajectories in direction and relevant lane(s)
     if isfield(data,'direction')

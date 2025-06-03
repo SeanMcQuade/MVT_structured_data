@@ -68,7 +68,7 @@ gradeDataIntercept = gradeData(:,5);
 % GPS Data is assumed to be processed. Run create_data_GPS.m to produce processed GPS files
 fprintf('\nLoading and decoding AVs GPS data file ...'); tic
 dataGPS = jsondecode(fileread(fullfile(parentDirectory,...
-    ['Data\Data_GPS\CIRCLES_GPS_10Hz_2022-11-' num2str(DAY_TO_PROCESS) '.json'])));
+    'Data','Data_GPS',['CIRCLES_GPS_10Hz_2022-11-' num2str(DAY_TO_PROCESS) '.json'])));
 fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Process each I24 MOTION file 
@@ -305,7 +305,7 @@ for fileNr = 1:24
         'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
     fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
     filenameSave = fullfile(parentDirectory,'Data',...
-        ['Data_2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Full\I-24MOTION_',fileStartT]);
+        ['Data_2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Full'],['I-24MOTION_',fileStartT]);
     jsonStr = jsonencode(data);
     clear data
     fid = fopen([filenameSave '.json'], 'w');

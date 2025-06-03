@@ -3,7 +3,7 @@
 % further adapted by Sean McQuade for CIRCLES scenario team.
 % This is licensed under BSD-3 clause license: https://opensource.org/license/bsd-3-clause
 
-clearvars -except DAY_TO_PROCESS COLLECT_SAMPLES_FLAG
+clearvars -except DAY_TO_PROCESS 
 if ~exist('DAY_TO_PROCESS', 'var') || isempty(DAY_TO_PROCESS) || ~ismember( DAY_TO_PROCESS,[16:18])
     global DAY_TO_PROCESS
     DAY_TO_PROCESS = input(['Enter the day of Nov. 2022 to collect samples from '...
@@ -95,7 +95,11 @@ function [all_d, all_v, all_vc, all_fr, all_x, all_t, all_lane, all_fcons] = ...
 
     for i=1:length(dataTemp)
         veh = dataTemp(i);
-        if veh.direction>0; continue;end % only aggregate for westbound traffic 
+        if isfield(veh,'direction') % only aggregate for westbound traffic 
+            if veh.direction>0 
+                continue
+            end 
+        end
 
         nemp_p = ~isempty(veh.distance_to_downstream_engaged_av_meters);
         nemp_n = ~isempty(veh.distance_to_upstream_engaged_av_meters);
