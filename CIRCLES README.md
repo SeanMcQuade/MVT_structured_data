@@ -23,4 +23,4 @@ Step 5: Run "Scripts\plot_macroscopic_stats.m' to generate the macroscopic field
 ## Websites
 [Visit the CIRCLES consortium website](https://circles-consortium.github.io/)
 
-[This repository is licensed under the BSD3 license](https://opensource.org/license/bsd-3-clause)
+[This repository is to be used only with express permission from a PI from the project]
