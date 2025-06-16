@@ -15,7 +15,7 @@ maxMatchDist = 6; %[m] maximum distance between AVs GPS trajectories and potenti
 maxMatchSpdDiff = 2; % [m/s] maximum speed difference
 maxMatchLaneDiff = 0.5; %[lane] maximum estimated lane difference
 minMatchTime = 3; % [s] minimum matching time
-originXPosition = 309804.0625; % [ft] location of the origin for the x-coordinates ()
+originXPosition = 309804.0625; % [ft] location of the origin for the x-coordinates 
 ft2meterFactor = 0.3048; % [m/ft] conversion factor from feet to meter
 %========================================================================
 % Load, parse, and preprocess AVs GPS data
