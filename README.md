@@ -1,9 +1,12 @@
+
+These scripts and data are from the CIRCLES consortium MegaVanderTest experiment that was conducted in Nashville on highway I-24 during the week of November 14th 2022. 
+This repository contains data recorded from the partially automated vehicles, called the GPS data (this includes GPS location data recoreded by the 
+installed raspberri pi and several flags to indicate the state of the vehicle) and data recorded by the I-24 MOTION observatory.
+
 # Contents
 - [Generate integrated data.](#tag1)
 - [Plot data and results.](#tag2)
 - [Websites](#tag3)
-
-
 
 ## Scripts to generate the integrated data set.
 Step 1: Run "Scripts\generate_data_mvt_full" or "Scripts\generate_data_mvt_slim.":This load files from Data_GPS and saves assembled GPS.json into Data_2022-11-??__I24_Base for each day. 
