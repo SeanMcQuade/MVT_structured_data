@@ -204,12 +204,13 @@ for fileNr = 1:24 % loop over base data files
         % Fuel consumption rate of drive on road
         eval(sprintf(['[fS,~,infeasible] = fuel_model_'...
             vehType '_simplified(v,a,theta,true);']))  
-        % Log fuel consumption data=
+        % Log fuel consumption data
         data(trjInd).fuel_rate_grams_per_second = fS;
         data(trjInd).percent_infeasibility = length(infeasible(infeasible>0))/...
             length(infeasible)*100; % percentage of infeasible drive
         data(trjInd).total_fuel_consumed_grams = integrate(t,fS); % total fuel
-        data(trjInd).total_fuel_consumed_gallons = g2gallonsFactor*data(trjInd).total_fuel_consumed_grams;
+        data(trjInd).total_fuel_consumed_gallons = ...
+            g2gallonsFactor*data(trjInd).total_fuel_consumed_grams;
         data(trjInd).total_fuel_economy_mpg = ...
             ((data(trjInd).total_distance_traversed_meters)*meter2mileFactor)./...
             (data(trjInd).total_fuel_consumed_gallons);
@@ -276,7 +277,8 @@ for fileNr = 1:24 % loop over base data files
         dataFields = fields(data);        
         for iField =2:length(dataFields)
             if isnumeric(data(trjInd).(string(dataFields(iField))))
-                data(trjInd).(string(dataFields(iField))) = round(data(trjInd).(string(dataFields(iField))),4,'decimals');
+                data(trjInd).(string(dataFields(iField))) = ...
+                    round(data(trjInd).(string(dataFields(iField))),4,'decimals');
             end
         end
     end
@@ -288,7 +290,8 @@ for fileNr = 1:24 % loop over base data files
         'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
     fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
     filenameSave = fullfile(parentDirectory,'Data',...
-        ['Data_2022-11-' num2str(processingDay) '__MVT_Full'],['I-24MOTION_',fileStartT]);
+        ['Data_2022-11-' num2str(processingDay) '__MVT_Full'],...
+        ['I-24MOTION_',fileStartT]);
     jsonStr = jsonencode(data);
     clear data
     fid = fopen([filenameSave '.json'], 'w');
@@ -323,7 +326,7 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [dataLanes] = assign_lanes(baseFileName,laneIdentificationOpts)
+function dataLanes = assign_lanes(baseFileName,laneIdentificationOpts)
 
 % Function that takes in original I24 v2 data and outputs lane identification at
 % each time step for all trajectories and adjusted y_position (ft)
