@@ -1,11 +1,9 @@
+function [] = plot_macroscopic_fields(processingDay)
 % Plot macroscopic fields based on I24-MOTION data for Nature.
 % (C) 2025 Benjamin Seibold (edited by Sulaiman Almatrudi)
-
-clearvars -except DAY_TO_PROCESS
-if ~exist('DAY_TO_PROCESS', 'var')
-    global DAY_TO_PROCESS
-    DAY_TO_PROCESS = input(['Enter the day of Nov. 2022 MVT to generate'...
-        ' macroscopic fileds for (from 16 to 18): ']);
+if nargin < 1
+    error(['Specify the day of Nov. 2022 MVT to plot'...
+        ' macroscopic fileds for (from 16 to 18)']);
 end
 %========================================================================
 % Parameters
@@ -17,7 +15,7 @@ flagSaveFigures = 1; % if true, save figure into png file
 flagPlotAvTrajectories = 1; % if true, overlay fields with AV traces
 skipTPlot = 1; % sub-sample trajectories for plotting
 subfieldNameX = 'x_position';
-timeZoomWindow = [0610 0950]; % time window of intrest to zoom into in military time
+timeZoomWindow = [0610 0950]; % time window of intrest to zoom into (in military time)
 % Set maximum value limit for plotting ,  set to 0 to defualt to 99th
 % percentile of the field vaules to be plotted
 colorbarLimit.Rho = 220; % (veh/km)
@@ -31,13 +29,13 @@ colorbarLimit.Psi =  0.22; % (g/m)
 %========================================================================
 [parentDirectory, ~, ~] = fileparts(pwd);
 filename = fullfile(parentDirectory ,'Data','Data_for_Figures',['fields_motion_2022-11-'...
-     num2str(DAY_TO_PROCESS) '.mat']);
+     num2str(processingDay) '.mat']);
 fprintf('Loading %s ...',filename), tic
 load(filename)
 fprintf(' Done (%0.0fsec).\n',toc)
 if flagPlotAvTrajectories
     dataFiles = dir(fullfile(parentDirectory, 'Data','Data_GPS',['CIRCLES_GPS_10Hz_2022-11-'...
-         num2str(DAY_TO_PROCESS)  '.json']));
+         num2str(processingDay)  '.json']));
     filename = dataFiles(1).name; % if multiple files, use first one
     fprintf('Loading %s ...',filename), tic
     fid = fopen(fullfile(parentDirectory, 'Data','Data_GPS',filename));
@@ -51,7 +49,6 @@ if flagPlotAvTrajectories
     ind = find([data.direction]*direction>0&...
         ([data.assigned_lane]==lane|lane==0));
 end
-
 %========================================================================
 % Plot results
 %========================================================================
@@ -87,31 +84,34 @@ for i = 1:length(plotFields)
     Valq = interp2(T,X,Val,Tq,Xq);
     % Plot interpolated field
     imagesc(tq,xq/1000,Valq)
+    % Set color limits on the heatmap
     cMax = colorbarLimit.(fieldPlot);
     if cMax > 0 
-        caxis([0,cMax]) 
+        caxis([0,cMax])     % preset max
     else
         caxis([0,prctile(Val(:),99)]) % max out slightly below maximum
     end
+    % Time ticks location and text
     skip_t_data = round(length(t)/n_xticks);
     set(gca,'xtick',t(1:skip_t_data:end),'xticklabel',...
         string(datetime(t_local(1:skip_t_data:end),'Format','HH:mm:ss')))
+    % Title of the plot
     [~,weekdayName] = weekday(t_local(1),'long');
     title(sprintf('%s (%s) on %s %s: %s',...
         directionName,laneName,weekdayName,...
         datetime(t_local(1),'Format','d-MMM-y'),...
         field.name.(fieldPlot)))
     hl = colorbar; hl.Label.String = field.unit.(fieldPlot);
-    if flagPlotAvTrajectories
+    if flagPlotAvTrajectories % add AV trajectories 
         hold on
-        for j = ind % add trajectories
-            ind_e = find(data(j).control_car'==0);
-            traj_t = data(j).timestamp(ind_e(1:skipTPlot:end));
-            traj_x = data(j).(subfieldNameX)(ind_e(1:skipTPlot:end));
+        for trjInd = ind % add AV trajectories to the plot (inactive/active)
+            ind_e = find(data(trjInd).control_car'==0);
+            traj_t = data(trjInd).timestamp(ind_e(1:skipTPlot:end));
+            traj_x = data(trjInd).(subfieldNameX)(ind_e(1:skipTPlot:end));
             plot(traj_t,traj_x/1000,'w.','MarkerSize',3)
-            ind_e = find(data(j).control_car'==1);
-            traj_t = data(j).timestamp(ind_e(1:skipTPlot:end));
-            traj_x = data(j).(subfieldNameX)(ind_e(1:skipTPlot:end));
+            ind_e = find(data(trjInd).control_car'==1);
+            traj_t = data(trjInd).timestamp(ind_e(1:skipTPlot:end));
+            traj_x = data(trjInd).(subfieldNameX)(ind_e(1:skipTPlot:end));
             plot(traj_t,traj_x/1000,'r.','MarkerSize',3)
         end
         hl = [plot(0,0,'r.','MarkerSize',26);...
@@ -122,8 +122,7 @@ for i = 1:length(plotFields)
     xlabel(sprintf('time in UTC%s',datetime(t_local(1),'Format','Z')))
     ylabel('position / km')
     fprintf(' Done (%0.0fsec).\n',toc)
-
-    % Conduct zoom
+    % Zoom in on time window
     lowHour = floor(timeZoomWindow(1)/100); 
     lowMinutes = mod(timeZoomWindow(1),100);
     lowShift = min(240,max(0,(lowHour - 6)*60 + lowMinutes)) ;
@@ -148,4 +147,5 @@ for i = 1:length(plotFields)
         print(filename,'-dpng','-r384');
         fprintf(' Done (%0.0fsec).\n',toc)
     end
+end
 end
