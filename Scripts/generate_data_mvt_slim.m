@@ -294,7 +294,6 @@ end
 % sample data in both directions
 N = length(data);
 xWest = []; yWest = [];
-xEast = []; yEast = [];
 for trajInd=1:N  % Loop over all trajectories 
     veh = data(trajInd);
     t = veh.timestamp;
@@ -305,11 +304,7 @@ for trajInd=1:N  % Loop over all trajectories
         if direction == -1   %west bound
             xWest = [xWest, veh.x_position(1 :ss: end)'];
             yWest = [yWest, veh.y_position(1 :ss: end)'];
-        else                %east bound
-            xEast = [xEast, veh.x_position(1 :ss: end)'];
-            yEast = [yEast, veh.y_position(1 :ss: end)'];
         end
-
     end
 end
 % Copy defined processing parameters 
@@ -321,25 +316,18 @@ yLowLim = laneIdentificationOpts.Y_Low_Lim;
 upBoundY = laneWidth*yUpLim;
 lowBoundY = laneWidth*yLowLim;
 % Remove outliers from the sampled data based on bounds
-yEast = -yEast;  % flip eastbound y position to be positive in sign
-xEast = xEast(yEast<=upBoundY & yEast>=lowBoundY);
-yEast = yEast(yEast<=upBoundY & yEast>=lowBoundY);
 xWest = xWest(yWest<=upBoundY & yWest>=lowBoundY);
 yWest = yWest(yWest<=upBoundY & yWest>=lowBoundY);
 % Initialize x position grid in both directions
-xCellsEast = linspace(min(xEast),max(xEast),nrXCells+1);
 xCellsWest = linspace(min(xWest),max(xWest),nrXCells+1);
 % Initialize driving line in both directions
 drivingLineWest = zeros(1,nrXCells);
-drivingLineEast = zeros(1,nrXCells);
 % Loop over x cells to calculate the shift in driving line
 for cellInd = 1:nrXCells
     % Identify points in the cells
     pointsInCellWest = xCellsWest(cellInd)<xWest&xWest<=xCellsWest(cellInd+1);
-    pointsInCellEast = xCellsEast(cellInd)<xEast&xEast<=xCellsEast(cellInd+1);
     % Aggregate samples in the cell. Shift down so leftmost lane edge = 0 
     yCellWest = yWest(pointsInCellWest) - laneWidth/2; 
-    yCellEast = yEast(pointsInCellEast) - laneWidth/2;
     % Calculate driving line shift if sufficient samples are found in cell
     if length(yCellWest) > minCellsSamples 
         % Mapping shift to a unit circle
@@ -351,22 +339,11 @@ for cellInd = 1:nrXCells
     else % assume no shift if not enough samples are found in cell
         drivingLineWest(cellInd) = 0;
     end
-    % Similar process for Eastbound data
-    if length(yCellEast) > minCellsSamples
-        p_j_e = cos(2*pi*yCellEast/laneWidth); 
-        q_j_e = sin(2*pi*yCellEast/laneWidth); 
-        dle_t = atan2(mean(q_j_e), mean(p_j_e))*laneWidth/2/pi; 
-        drivingLineEast(cellInd) = dle_t;
-    else
-        drivingLineEast(cellInd) = 0;
-    end
 end
 % Remove maximum edge in the grid
 xCellsWest = xCellsWest(1:end-1);
-xCellsEast = xCellsEast(1:end-1);
 %%% Start Lane assignment
 % Set shifting factors used for y-position correction
-Se = laneIdentificationOpts.Se; Ce = laneIdentificationOpts.Ce; 
 Sw = laneIdentificationOpts.Sw; Cw = laneIdentificationOpts.Cw;
 % Loop over trajectories to correct y position and estimate lane position
 dataLanes = struct([]);
@@ -377,14 +354,8 @@ for trajInd = 1: N
     laneTemp = zeros(size(y)); % Pre-filtering estimated lane position
     lane = zeros(size(y)); % Output lane estimate
     n = length(laneTemp); % trajectory length
-    if veh.direction >0        % take positive y value for eastbound
-        y = -y;
-    end
     % correct for wiggle in y
-    if veh.direction >0 % eastbound
-        dataLanes(trajInd).y_corr = - ...
-            (Se * (y - interp1(xCellsEast,drivingLineEast,x,'linear','extrap'))+Ce);
-    else
+    if veh.direction <0 % westbound
         dataLanes(trajInd).y_corr = ...
             Sw * (y - interp1(xCellsWest,drivingLineWest,x,'linear','extrap'))+Cw;
     end
