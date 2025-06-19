@@ -1,4 +1,4 @@
-function [] = generate_macroscopic_fields_motion(processingDay)
+function [] = generate_macroscopic_fields(processingDay)
 % Construct macroscopic fields based on I24-MOTION data files
 % (C) 2025 Benjamin Seibold (edited by Sulaiman Almatrudi)
 if nargin < 1
