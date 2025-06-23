@@ -8,8 +8,7 @@ installed raspberri pi and several flags to indicate the state of the vehicle) a
 - [Websites](#tag3)
 
 ## Scripts to generate the integrated data set.
-Step 1: Run "Scripts\generate_data_mvt_full" or "Scripts\generate_data_mvt_slim.":This load files from Data_GPS and saves assembled GPS.json into Data_2022-11-??__I24_Base for each day. The full data includes trajectories and fields not relavent to the results article. These trajectories are: Eastbound trajectories, reference trajectories. These fields are: flat fuel consumption, direction.
-
+Step 1: Run "Scripts\generate_data_mvt_full" or "Scripts\generate_data_mvt_slim.":This load files from Data_GPS and saves assembled GPS.json into Data_2022-11-??__I24_Base for each day. The full data includes trajectories and fields not relavent to the results article. These trajectories are: 1. Eastbound trajectories, 2. reference trajectories. These fields are: 1. flat fuel consumption, 2. direction. The matlab file "generate_data_mvt_????" is a function with 1 argument called "processingDay." Set processingDay equal to 16, 17, or 18 for Wednesday Nov. 16 2022, Thursday Nov. 17 2022, or Friday Nov 18 2022 respectively.
 
 Step 2: Once the slimmed or full data is generated, run "Scripts\generate_data_samples.m." It produces mat-files in the Folder called 'Data_Analysis,' one for each day.
 
