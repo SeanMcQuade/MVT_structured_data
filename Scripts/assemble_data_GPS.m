@@ -38,13 +38,13 @@ fprintf('Done (%0.0fsec).\n',toc)
 % Find AV activity limits to load MOTION data
 % Get epoch time of 6am and 10am for the day.
 dataTLimits = datetime(2022,11,processingDay,[6 10],0,0,'TimeZone','America/Chicago');
-dataTLimits = convertTo(dataTLimits,'epochtime');
+dataTLimits = double(convertTo(dataTLimits,'epochtime'));
 % Find start of first AV run during the test
-minAVStart = min([dataGPS0([dataGPS0.starting_time]>dataTLimits(1)).starting_time]);
-minFileNr = max(1,floor((minAVStart-dataTLimits(1))/60*10));
+minAVStart = min([dataGPS0([dataGPS0.ending_time]>dataTLimits(1)).starting_time]);
+minFileNr = max(1,floor((minAVStart-dataTLimits(1))/60/10));
 % Find end of last AV run during the test
-maxAVStart = max([dataGPS0([dataGPS0.ending_time]<dataTLimits(2)).ending_time]);
-maxFileNr = min(24,floor((maxAVStart-dataTLimits(1))/60*10)+1);
+maxAVStart = max([dataGPS0([dataGPS0.starting_time]<dataTLimits(2)).ending_time]);
+maxFileNr = min(24,floor((maxAVStart-dataTLimits(1))/60/10)+1);
 % Find I24 MOTION data files in the folder
 dataFolderPath = fullfile(parentDirectory,'Data',['Data_2022-11-' num2str(processingDay) ...
     '__I24_Base']) ;
@@ -54,7 +54,7 @@ end
 % Use day abbreviation to identify base data files
 dayAbbrvs = ["wed","thu","fri"];
 dayAbbrv = dayAbbrvs(processingDay-15);
-dataFiles = dir(fullfile(dataFolderPath ,['*_' char(dayAbbrv) '_0_*.json']);
+dataFiles = dir(fullfile(dataFolderPath ,['*_' char(dayAbbrv) '_0_*.json']));
 if length(dataFiles) < 24
     error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.',processingDay)
 end
