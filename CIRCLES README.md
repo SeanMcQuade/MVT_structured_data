@@ -8,7 +8,8 @@ installed raspberri pi and several flags to indicate the state of the vehicle) a
 - [Websites](#tag3)
 
 ## Scripts to generate the integrated data set.
-Step 1: Run "Scripts\generate_data_mvt_full" or "Scripts\generate_data_mvt_slim.":This load files from Data_GPS and saves assembled GPS.json into Data_2022-11-??__I24_Base for each day. 
+Step 1: Run "Scripts\generate_data_mvt_full" or "Scripts\generate_data_mvt_slim.":This load files from Data_GPS and saves assembled GPS.json into Data_2022-11-??__I24_Base for each day. The full data includes trajectories and fields not relavent to the results article. These trajectories are: Eastbound trajectories, reference trajectories. These fields are: flat fuel consumption, direction.
+
 
 Step 2: Once the slimmed or full data is generated, run "Scripts\generate_data_samples.m." It produces mat-files in the Folder called 'Data_Analysis,' one for each day.
 
