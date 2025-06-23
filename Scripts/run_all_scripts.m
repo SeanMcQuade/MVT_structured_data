@@ -22,9 +22,9 @@ for processingDay = 16:18
         '-11-2022\n'])
     generate_data_samples(processingDay)
     % Generate macroscopic fields from MOTION data
-    fprintf(['running function generate_macroscopic_fields_motion.m for day ' num2str(processingDay)...
+    fprintf(['running function generate_macroscopic_fields.m for day ' num2str(processingDay)...
         '-11-2022\n'])
-    generate_macroscopic_fields_motion(processingDay)
+    generate_macroscopic_fields(processingDay)
     % Plot macroscopic fields 
     fprintf(['running function plot_macroscopic_fields.m for day ' num2str(processingDay)...
         '-11-2022\n'])
