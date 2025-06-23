@@ -1,6 +1,5 @@
 function [] = plot_AV_analysis()
-% Function to plot multiple analysis results for AV effect on fuel
-% consumption Test
+% Function to plot multiple analysis results for AV effect on fuel consumption 
 % for experiments run on the following dates: 11/16/2022, 11/17/2022, and 11/18/2022
 % (C) 2025 Sean McQuade and Sulaiman Almatrudi
 % This script uses data in ../Data/Data_for_Figures.
