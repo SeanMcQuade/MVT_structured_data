@@ -103,6 +103,7 @@ for fileNr = 1:24 % loop over base data files
         data(trjInd).timestamp = veh.timestamp; % time array for i-th vehicle trajectory
         % numbers corresponding to vehicle types 0:sedan, 1:midSUV, 2:van, 3:pickup, 4:semi, 5:truck
         data(trjInd).coarse_vehicle_class = veh.coarse_vehicle_class; 
+        data(trjInd).direction = veh.direction; % -1: for westbound, 1: for eastbound
         data(trjInd).first_timestamp = veh.first_timestamp; % first timestamp in the trajectory fragment
         data(trjInd).last_timestamp = veh.last_timestamp; % last timestamp in the trajectory fragment
         data(trjInd).length = veh.length; % length of vehicle in feet
