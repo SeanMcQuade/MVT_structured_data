@@ -253,7 +253,7 @@ removed_fields = {
     'distance_to_downstream_engaged_av_meters'};
 
 data_files = dir(fullfile(dataFolder,'*.json'));
-for fileInd = 17:length(data_files)
+for fileInd = 1:length(data_files)
     filename = data_files(fileInd).name;
     filenameSave = [filename(1:end-5),'_reduced.mat'];
     fprintf('Reducing data and saving as %s ...',filename), tic
