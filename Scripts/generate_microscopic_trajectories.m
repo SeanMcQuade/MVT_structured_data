@@ -26,7 +26,7 @@ n_xticks = 16; % number of time ticks
 font_size = 20; % font size in figure
 zoom_t_rel = [.44 .49]; zoom_x_rel = [.13 .23]; % zoom window coords %NOTE use clearer paramter
 flag_save_lowres = 1; % if true, save low resolution figures
-flag_save_highres = 1; % if true, save high resolution figures 
+flag_save_highres = 0; % if true, save high resolution figures 
 flag_reduce_data_files = 1; % if true, generate .mat reduced data files to
 % run the script faster on next iterations 
 ft2meterFactor = 0.3048; % [m/ft] conversion factor from feet to meter
@@ -80,7 +80,7 @@ end
 close all
 fprintf('Initialize figure ...'), tic
 figure('Position',[10 50 fig_res],'PaperPositionMode','auto',...
-    'InvertHardcopy','off','Color',[1 1 1])
+    'InvertHardcopy','off','Color',[1 1 1])%,'Visible','off')
 set(gca,'Color',[0 0 0],'FontSize',font_size)
 set(gca,'Position',[.023 .093 .957 .866]) % fontsize=20 ; [2500 800]
 t = linspace(ax_t(1),ax_t(2),n_xticks+1);
@@ -151,7 +151,7 @@ for fileInd = 1:length(data_files) % loop over relevant files
     end
     fprintf(' Done (%0.0fsec).\n',toc)
 end
-
+clear data  veh_lengths
 %========================================================================
 % Save figure
 %========================================================================
@@ -253,7 +253,7 @@ removed_fields = {
     'distance_to_downstream_engaged_av_meters'};
 
 data_files = dir(fullfile(dataFolder,'*.json'));
-for fileInd = 17:length(data_files)
+for fileInd = 1:length(data_files)
     filename = data_files(fileInd).name;
     filenameSave = [filename(1:end-5),'_reduced.mat'];
     fprintf('Reducing data and saving as %s ...',filename), tic
