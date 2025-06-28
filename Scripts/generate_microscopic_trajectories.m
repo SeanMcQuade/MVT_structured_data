@@ -119,7 +119,7 @@ for fileInd = 1:length(data_files) % loop over relevant files
     end
     fprintf(' Done (%0.0fsec).\n',toc)
     % Find indices of trajectories in direction and relevant lane(s)
-    if isfield(data,'direction') && ~isempty([data.direction])
+    if isfield(data,'direction') %&& ~isempty([data.direction])
         ind = find([data.direction]*direction>0&([data.lane_number]==lane|lane==0));
     else
         ind = find(([data.lane_number]==lane|lane==0));
