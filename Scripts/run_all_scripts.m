@@ -29,7 +29,12 @@ for processingDay = 16:18
     fprintf(['running function plot_macroscopic_fields.m for day ' num2str(processingDay)...
         '-11-2022\n'])
     plot_macroscopic_fields(processingDay)
+    % Plot microscopic trajectories 
+    fprintf(['running function plot_microscopic_trajectories.m for day ' num2str(processingDay)...
+        '-11-2022\n'])
+    plot_microscopic_trajectories(processingDay)
 end
-% Plot stats of contorlled AVs and sampled leaders/followers
+% Plot stats of contorlled AVs and sampled leaders/followers and compare
+% days
 fprintf('running function plot_AV_stats.m for \n')
 plot_AV_analysis()
