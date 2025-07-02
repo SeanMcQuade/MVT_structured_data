@@ -400,14 +400,14 @@ end
 function dataGPS0 = preproc_gps(dataGPS0,gpsDataFolder)
 % Function to preprocess GPS data and sample the base data at 10
 % samples/sec
-inVehShift = 7; % [ft] x position shift from GPS unit position to AV front bumper
+inVehShift = 7; % [ft] x position shift from GPS unit position to AV rear bumper
 nAVrunss = length(dataGPS0);
 avVINData = readtable(fullfile(gpsDataFolder ,'veh_vins.csv'));
 for runIdx = 1:nAVrunss % loop over AV runs and sample data at 10 hz
     % Initialize time grid at 10hz
     t10Hz = floor(dataGPS0(runIdx).timestamp(1)*10)/10:.1:ceil(dataGPS0(runIdx).timestamp(end)*10)/10;
     dataGPS0(runIdx).index = runIdx;
-    % Shift x position data from average GPS position to front bumper of AV
+    % Shift x position data from average GPS position to rear bumper of AV
     dataGPS0(runIdx).x_position = dataGPS0(runIdx).x_position - dataGPS0(runIdx).direction * inVehShift;
     dataGPS0(runIdx).x_position = sample_10hz(dataGPS0(runIdx).timestamp, dataGPS0(runIdx).x_position, t10Hz);
     dataGPS0(runIdx).y_position = sample_10hz(dataGPS0(runIdx).timestamp, dataGPS0(runIdx).y_position, t10Hz);
