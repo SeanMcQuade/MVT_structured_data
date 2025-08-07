@@ -10,12 +10,34 @@ installed raspberri pi and several flags to indicate the state of the vehicle) a
 
 ## Scripts to generate the integrated data set.
 
-Step 0: Have the correct folder structure before you begin. The main folder '/' must create the following subfolders /Data, /Models, and /Scripts. 
+Step 0: Have the correct folder structure before you begin. In the main folder '/' must create the following subfolders /Data, /Models, and /Scripts. 
 There should be 10 folders in the Data/ folder.
 Three correspond to 11/16/2022: "Data_2022-11-16__I24_Base", "Data_2022-11-16__I24_Slim", "Data_2022-11-16__I24_Full",
 Three correspond to 11/17/2022: "Data_2022-11-17__I24_Base", "Data_2022-11-17__I24_Slim", "Data_2022-11-17__I24_Full", and
 Three correspond to 11/18/2022: "Data_2022-11-18__I24_Base", "Data_2022-11-18__I24_Slim", "Data_2022-11-18__I24_Full".
 The tenth folder is called "Data_GPS".
+
+\Models contains 9 files:
+Eastbound_grade_fit.csv,
+fuel_model_Class4PND_simplified.m
+fuel_model_Class8Tractor_simplified.m
+fuel_model_Compact_simplified.m
+fuel_model_midBase_simplified.m
+fuel_model_midSUV_simplified.m
+fuel_model_Pickup_simplified.m
+README.txt
+save_i24motiondata_v2_point_1_slim.m
+
+\Scripts contains 9 files:
+assemble_data_GPS.m
+generate_data_mvt_full.m
+generate_data_mvt_slim.m
+generate_data_samples.m
+generate_macroscopic_fields.m
+plot_AV_analysis.m
+plot_macroscopic_fields.m
+plot_microscopic_trajectories.m
+run_all_scripts.m
 
 The base data .json files go into "Data_2022-11-1*__I24_Base" then create the folders "Data_2022-11-16__I24_Slim" and "Data_2022-11-16__I24_Full". The slim and full data writes to these folders respectively.
 
