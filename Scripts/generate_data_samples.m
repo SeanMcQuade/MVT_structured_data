@@ -1,32 +1,32 @@
+function [] = generate_data_samples(processingDay)
 % Run to generate data samples in .mat format for generating fuel consumption figures.
-% (C) 11/8/2024 by Sulaiman Almatrudi for CIRCLES energy team; further adapted by Sean McQuade for CIRCLES scenario team.
-% This licensed under BSD-3 clause license: https://opensource.org/license/bsd-3-clause
-tic
-DAYS_TO_PROCESS = [16,17,18]; % /NOV/2022 Enter 16, 17, or 18 here.
-
+% (C) 2025 by Sulaiman Almatrudi for CIRCLES energy team;
+% further adapted by Sean McQuade for CIRCLES scenario team.
+% This is licensed under BSD-3 clause license: https://opensource.org/license/bsd-3-clause
+if nargin < 1
+    error(['Specify the day of Nov. 2022 MVT to collect samples from '...
+        'MVT data files (from 16 to 18)']);
+end
 %========================================================================
 % Generate samples_for_distance_analysis
 %========================================================================
-
-for day = DAYS_TO_PROCESS
-
-    %% data preprocessing to generate data samples in .mat
-    av_file_name = ['samples_for_distance_analysis_' char(num2str(day)) '.mat'];
-    fprintf('\nGenerating data relative to active AVs\n')
-    generate_data_samples_v10(day);
-
+[parentDirectory, ~, ~] = fileparts(pwd);
+dataFolder = fullfile(parentDirectory,'Data',...
+    ['Data_2022-11-' char(num2str(processingDay)) '__MVT_Slim']);
+I24FilesInDir = dir(fullfile(dataFolder, ...
+    ['I-24*' char(num2str(processingDay)) '*.json']));
+nrFiles = length(I24FilesInDir);
+if nrFiles < 24
+    dataFolder = fullfile(parentDirectory,'Data',...
+        ['Data_2022-11-' char(num2str(processingDay)) '__MVT_Full']);
+    I24FilesInDir = dir(fullfile(dataFolder, ...
+        ['I-24*' char(num2str(processingDay)) '*.json']));
+    nrFiles = length(I24FilesInDir);
+    if nrFiles < 24
+        error(['Processed I-24 data files not found. Please generate files'...
+            ' by running generate_data_mvt_slim.m first.'])
+    end
 end
-
-%% Functions used in this script 
-%%%%%%%%%%%%%%%%%%%%%% auxiliary function 1
-
-function [] = generate_data_samples_v10(day_to_process)
-
-folder = [ '../Data/Data_2022-11-' char(num2str(day_to_process)) '__MVT_Data_Slim'];
-I24_files_in_dir = dir([ folder '\I-24*' char(num2str(day_to_process)) '*.json']);
-%I24_files_in_dir = dir([ 'I-24*' char(num2str(day_to_process)) '*.json']);
-NR_files = length(I24_files_in_dir);
-
 %% script outputs
 samples_dist = []; %distance relative to engaged av (positive = behind an av, negative = ahead of an av)
 samples_speed = []; %speed samples with downstream/upstream av
@@ -36,24 +36,26 @@ samples_class = []; %vehicle class for samples with downstream/upstream  av
 samples_xpos = []; %x position for samples with downstream/upstream  av
 samples_lane = []; %lane number for samples with downstream/upstream  av
 samples_t = []; %timestamp for samples with downstream/upstream  av (seconds after 6am)
-
 %% data collection
-for file_nr =1:NR_files
-    fprintf(sprintf('\n Loading original data file %d / %d \n', file_nr,NR_files ))
+for file_nr =1:nrFiles % loop over data files and append samples
+    fprintf('Loading original data file %d / %d ...', file_nr,nrFiles )
     tic
-    filename_load = [folder '\' I24_files_in_dir(file_nr).name];
-    data_v22 = jsondecode(fileread(filename_load));
-    toc
-    if ~isfield(data_v22,'distance_to_upstream_engaged_av_meters');fprintf('no AVs on the road');continue;end
+    % Load MOTION data file
+    filenameLoad = fullfile(dataFolder , I24FilesInDir(file_nr).name);
+    data = jsondecode(fileread(filenameLoad));
+    fprintf('Done (%0.0fsec).\n',toc)
+    % Skip file if no AVs are active
+    if ~isfield(data,'distance_to_upstream_engaged_av_meters')
+        fprintf('no AVs on the road\n');
+        continue;
+    end
+    fprintf('Processing data...')
     tic
-    fprintf('\n Processing data\n')
-
-    [dist, speed, class, fr, xpos, t, lane, fcons] = stats_to_av_dist(data_v22,day_to_process);
-
-    toc
-    
-    tic
-    fprintf('\n appending data\n')
+    % collect samples from trajectories
+    [dist, speed, class, fr, xpos, t, lane, fcons] = stats_to_av_dist(data,processingDay);
+    fprintf('Done (%0.0fsec).\n',toc)
+    % Append samples from file to day samples
+    fprintf('Appending data...');tic
     samples_dist = [samples_dist;dist];
     samples_speed = [samples_speed;speed];
     samples_class = [samples_class;class];
@@ -62,97 +64,81 @@ for file_nr =1:NR_files
     samples_t = [samples_t;t];
     samples_lane = [samples_lane;lane];
     samples_fcons = [samples_fcons;fcons];
-    toc
+    fprintf('Done (%0.0fsec).\n',toc)
 end
-
 %% save the output file to .mat data file
-savefolder = '../Data/Data_for_Figures/';
-save([savefolder 'samples_for_distance_analysis_' char(num2str(day_to_process)) '.mat'],'samples_*','-v7.3')
-
+saveFolder = fullfile(parentDirectory,'Data','Data_for_Figures');
+save(fullfile(saveFolder, ['samples_for_distance_analysis_' char(num2str(processingDay)) ...
+    '.mat']),'samples_*','-v7.3')
 end
-
-%%%%%%%%%%%%%%%%%%%%%% auxiliary function 2
-function [all_d, all_v, all_vc, all_fr, all_x, all_t, all_lane, all_fcons] = stats_to_av_dist(data_v22,dayDate)
-
-    Max_Dist = 1000; %maximum distance from an engaged AV for samples to be collected
-
-    % initialize with appropriate data type to optimize for memory use  
-    all_v = inf*ones(size(vertcat(data_v22.timestamp)));
-    all_fr = inf*ones(size(vertcat(data_v22.timestamp)));
-    all_d = inf*ones(size(vertcat(data_v22.timestamp)));
-
-    all_x = int16(inf*ones(size(vertcat(data_v22.timestamp))));
-    
-    
-    
-    all_vc = uint8(all_x);
-    all_lane = uint8(all_x);
-
-    all_t = uint16(all_x);
-    
-
-    jj1 = 1;
-
-    for i=1:length(data_v22)
-        veh = data_v22(i);
-        if veh.direction>0; continue;end % only aggregate for westbound traffic 
-
-        nemp_p = ~isempty(veh.distance_to_downstream_engaged_av_meters);
-        nemp_n = ~isempty(veh.distance_to_upstream_engaged_av_meters);
-
-        if ((nemp_p)||(nemp_n))
-
-            for ii =1:length(veh.timestamp)
-                
-               
-                if nemp_p &&(~isnan(veh.distance_to_downstream_engaged_av_meters(ii))) && ...   %aggregate data for vehicles that have an AV downstream within Max_Dist
-                        (veh.distance_to_downstream_engaged_av_meters(ii) <= Max_Dist) 
-
-                    temp_d = veh.distance_to_downstream_engaged_av_meters(ii);
-
-                    all_v(jj1) = veh.speed_meters_per_second(ii);
-                    all_fr(jj1) = veh.fuel_rate_grams_per_second(ii);
-
-                    all_vc(jj1) = uint8(veh.coarse_vehicle_class);
-                    all_x(jj1) = int16(veh.x_position_meters(ii));
-                    all_d(jj1) =   temp_d;
-                    all_lane(jj1) = veh.lane_number;
-                    all_t(jj1) = uint16(veh.timestamp(ii)-(1668772800-(18-dayDate)*24*60*60)); %record time in (s) after 6am of each test day
-                    jj1 =jj1+1;
-                end
-                
-                if nemp_n && (~isnan(veh.distance_to_upstream_engaged_av_meters(ii))) && ...  %aggregate data for vehicles that have an AV upstream within Max_Dist
-                        (veh.distance_to_upstream_engaged_av_meters(ii) >= -Max_Dist) 
-
-                    temp_d = veh.distance_to_upstream_engaged_av_meters(ii);
-
-                        all_v(jj1) = veh.speed_meters_per_second(ii);
-                        all_fr(jj1) = veh.fuel_rate_grams_per_second(ii);
-
-                        all_vc(jj1) = uint8(veh.coarse_vehicle_class);
-                        all_x(jj1) = int16(veh.x_position_meters(ii));
-                        all_d(jj1) =   temp_d;
-                        all_lane(jj1) = veh.lane_number;
-
-                        all_t(jj1) = uint16(veh.timestamp(ii)-(1668772800-(18-dayDate)*24*60*60)); %record time in (s) after 6am of each test day
-                        jj1 =jj1+1;
-
-                end
+%%%%%%%%%%%%%%%%%%%%%% local function %%%%%%%%%%%%%%%%%%%%%%
+function [all_d, all_v, all_vc, all_fr, all_x, all_t, all_lane, all_fcons] = ...
+    stats_to_av_dist(dataTemp,dayDate)
+sixAM18 = 1668772800; % [s] epoch time corresponding to 6 am 11/18/2022 EDT
+Max_Dist = 1000; %[m] maximum distance from an engaged AV for samples to be collected
+% initialize with appropriate data type to optimize for memory use
+all_v = inf*ones(size(vertcat(dataTemp.timestamp)));
+all_fr = inf*ones(size(vertcat(dataTemp.timestamp)));
+all_d = inf*ones(size(vertcat(dataTemp.timestamp)));
+all_x = int16(inf*ones(size(vertcat(dataTemp.timestamp))));
+all_vc = uint8(all_x);
+all_lane = uint8(all_x);
+all_t = uint16(all_x);
+sampleCounter = 1;
+for vehInd=1:length(dataTemp)
+    veh = dataTemp(vehInd);
+    if isfield(veh,'direction')
+        % only aggregate for westbound traffic
+        if veh.direction>0
+            continue
+        end
+    end
+    nemp_p = ~isempty(veh.distance_to_downstream_engaged_av_meters);
+    nemp_n = ~isempty(veh.distance_to_upstream_engaged_av_meters);
+    if nemp_p || nemp_n
+        % if there's an active AV up or downstream of trajectory
+        for pointInd =1:length(veh.timestamp) % loop over all points in the trajectory
+            %aggregate data for points that have an AV downstream within Max_Dist
+            if nemp_p && (~isnan(veh.distance_to_downstream_engaged_av_meters(pointInd))) && ...
+                    (veh.distance_to_downstream_engaged_av_meters(pointInd) <= Max_Dist)
+                % append sample to appropriate vectors
+                temp_d = veh.distance_to_downstream_engaged_av_meters(pointInd);
+                all_v(sampleCounter) = veh.speed_meters_per_second(pointInd);
+                all_fr(sampleCounter) = veh.fuel_rate_grams_per_second(pointInd);
+                all_vc(sampleCounter) = uint8(veh.coarse_vehicle_class);
+                all_x(sampleCounter) = int16(veh.x_position_meters(pointInd));
+                all_d(sampleCounter) =   temp_d;
+                all_lane(sampleCounter) = veh.lane_number;
+                %record time in (s) after 6am of each test day
+                all_t(sampleCounter) = uint16(veh.timestamp(pointInd)-(sixAM18-(18-dayDate)*24*60*60));
+                sampleCounter =sampleCounter+1;
+            end
+            %aggregate data for points that have an AV upstream within Max_Dist
+            if nemp_n && (~isnan(veh.distance_to_upstream_engaged_av_meters(pointInd))) && ...
+                    (veh.distance_to_upstream_engaged_av_meters(pointInd) >= -Max_Dist)
+                % append sample to appropriate vectors
+                temp_d = veh.distance_to_upstream_engaged_av_meters(pointInd);
+                all_v(sampleCounter) = veh.speed_meters_per_second(pointInd);
+                all_fr(sampleCounter) = veh.fuel_rate_grams_per_second(pointInd);
+                all_vc(sampleCounter) = uint8(veh.coarse_vehicle_class);
+                all_x(sampleCounter) = int16(veh.x_position_meters(pointInd));
+                all_d(sampleCounter) =   temp_d;
+                all_lane(sampleCounter) = veh.lane_number;
+                %record time in (s) after 6am of each test day
+                all_t(sampleCounter) = uint16(veh.timestamp(pointInd)-(sixAM18-(18-dayDate)*24*60*60));
+                sampleCounter =sampleCounter+1;
             end
         end
     end
-    
-
-
-    all_d(jj1:end) = [];
-    all_v(jj1:end) = [];
-    all_vc(jj1:end) = [];
-    all_fr(jj1:end) = [];
-    all_x(jj1:end) = [];    
-    all_t(jj1:end) = [];   
-    all_lane(jj1:end) = [];
-    all_fcons = all_fr./ (1e-6+all_v);
-    
 end
-
-toc
+% claer extra rserved size in all vectors
+all_d(sampleCounter:end) = [];
+all_v(sampleCounter:end) = [];
+all_vc(sampleCounter:end) = [];
+all_fr(sampleCounter:end) = [];
+all_x(sampleCounter:end) = [];
+all_t(sampleCounter:end) = [];
+all_lane(sampleCounter:end) = [];
+% calculate instantanious fuel consumption (add 1e-6 to avoid division by 0)
+all_fcons = all_fr./ (1e-6+all_v);
+end
