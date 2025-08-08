@@ -1,4 +1,4 @@
-function [] = generate_data_samples()
+function [] = generate_data_samples(processingDay)
 % Run to generate data samples in .mat format for generating fuel consumption figures.
 % (C) 2025 by Sulaiman Almatrudi for CIRCLES energy team;
 % further adapted by Sean McQuade for CIRCLES scenario team.
