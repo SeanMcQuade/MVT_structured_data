@@ -7,12 +7,12 @@ installed raspberri pi and several flags to indicate the state of the vehicle) a
 - [Plot data and results.](#tag2)
 - [Websites](#tag3)
 
-Step 0: Have the correct folder structure before you begin. In the main folder '/' must create the following subfolders /Data, /Models, and /Scripts. 
-There should be 10 folders in the Data/ folder.
+Step 0: Have the correct folder structure before you begin. In the main folder '/' one must create the following subfolders /Data, /Models, and /Scripts. 
+There should be 11 folders in the Data/ folder.
 Three correspond to 11/16/2022: "Data_2022-11-16__I24_Base", "Data_2022-11-16__I24_Slim", "Data_2022-11-16__I24_Full",
 Three correspond to 11/17/2022: "Data_2022-11-17__I24_Base", "Data_2022-11-17__I24_Slim", "Data_2022-11-17__I24_Full", and
 Three correspond to 11/18/2022: "Data_2022-11-18__I24_Base", "Data_2022-11-18__I24_Slim", "Data_2022-11-18__I24_Full".
-The tenth folder is called "Data_GPS".
+There are two additional folders: "Data_GPS", and "Data_for_Figures".
 
 \Models contains 9 files:
 Eastbound_grade_fit.csv,
