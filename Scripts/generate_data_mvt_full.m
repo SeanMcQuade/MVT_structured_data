@@ -1,29 +1,28 @@
-% save_i24motiondata_v2_point_1_slim - (C) CIRCLES Energy team, 4/15/2025
+function [] = generate_data_mvt_full(processingDay)
+% (C) 2025 CIRCLES Energy team 
 %
-% This script process v2.0 of the I-24 MOTION data from the MVT to generate
-% a slim version of CIRCLES' v2.1 of the data, used in the team nature
+% Function that process base I-24 MOTION data from the MVT to generate
+% a full version of CIRCLES' v2.1 of the data, used in the team nature
 % paper submission, and saves it to json files.
 %
-% Generated json files will be saved in \Data_{DATE}__MVT_Full folder.
-
-clearvars -except DAY_TO_PROCESS
-if ~exist('DAY_TO_PROCESS', 'var')
-    global DAY_TO_PROCESS
-    DAY_TO_PROCESS = input('Enter the day of Nov. 2022 MVT to generate full MVT data files (from 16 to 18): ');
+% Generated json files will be saved in .\Data\Data_{DATE}__MVT_Full folder.
+if nargin < 1
+error(['Specify the day of Nov. 2022 MVT to generate full'... 
+        'MVT data files (from 16 to 18)']);
 end
 %========================================================================
 % Parameters
 %========================================================================
 % Set processing parameters
-processingOpts.laneIdentificationOpts.LANEWIDTH = 12;       % Lane width in feet
+processingOpts.laneIdentificationOpts.LaneWidth = 12;  % Lane width in feet
 % Number of cells in the x direction used to identify driving line
-processingOpts.laneIdentificationOpts.Nr_XCELLS = 200;      
+processingOpts.laneIdentificationOpts.Nr_XCells = 200;      
 % Minimum number of samples per cell used to identify driving line
-processingOpts.laneIdentificationOpts.MINCELLSAMPLES = 20; 
+processingOpts.laneIdentificationOpts.MinCellSamples = 20; 
 % samples upper bound as a multiplier of lane width to remove outliers
-processingOpts.laneIdentificationOpts.Y_UP_LIM = 5;        
+processingOpts.laneIdentificationOpts.Y_Up_Lim = 5;        
 % samples lower bound as a multiplier of lane width to remove outliers
-processingOpts.laneIdentificationOpts.Y_LOW_LIM = 0.5;        
+processingOpts.laneIdentificationOpts.Y_Low_Lim = 0.5;        
 % Shift parameters for y position correction (west{east}bound) s.t. y_corrected =  
 % Sw{e} * (y  - drivingLineShift_w{e}) + Cw{e};
 processingOpts.laneIdentificationOpts.Se = 0.97;            
@@ -31,32 +30,37 @@ processingOpts.laneIdentificationOpts.Ce = 1;
 processingOpts.laneIdentificationOpts.Sw = 0.98;          
 processingOpts.laneIdentificationOpts.Cw = 1;
 % Threshold to identify lane change as a multiplier of lane width
-processingOpts.laneChangeClippingOpts.LANECHANGETHRSH = 0.5;        
+processingOpts.laneChangeClippingOpts.LaneChangeThresh = 0.5;        
 % Threshold for maximum rate of change in the identified lane for which 
 % trajectory is assumed to not change lane as a multiplier of lane width/s
-processingOpts.laneChangeClippingOpts.MAXLANECHANGERATE = 0.1;      
+processingOpts.laneChangeClippingOpts.MaxLaneChangeRate = 0.1;      
 % Minimum duration for a clipped trajectory in seconds
-processingOpts.laneChangeClippingOpts.MINCLIPTIME = 0.5;            
+processingOpts.laneChangeClippingOpts.MinClipTime = 0.5;            
 % Buffer threshold to ensure full lane change as a multiplier of lane width
-processingOpts.laneChangeClippingOpts.CHANGEBUFFERTHRESH = 0.2;     
+processingOpts.laneChangeClippingOpts.ChangeBufferThresh = 0.2; 
+originXPosition = 309804.0625; % [ft] location of the origin for the x-coordinates 
+ft2meterFactor = 0.3048; % [m/ft] conversion factor from feet to meter
+meter2mileFactor = 6.213712e-04; % [mile/m] conversion factor from meter to mile
+g2gallonsFactor = 3.522294e-04; % [gallon/g] conversion factor from fuel gram to gallon
+mcDist = 0.225 ; %[mile] the distance between mill creek origin (MM58.675) and MM58.9
+% the estimated origin of the road grade map
 %========================================================================
 % Initilize
 %========================================================================
 [parentDirectory, ~, ~] = fileparts(pwd);
-dataFolderPath = fullfile(parentDirectory,['Data_2022-11-' num2str(DAY_TO_PROCESS) '__I24_Base']);
+dataFolderPath = fullfile(parentDirectory,'Data',...
+    ['Data_2022-11-' num2str(processingDay) '__I24_Base']);
 dayAbbrvs = ["mon","tue","wed","thu","fri"];
-dayAbbrv = dayAbbrvs(DAY_TO_PROCESS-13);
-dataFiles = dir([dataFolderPath '\*_' char(dayAbbrv) '_0_*.json']);
+dayAbbrv = dayAbbrvs(processingDay-13);
+dataFiles = dir(fullfile(dataFolderPath, ['*_' char(dayAbbrv) '_0_*.json']));
 if length(dataFiles) < 24
-    error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.',DAY_TO_PROCESS)
+    error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.',processingDay)
 end
 %========================================================================
 % Load GPS and road grade data
 %========================================================================
 % Load road grade map
-gradeData = readmatrix([parentDirectory '\Models_Energy\Eastbound_grade_fit.csv']);
-% 0.225miles is the distance between mill creek origin (MM58.675) and MM58.9
-% the estimated origin of the road grade map
+gradeData = readmatrix(fullfile(parentDirectory,'Models','Eastbound_grade_fit.csv'));
 gradeDataStart = gradeData(:,2);
 gradeDataEnd = gradeData(:,3);
 gradeDataPoints = [gradeDataStart; gradeDataEnd(end)];
@@ -64,13 +68,14 @@ gradeDataSlope = gradeData(:,4);
 gradeDataIntercept = gradeData(:,5);
 % GPS Data is assumed to be processed. Run create_data_GPS.m to produce processed GPS files
 fprintf('\nLoading and decoding AVs GPS data file ...'); tic
-dataGPS = jsondecode(fileread(fullfile(parentDirectory,['Data_GPS\CIRCLES_GPS_10Hz_2022-11-' num2str(DAY_TO_PROCESS) '.json'])));
+dataGPS = jsondecode(fileread(fullfile(parentDirectory,...
+    'Data','Data_GPS',['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])));
 fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Process each I24 MOTION file 
 %========================================================================
-addpath([parentDirectory '\Models_Energy']);
-for fileNr = 1:24
+addpath(fullfile(parentDirectory, 'Models'));
+for fileNr = 1:24 % loop over base data files
     % Load MOTION data file
     filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
     fprintf('Loading and decoding MOTION data file, %d/24 ... ', ...
@@ -92,26 +97,27 @@ for fileNr = 1:24
     fprintf('Generating v2.1 version of data ... '),tic
     n = length(dataTemp);
     data = init_data_struct(n);
-    for i=1:floor(n) %loop over all data(vehicle) segments
-        veh = dataTemp(i);               % get each vehicle
-        data(i).trajectory_id = veh.x_id; % id for i-th vehicle trajectory
-        data(i).timestamp = veh.timestamp; % time array for i-th vehicle trajectory
+    for trjInd=1:floor(n) %loop over all data(vehicle) segments
+        veh = dataTemp(trjInd);               % get each vehicle
+        data(trjInd).trajectory_id = veh.x_id; % id for i-th vehicle trajectory
+        data(trjInd).timestamp = veh.timestamp; % time array for i-th vehicle trajectory
         % numbers corresponding to vehicle types 0:sedan, 1:midSUV, 2:van, 3:pickup, 4:semi, 5:truck
-        data(i).coarse_vehicle_class = veh.coarse_vehicle_class; 
-        data(i).first_timestamp = veh.first_timestamp; % first timestamp in the trajectory fragment
-        data(i).last_timestamp = veh.last_timestamp; % last timestamp in the trajectory fragment
-        data(i).length = veh.length; % length of vehicle in feet
-        data(i).width = veh.width; % width of vehicle in feet
-        data(i).height = veh.height; % height of vehicle in feet
+        data(trjInd).coarse_vehicle_class = veh.coarse_vehicle_class; 
+        data(trjInd).direction = veh.direction; % -1: for westbound, 1: for eastbound
+        data(trjInd).first_timestamp = veh.first_timestamp; % first timestamp in the trajectory fragment
+        data(trjInd).last_timestamp = veh.last_timestamp; % last timestamp in the trajectory fragment
+        data(trjInd).length = veh.length; % length of vehicle in feet
+        data(trjInd).width = veh.width; % width of vehicle in feet
+        data(trjInd).height = veh.height; % height of vehicle in feet
         %lane number of the vehicle: 1 leftmost lane(HOV) , 4 right most lane. 0 off the highway, 5 on/off ramp.
-        data(i).lane_number = veh.lane; 
+        data(trjInd).lane_number = veh.lane; 
         % shift x position to v2 local coordinate system (origin: Mill Creek Bridge) and convert to meters.
-        data(i).x_position_meters = 0.3048*(veh.x_position-309804.125); 
-        data(i).y_position_corrected_meters = veh.y_position*0.3048; % convert to meters after correction and clipping
-        data(i).starting_x = data(i).x_position_meters(1);
-        data(i).ending_x = data(i).x_position_meters(end);
+        data(trjInd).x_position_meters = ft2meterFactor*(veh.x_position-originXPosition); 
+        data(trjInd).y_position_corrected_meters = veh.y_position*ft2meterFactor; % convert to meters after correction and clipping
+        data(trjInd).starting_x = data(trjInd).x_position_meters(1);
+        data(trjInd).ending_x = data(trjInd).x_position_meters(end);
         x = veh.x_position;          % original x-position for i-th vehicle
-        x = 0.3048*abs(x-x(1));      % change position from feet to meters
+        x = ft2meterFactor*abs(x-x(1));      % change position from feet to meters
         t = veh.timestamp;           % original timestamp data for i-th vehicle
         t = t-t(1);                  % start from time zero for each vehicle
         % Calculate velocity (m/s)
@@ -119,17 +125,13 @@ for fileNr = 1:24
         % Calculate acceleration central (m/s/s)
         a = (x(1:end-2)-2*x(2:end-1)+x(3:end))./((t(3:end)-t(1:end-2))/2).^2; 
         a = a([1,1:end,end]);
-        data(i).total_distance_traversed_meters = abs(x(end)-x(1));
-        data(i).speed_meters_per_second = v;
-        data(i).acceleration_meters_per_second_per_second = a;
+        data(trjInd).total_distance_traversed_meters = abs(x(end)-x(1));
+        data(trjInd).speed_meters_per_second = v;
+        data(trjInd).acceleration_meters_per_second_per_second = a;
         % approximate road grade theta
-        % shift = 6.01*1609.344 + 309804.5*0.3048; % approx distance between symernia and origin in nashville city 
-        % (6.01mil is distance between Sym and mm60 and 309804.5 is distance
-        % from mm to origin of I24motion system near Nashville city)
-        % xNew = shift-0.3048*veh.x_position;     
-        % position of vehicles wrt to symernia origin (end of Sam Ridely Pkwy on ramp)
-        % xNew = x_position_meters_symernia;
-        xNew = data(i).x_position_meters/1609.344 - 0.225;
+        % 0.225miles is the distance between mill creek origin (MM58.675) and 
+        % MM58.9 the estimated origin of the road grade map
+        xNew = data(trjInd).x_position_meters*meter2mileFactor - mcDist;
         cellInd = xNew*0;
         for j=1:length(gradeDataPoints)
             cellInd(xNew-gradeDataPoints(j)>=0)=j;
@@ -141,53 +143,45 @@ for fileNr = 1:24
         else
             theta = -asin((gradeDataSlope(cellInd).*xNewLocal(:)/100+gradeDataIntercept(cellInd)/100));
         end
-        data(i).road_grade_radians = theta;
-        
+        data(trjInd).road_grade_radians = theta;
          % Construct reference trajectories 
         a2 = @(t1)(x(end)-x(1)-0.5*t1*v(1)-v(end)*t(end)+0.5*t1*v(end))/(-0.5*t(end)^2+0.5*t1*t(end));
         a1 = @(t1) (v(end)+a2(t1)*(t1-t(end))-v(1))/t1;
         t1 = (t(end)/2);
-        data(i).reference_a1_meters_per_second_per_second = a1(t1); 
-        data(i).reference_a2_meters_per_second_per_second = a2(t1);    
+        data(trjInd).reference_a1_meters_per_second_per_second = a1(t1); 
+        data(trjInd).reference_a2_meters_per_second_per_second = a2(t1);    
         vRef = (v(1)+a1(t1)*t).*(t<=t1)+(v(end)+a2(t1)*(t-t(end))).*(t>t1);
         aRef = a1(t1).*(t<=t1) + a2(t1).*(t>t1);
         xRef = (x(1)+v(1)*t+a1(t1)*t.^2/2).*(t<=t1)+((x(end)-v(end)*t(end)...
             +a2(t1)*t(end)^2/2)+v(end)*t+a2(t1)*(t/2-t(end)).*t).*(t>t1);
-
         if any(vRef<0)
             tt1 = (x(end)-x(1))/((v(1)+v(end))/2); tt2 = t(end)-tt1;
             aa1 = -((v(1)+v(end))/2)/(x(end)-x(1))*v(1); 
             aa2 = ((v(1)+v(end))/2)/(x(end)-x(1))*v(end);
-            data(i).reference_a1_meters_per_second_per_second = aa1; 
-            data(i).reference_a2_meters_per_second_per_second = aa2;
+            data(trjInd).reference_a1_meters_per_second_per_second = aa1; 
+            data(trjInd).reference_a2_meters_per_second_per_second = aa2;
             vRef = (v(1)+aa1*t).*(t<=tt1)+(0).*(t>tt1 & t<tt2)+(v(end)+aa2*(t-t(end))).*(t>tt2);
             aRef = aa1.*(t<=tt1)+(0).*(t>tt1 & t<tt2)+aa2.*(t>tt2);
             xRef = (x(1)+v(1)*t+aa1*t.^2/2).*(t<=tt1)+(x(1)+v(1)*tt1+aa1*tt1.^2/2).*(t>tt1 & t<tt2)...
                 +((x(end)-v(end)*t(end)+aa2*t(end)^2/2)+v(end)*t+aa2*(t/2-t(end)).*t).*(t>tt2);  
         end
-
         if veh.direction>0
-            xRef = data(i).x_position_meters(1) + xRef;
+            xRef = data(trjInd).x_position_meters(1) + xRef;
         else
-            xRef = data(i).x_position_meters(1) - xRef;
+            xRef = data(trjInd).x_position_meters(1) - xRef;
         end
-
-        xNew = xRef/1609.344 - 0.225;
+        xNew = xRef*meter2mileFactor - mcDist;
         cellInd = xNew*0;
         for j=1:length(gradeDataPoints)
             cellInd(xNew-gradeDataPoints(j)>=0)=j;
         end
-        
         cellInd = min(max(cellInd,1),length(gradeDataPoints)-1);
         xNewLocal = min(max(xNew,gradeDataPoints(1)),gradeDataPoints(end));
-
-
         if veh.direction>0
             thetaRef = asin((gradeDataSlope(cellInd).*xNewLocal(:)/100+gradeDataIntercept(cellInd)/100));
         else
             thetaRef = -asin((gradeDataSlope(cellInd).*xNewLocal(:)/100+gradeDataIntercept(cellInd)/100));
         end
-
         % Identify the class of vehicles, in the original data file
         % 0=sedan 1=midsize 2=van 3=pickup 4=semi 5=truck 6=motorcycle(not present in data)
         C = veh.coarse_vehicle_class;
@@ -205,93 +199,89 @@ for fileNr = 1:24
             case 5
                 vehType = 'Pickup';
         end
-        
-        data(i).energy_model = vehType;
+        data(trjInd).energy_model = vehType;
         % Calculate total fuel
         integrate = @(t,v) dot( t(2:end)-t(1:end-1) , (v(1:end-1)+v(2:end))/2); % quadrature
         % Fuel consumption rate of drive on road
         eval(sprintf(['[fS,~,infeasible] = fuel_model_'...
-            vehType '_simplified(v,a,theta,true);']))
-        
-        data(i).fuel_rate_grams_per_second = fS;
-        data(i).percent_infeasibility = length(infeasible(infeasible>0))/length(infeasible)*100; % percentage of infeasible drive
-        data(i).total_fuel_consumed_grams = integrate(t,fS); % total fuel
-        data(i).total_fuel_consumed_gallons = (1/2839.0588)*data(i).total_fuel_consumed_grams;
-        data(i).total_fuel_economy_mpg = ((data(i).total_distance_traversed_meters)/1609.34)./...
-            (data(i).total_fuel_consumed_gallons);
-
+            vehType '_simplified(v,a,theta,true);']))  
+        % Log fuel consumption data
+        data(trjInd).fuel_rate_grams_per_second = fS;
+        data(trjInd).percent_infeasibility = length(infeasible(infeasible>0))/...
+            length(infeasible)*100; % percentage of infeasible drive
+        data(trjInd).total_fuel_consumed_grams = integrate(t,fS); % total fuel
+        data(trjInd).total_fuel_consumed_gallons = ...
+            g2gallonsFactor*data(trjInd).total_fuel_consumed_grams;
+        data(trjInd).total_fuel_economy_mpg = ...
+            ((data(trjInd).total_distance_traversed_meters)*meter2mileFactor)./...
+            (data(trjInd).total_fuel_consumed_gallons);
         % Fuel consumption rate of drive on flat road
         eval(sprintf(['[fSFlat,~,infeasibleFlat] = fuel_model_'...
             vehType '_simplified(v,a,v*0,true);']))    
-
-        data(i).fuel_rate_flat_road_grams_per_second = fSFlat;
-        data(i).percent_infeasibility_flat_road = length(infeasibleFlat(infeasibleFlat>0))/length(infeasibleFlat)*100; % percentage of infeasible drive
-        data(i).total_fuel_consumed_flat_road_grams = integrate(t,fSFlat); % total fuel 
-        data(i).total_fuel_consumed_flat_road_gallons = (1/2839.0588)*data(i).total_fuel_consumed_flat_road_grams;
-        data(i).total_fuel_economy_flat_road_mpg = ((data(i).total_distance_traversed_meters)/1609.34)./(data(i).total_fuel_consumed_flat_road_gallons);
-
-
+        % Log fuel consumption data for flat road
+        data(trjInd).fuel_rate_flat_road_grams_per_second = fSFlat;
+        data(trjInd).percent_infeasibility_flat_road = length(infeasibleFlat(infeasibleFlat>0))/...
+            length(infeasibleFlat)*100; % percentage of infeasible drive
+        data(trjInd).total_fuel_consumed_flat_road_grams = integrate(t,fSFlat); % total fuel 
+        data(trjInd).total_fuel_consumed_flat_road_gallons = ...
+            g2gallonsFactor*data(trjInd).total_fuel_consumed_flat_road_grams;
+        data(trjInd).total_fuel_economy_flat_road_mpg = ...
+            ((data(trjInd).total_distance_traversed_meters)*meter2mileFactor)./...
+            (data(trjInd).total_fuel_consumed_flat_road_gallons);
         % Fuel consumption rate of reference drive on road
         eval(sprintf(['[fSRef,~,infeasibleRef] = fuel_model_'...
             vehType '_simplified(vRef,aRef,thetaRef,true);']))
-
-        data(i).reference_fuel_rate_grams_per_second = fSRef;
-        data(i).percent_reference_infeasibility = length(infeasibleRef(infeasibleRef>0))/...
+        data(trjInd).reference_fuel_rate_grams_per_second = fSRef;
+        data(trjInd).percent_reference_infeasibility = length(infeasibleRef(infeasibleRef>0))/...
             length(infeasibleRef)*100;  
-        data(i).total_reference_fuel_consumed_grams = integrate(t,fSRef); % total reference fuel 
-
+        data(trjInd).total_reference_fuel_consumed_grams = integrate(t,fSRef); % total reference fuel 
        % Fuel consumption rate of reference drive on flat road
         eval(sprintf(['[fSRefFlat,~,infeasibleRef_flat] = fuel_model_'...
             vehType '_simplified(vRef,aRef,vRef*0,true);']))
-
-        data(i).reference_fuel_rate_flat_road_grams_per_second = fSRefFlat;
-        data(i).percent_reference_infeasibility_flat_road = ...
+        data(trjInd).reference_fuel_rate_flat_road_grams_per_second = fSRefFlat;
+        data(trjInd).percent_reference_infeasibility_flat_road = ...
             length(infeasibleRef_flat(infeasibleRef_flat>0))/length(infeasibleRef_flat)*100;  
-        data(i).total_reference_fuel_consumed_flat_road_grams = integrate(t,fSRefFlat); 
+        data(trjInd).total_reference_fuel_consumed_flat_road_grams = integrate(t,fSRefFlat); 
         % Distance to av engaged US
-        if ~isempty(distToAvsData(i).AvIdUSEng)
-            data(i).upstream_engaged_av_id = distToAvsData(i).AvIdUSEng;
-            data(i).distance_to_upstream_engaged_av_meters = -distToAvsData(i).distanceToAvUSEng;
+        if ~isempty(distToAvsData(trjInd).AvIdUSEng)
+            data(trjInd).upstream_engaged_av_id = distToAvsData(trjInd).AvIdUSEng;
+            data(trjInd).distance_to_upstream_engaged_av_meters = -distToAvsData(trjInd).distanceToAvUSEng;
         else
-            data(i).upstream_engaged_av_id = [];
-            data(i).distance_to_upstream_engaged_av_meters = [];
-        end
-        
+            data(trjInd).upstream_engaged_av_id = [];
+            data(trjInd).distance_to_upstream_engaged_av_meters = [];
+        end        
         % Distance to av US
-        if ~isempty(distToAvsData(i).AvIdUS)
-            data(i).upstream_av_id = distToAvsData(i).AvIdUS;
-            data(i).distance_to_upstream_av_meters = -distToAvsData(i).distanceToAvUS;
+        if ~isempty(distToAvsData(trjInd).AvIdUS)
+            data(trjInd).upstream_av_id = distToAvsData(trjInd).AvIdUS;
+            data(trjInd).distance_to_upstream_av_meters = -distToAvsData(trjInd).distanceToAvUS;
         else
-            data(i).upstream_av_id = [];
-            data(i).distance_to_upstream_av_meters = [];
-        end
-        
+            data(trjInd).upstream_av_id = [];
+            data(trjInd).distance_to_upstream_av_meters = [];
+        end        
         % Distance to av engaged DS
-        if ~isempty(distToAvsData(i).AvIdDSEng)
-            data(i).downstream_engaged_av_id = distToAvsData(i).AvIdDSEng;
-            data(i).distance_to_downstream_engaged_av_meters = distToAvsData(i).distanceToAvDSEng;
+        if ~isempty(distToAvsData(trjInd).AvIdDSEng)
+            data(trjInd).downstream_engaged_av_id = distToAvsData(trjInd).AvIdDSEng;
+            data(trjInd).distance_to_downstream_engaged_av_meters = distToAvsData(trjInd).distanceToAvDSEng;
         else
-            data(i).downstream_engaged_av_id = [];
-            data(i).distance_to_downstream_engaged_av_meters = [];
-        end
-        
+            data(trjInd).downstream_engaged_av_id = [];
+            data(trjInd).distance_to_downstream_engaged_av_meters = [];
+        end        
         % Distance to av DS
-        if ~isempty(distToAvsData(i).AvIdDS)
-            data(i).downstream_av_id = distToAvsData(i).AvIdDS;
-            data(i).distance_to_downstream_av_meters = distToAvsData(i).distanceToAvDS;
+        if ~isempty(distToAvsData(trjInd).AvIdDS)
+            data(trjInd).downstream_av_id = distToAvsData(trjInd).AvIdDS;
+            data(trjInd).distance_to_downstream_av_meters = distToAvsData(trjInd).distanceToAvDS;
         else
-            data(i).downstream_av_id = [];
-            data(i).distance_to_downstream_av_meters = [];
+            data(trjInd).downstream_av_id = [];
+            data(trjInd).distance_to_downstream_av_meters = [];
         end
         %Set number of decimal points to be saved for each processed variable
-        dataFields = fields(data);
-        
+        dataFields = fields(data);        
         for iField =2:length(dataFields)
-            if isnumeric(data(i).(string(dataFields(iField))))
-                data(i).(string(dataFields(iField))) = round(data(i).(string(dataFields(iField))),4,'decimals');
+            if isnumeric(data(trjInd).(string(dataFields(iField))))
+                data(trjInd).(string(dataFields(iField))) = ...
+                    round(data(trjInd).(string(dataFields(iField))),4,'decimals');
             end
         end
-        
     end
     clear dataTemp
     pause(5)
@@ -300,8 +290,9 @@ for fileNr = 1:24
     fileStartT = (datetime(data(1).first_timestamp, 'convertfrom', 'posixtime', ...
         'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
     fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
-    filenameSave = [parentDirectory '\Data_2022-11-' num2str(DAY_TO_PROCESS)...
-        '__MVT_Full\I-24MOTION_',fileStartT];
+    filenameSave = fullfile(parentDirectory,'Data',...
+        ['Data_2022-11-' num2str(processingDay) '__MVT_Full'],...
+        ['I-24MOTION_',fileStartT]);
     jsonStr = jsonencode(data);
     clear data
     fid = fopen([filenameSave '.json'], 'w');
@@ -311,11 +302,12 @@ for fileNr = 1:24
     clear jsonStr
     toc
 end
-rmpath([parentDirectory '\Models_Energy']);
+rmpath(fullfile(parentDirectory ,'Models'));
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%% Local Functions Definitions %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 function data = init_data_struct(n)
 data(1,n) = struct('trajectory_id', [],'timestamp',[],'x_position_meters',[],'y_position_corrected_meters',[],...
     'coarse_vehicle_class',[],'direction',[],'first_timestamp',[],'last_timestamp',[],...
@@ -335,9 +327,8 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [dataLanes] = assign_lanes(baseFileName,laneIdentificationOpts)
+function dataLanes = assign_lanes(baseFileName,laneIdentificationOpts)
 
-% v1.2
 % Function that takes in original I24 v2 data and outputs lane identification at
 % each time step for all trajectories and adjusted y_position (ft)
 %
@@ -355,90 +346,118 @@ function [dataLanes] = assign_lanes(baseFileName,laneIdentificationOpts)
 % Lane = 0 -> vehicle is off the highway
 %
 
+% Parse input, load data if input is a file path
 if isa(baseFileName,'struct')
     data = baseFileName;
 elseif ischar(baseFileName)
-    fprintf('Loading data \n')
+    fprintf(['Loading data ' baseFileName '\n'])
     filenameLoad = baseFileName;
     data = jsondecode(fileread(filenameLoad));
 else
     fprintf('Wrong input \n')
     return
 end
-
-
-%%% define Driving Line
-% sample data
+% sample data in both directions
 N = length(data);
 xWest = []; yWest = [];
-for i=1:N
-    veh = data(i);
+xEast = []; yEast = [];
+for trajInd=1:N  % Loop over all trajectories 
+    veh = data(trajInd);
     t = veh.timestamp;
-    ts = t(2)-t(1);
-    ss = ceil(1 / ts); %sample at 1 Hz
+    ts = t(2)-t(1); % [s] timestep
+    ss = ceil(1 / ts); % sample at 1 Hz
+    direction = veh.direction;
     if (t(end)-t(1))>5     %sample only trajectories > 5s , each second
-        xWest = [xWest, veh.x_position(1 :ss: end)'];
-        yWest = [yWest, veh.y_position(1 :ss: end)'];
+        if direction == -1   %west bound
+            xWest = [xWest, veh.x_position(1 :ss: end)'];
+            yWest = [yWest, veh.y_position(1 :ss: end)'];
+        else                %east bound
+            xEast = [xEast, veh.x_position(1 :ss: end)'];
+            yEast = [yEast, veh.y_position(1 :ss: end)'];
+        end
+
     end
 end
-
-%%% Process data
-LANEWIDTH = laneIdentificationOpts.LANEWIDTH;    %ft
-Nr_XCELLS = laneIdentificationOpts.Nr_XCELLS;
-MINCELLSAMPLES = laneIdentificationOpts.MINCELLSAMPLES;
-% samples upper/lower bound as a multiplier of lane width
-Y_UP_LIM = laneIdentificationOpts.Y_UP_LIM;
-Y_LOW_LIM = laneIdentificationOpts.Y_LOW_LIM;
-upBoundY = LANEWIDTH*Y_UP_LIM;
-lowBoundY = LANEWIDTH*Y_LOW_LIM;
-
-%remove outliers from the sampled data based on bounds
+% Copy defined processing parameters 
+laneWidth = laneIdentificationOpts.LaneWidth;   
+nrXCells = laneIdentificationOpts.Nr_XCells;   
+minCellsSamples = laneIdentificationOpts.MinCellSamples;
+yUpLim = laneIdentificationOpts.Y_Up_Lim;
+yLowLim = laneIdentificationOpts.Y_Low_Lim;
+upBoundY = laneWidth*yUpLim;
+lowBoundY = laneWidth*yLowLim;
+% Remove outliers from the sampled data based on bounds
+yEast = -yEast;  % flip eastbound y position to be positive in sign
+xEast = xEast(yEast<=upBoundY & yEast>=lowBoundY);
+yEast = yEast(yEast<=upBoundY & yEast>=lowBoundY);
 xWest = xWest(yWest<=upBoundY & yWest>=lowBoundY);
 yWest = yWest(yWest<=upBoundY & yWest>=lowBoundY);
-
-xCellsWest = linspace(min(xWest),max(xWest),Nr_XCELLS+1);
-
-drivingLineWest = zeros(1,Nr_XCELLS);
-
-for i = 1:Nr_XCELLS    
-    yCellWest = yWest(xCellsWest(i)<xWest&xWest<=xCellsWest(i+1)) - LANEWIDTH/2; % points in this cell
-    
-    if length(yCellWest) > MINCELLSAMPLES
-        p_j_w = cos(2*pi*yCellWest/LANEWIDTH); q_j_w = sin(2*pi*yCellWest/LANEWIDTH); %mapping shift to unit circle
-        dlw_t = atan2(mean(q_j_w), mean(p_j_w))*LANEWIDTH/2/pi;   %find mean shift
-        drivingLineWest(i) = dlw_t;
-    else
-        drivingLineWest(i) = 0;
+% Initialize x position grid in both directions
+xCellsEast = linspace(min(xEast),max(xEast),nrXCells+1);
+xCellsWest = linspace(min(xWest),max(xWest),nrXCells+1);
+% Initialize driving line in both directions
+drivingLineWest = zeros(1,nrXCells);
+drivingLineEast = zeros(1,nrXCells);
+% Loop over x cells to calculate the shift in driving line
+for cellInd = 1:nrXCells
+    % Identify points in the cells
+    pointsInCellWest = xCellsWest(cellInd)<xWest&xWest<=xCellsWest(cellInd+1);
+    pointsInCellEast = xCellsEast(cellInd)<xEast&xEast<=xCellsEast(cellInd+1);
+    % Aggregate samples in the cell. Shift down so leftmost lane edge = 0 
+    yCellWest = yWest(pointsInCellWest) - laneWidth/2; 
+    yCellEast = yEast(pointsInCellEast) - laneWidth/2;
+    % Calculate driving line shift if sufficient samples are found in cell
+    if length(yCellWest) > minCellsSamples 
+        % Mapping shift to a unit circle
+        p_j_w = cos(2*pi*yCellWest/laneWidth); 
+        q_j_w = sin(2*pi*yCellWest/laneWidth); 
+        % Find mean shift
+        dlw_t = atan2(mean(q_j_w), mean(p_j_w))*laneWidth/2/pi; 
+        drivingLineWest(cellInd) = dlw_t;
+    else % assume no shift if not enough samples are found in cell
+        drivingLineWest(cellInd) = 0;
     end
-    
+    % Similar process for Eastbound data
+    if length(yCellEast) > minCellsSamples
+        p_j_e = cos(2*pi*yCellEast/laneWidth); 
+        q_j_e = sin(2*pi*yCellEast/laneWidth); 
+        dle_t = atan2(mean(q_j_e), mean(p_j_e))*laneWidth/2/pi; 
+        drivingLineEast(cellInd) = dle_t;
+    else
+        drivingLineEast(cellInd) = 0;
+    end
 end
-
+% Remove maximum edge in the grid
 xCellsWest = xCellsWest(1:end-1);
-
-
-%%% Lane assignment
-%set shifting factors used for y-position correction
-Se = laneIdentificationOpts.Se; Ce = laneIdentificationOpts.Ce; Sw = laneIdentificationOpts.Sw; Cw = laneIdentificationOpts.Cw;
+xCellsEast = xCellsEast(1:end-1);
+%%% Start Lane assignment
+% Set shifting factors used for y-position correction
+Se = laneIdentificationOpts.Se; Ce = laneIdentificationOpts.Ce; 
+Sw = laneIdentificationOpts.Sw; Cw = laneIdentificationOpts.Cw;
+% Loop over trajectories to correct y position and estimate lane position
 dataLanes = struct([]);
-for i = 1: N
-    veh = data(i);
+for trajInd = 1: N 
+    veh = data(trajInd);
     y = veh.y_position;
     x = veh.x_position;
-    laneTemp = zeros(size(y));
-    lane = zeros(size(y));
-    n = length(laneTemp);
-    
-    drivingLine = drivingLineWest;
-    xCells = xCellsWest;
-    
+    laneTemp = zeros(size(y)); % Pre-filtering estimated lane position
+    lane = zeros(size(y)); % Output lane estimate
+    n = length(laneTemp); % trajectory length
+    if veh.direction >0        % take positive y value for eastbound
+        y = -y;
+    end
     % correct for wiggle in y
-    
-    dataLanes(i).y_corr = Sw * (y  - interp1(xCellsWest,drivingLineWest,x,'linear','extrap')) + Cw;
-    
-    laneTemp = ((abs(dataLanes(i).y_corr) - LANEWIDTH/2) ./LANEWIDTH) ;
+    if veh.direction >0 % eastbound
+        dataLanes(trajInd).y_corr = - ...
+            (Se * (y - interp1(xCellsEast,drivingLineEast,x,'linear','extrap'))+Ce);
+    else
+        dataLanes(trajInd).y_corr = ...
+            Sw * (y - interp1(xCellsWest,drivingLineWest,x,'linear','extrap'))+Cw;
+    end
+    % Estimate lane position from corrected y position 
+    laneTemp = ((abs(dataLanes(trajInd).y_corr) - laneWidth/2) ./laneWidth) ;
     laneTemp = max(0,min(5,(laneTemp)));
-    
-    % median filter the lane
+    % Median filter estimated lane
     ww = 10;      %median filter window width (num. time steps)
     buff = ceil(ww/2);
     if n > ww
@@ -450,8 +469,7 @@ for i = 1: N
     else
         lane = (median(laneTemp)*ones(size(laneTemp)));
     end
-    dataLanes(i).lane = lane;
-    
+    dataLanes(trajInd).lane = lane;
 end
 end
 
@@ -469,103 +487,105 @@ function newData = clip_lane_changes(data,dataLanes,opts)
 % Output:  - mewData: processed data with clipped lane changes
 %
 
-LANECHANGETHRSH = opts.LANECHANGETHRSH;         % Threshold to identify lane change as a multiplier of lane width
-MAXLANECHANGERATE = opts.MAXLANECHANGERATE;     % Threshold for maximum rate of change in the identified lane for which trajectory is assumed to not change lane as a multiplier of lane width
-MINCLIPTIME = opts.MINCLIPTIME;                 % Minimum duration for a clipped trajectory in seconds
-CHANGEBUFFERTHRESH = opts.CHANGEBUFFERTHRESH;   % Buffer threshold to ensure full lane change as a multiplier of lane width
-
-
+%========================================================================
+% Parameters 
+%========================================================================
+% Threshold to identify lane change as a multiplier of lane width
+LaneChangeThresh = opts.LaneChangeThresh;         
+% Threshold for maximum rate of change in the identified lane for which trajectory 
+% is assumed to not change lane as a multiplier of lane width
+MaxLaneChangeRate = opts.MaxLaneChangeRate;     
+% Minimum duration for a clipped trajectory in seconds
+MinClipTime = opts.MinClipTime;                 
+% Buffer threshold to ensure full lane change as a multiplier of lane width
+ChangeBufferThresh = opts.ChangeBufferThresh;   
 nrTrajs = length(data);
 dataFields = fieldnames(data);
+% Initialize struct array to for output data
 newData = {};
-for i = 1:length(dataFields) %init
-    newData(4*nrTrajs).(cell2mat(dataFields(i))) = [];
+for fieldInd = 1:length(dataFields)  % Loop over all data fields to initialize
+    newData(4*nrTrajs).(cell2mat(dataFields(fieldInd))) = [];
 end
 newData(4*nrTrajs).lane =[];
-
 trajCounter =1;
-for i = 1:nrTrajs
-       
-    veh = data(i);
+% Loop over original trajectories and clip lane changes
+for trjInd = 1:nrTrajs
+    veh = data(trjInd);
     x = veh.x_position;
     t = veh.timestamp;
-    y = dataLanes(i).y_corr;
-    lane = dataLanes(i).lane;
+    y = dataLanes(trjInd).y_corr;
+    lane = dataLanes(trjInd).lane;
     trajectoryLength = length(veh.timestamp);
     tempLane = round(lane(1));
-    ii=1;
+    pointer = 1; % pointer to loop over trajctory points 
     clippedPart = -1; %clipped part number (starting from 0)
-    
-    while ii<trajectoryLength
-        ii0 = find((abs(diff(lane)./diff(t))) < MAXLANECHANGERATE,1); %start from when lane is stable
-        if isempty(ii0)
+    while pointer<trajectoryLength % loop over tajectory with a pointer
+        %start from when lane is stable
+        stInd = find((abs(diff(lane)./diff(t))) < MaxLaneChangeRate,1); 
+        if isempty(stInd)
             break %if lane is not stable at all, delete full trajectory
         end
-        
-        lane = lane(ii0:end);
+        lane = lane(stInd:end);
         tempLane = round(lane(1));
         trajectoryLength = length(lane);
-        x = x(ii0:end);
-        y = y(ii0:end);
-        t = t(ii0:end);
-        
-        % find index of lane changing
-        indChange = find(abs(lane-tempLane) > LANECHANGETHRSH,1);
+        x = x(stInd:end);
+        y = y(stInd:end);
+        t = t(stInd:end);        
+        % Find index of lane changing
+        indChange = find(abs(lane-tempLane) > LaneChangeThresh,1);
         if isempty(indChange); indChange =  trajectoryLength; end
-        % remove data before lane changing (up to stable lane)
+        % Remove data before lane changing (up to stable lane)
         mirroredLane0 = lane(indChange:-1:1);
         absDiffMirroredLane0 = abs(diff(mirroredLane0)./diff(t(indChange:-1:1)));
         absDiffMirroredLane0 = [absDiffMirroredLane0;absDiffMirroredLane0(end)];
-        ii_p2 = find(abs(mirroredLane0 - tempLane) < CHANGEBUFFERTHRESH & absDiffMirroredLane0 < MAXLANECHANGERATE,1);
-        % log clipped trajectory
-        if ~isempty(ii_p2) && (t(indChange-ii_p2+1)-t(1)) >= MINCLIPTIME % only MINCLIPTIME [s] minimum
-            
-            
+        secPointer = find(abs(mirroredLane0 - tempLane) < ChangeBufferThresh &...
+            absDiffMirroredLane0 < MaxLaneChangeRate,1);
+        if ~isempty(secPointer) && (t(indChange-secPointer+1)-t(1)) >= MinClipTime % only MinClipTime [s] minimum
+            % Log clipped trajectory 
             clippedPart = clippedPart+1;
-            ii_p2 = indChange - ii_p2;
-            
+            secPointer = indChange - secPointer;
+            % Clip and append data to output struct array
             newVeh = veh;
-            newVeh.timestamp = t(1:ii_p2);
-            newVeh.x_position = x(1:ii_p2);
-            newVeh.y_position = y(1:ii_p2);
-            newVeh.ending_x = x(ii_p2);
+            newVeh.timestamp = t(1:secPointer);
+            newVeh.x_position = x(1:secPointer);
+            newVeh.y_position = y(1:secPointer);
+            newVeh.ending_x = x(secPointer);
             newVeh.first_timestamp = t(1);
-            newVeh.last_timestamp = t(ii_p2);
+            newVeh.last_timestamp = t(secPointer);
             newVeh.starting_x = x(1);
-            newVeh.ending_x = x(ii_p2);
+            newVeh.ending_x = x(secPointer);
             newVeh.lane = tempLane;
             newVeh.x_id.x_oid = [newVeh.x_id.x_oid '-' num2str(clippedPart)];
             newData(trajCounter) = newVeh;
             trajCounter = trajCounter+1;
         end
-        
+        % Discard processed part
         lane = lane(indChange:end);
         x = x(indChange:end);
         y = y(indChange:end);
         t = t(indChange:end);
         tempLane = round(lane(1));
-        
-        % if clipping happen, remove starting part of the remaining trajectory
-        % until within (CHANGEBUFFERTHRESH * lane width) of new lane
+        % If clipping happen, remove starting part of the remaining trajectory
+        % until within (ChangeBufferThresh * lane width) of new lane
         if indChange<trajectoryLength
-            ii_n2 = find(abs(lane-tempLane)<CHANGEBUFFERTHRESH,1);
+            ii_n2 = find(abs(lane-tempLane)<ChangeBufferThresh,1);
             if isempty(ii_n2)
                 ii_n2 =  length(lane);
             end
-            ii_notfull = find(abs(lane-tempLane)>1-CHANGEBUFFERTHRESH,1);
-            if ~isempty(ii_notfull)&& ii_notfull< ii_n2  %false lane change: clip but don't start new trajectory
+            ii_notfull = find(abs(lane-tempLane)>1-ChangeBufferThresh,1);
+            if ~isempty(ii_notfull)&& ii_notfull< ii_n2  
+                %false lane change: clip but don't start new trajectory
                 ii_n2 =  ii_notfull;
                 tempLane = round(lane(ii_n2));
             end
-            ii = ii_n2+1;
-            lane = lane(ii:end);
-            x = x(ii:end);
-            y = y(ii:end);
-            t = t(ii:end);
-            ii = 1;
+            pointer = ii_n2+1;
+            lane = lane(pointer:end);
+            x = x(pointer:end);
+            y = y(pointer:end);
+            t = t(pointer:end);
+            pointer = 1;
             trajectoryLength = length(x);
         end
-        
     end
 end
 newData(trajCounter:end) = [];
@@ -575,7 +595,6 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function DistToAvs = calculate_distance_to_avs(dataTemp,dataGPS)
-
 % Function to identify closest AVs and the distance to AVs in meters for all trajectories
 %
 % Input: - dataTemp: I24MOTION data with clipped lane changes
@@ -590,93 +609,101 @@ function DistToAvs = calculate_distance_to_avs(dataTemp,dataGPS)
 %             distanceToAvDS: distance to nearest AV downstream at each timestamp
 %             AvIdDSEng: nearest engaged AV downstream at each timestamp
 %             distanceToAvDSEng: distance to nearest engaged AV downstream at each timestamp
+%
 
+originXPosition = 309804.0625; % [ft] location of the origin for the x-coordinates 
+ft2meterFactor = 0.3048; % [m/ft] conversion factor from feet to meter
+% Intialize output struct array
 n = length(dataTemp);
 DistToAvs(1,n) = struct('distanceToAvUS',[],'AvIdUS',[],'distanceToAvUSEng',[],'AvIdUSEng',[],...
     'distanceToAvDS',[],'AvIdDS',[],'distanceToAvDSEng',[],'AvIdDSEng',[]);
-distKeys = ["distanceToAvUS","distanceToAvDS"];
-distEngKeys = ["distanceToAvUSEng","distanceToAvDSEng"];
-idsKeys = ["AvIdUS","AvIdDS"];
-idsEngKeys = ["AvIdUSEng","AvIdDSEng"];
-distDir = ["upstream","downstream"];
-distDirSign = [-1 ,1];
-
+% Setup field names to loop over
+distKeys = ["distanceToAvUS","distanceToAvDS"]; % dist to avs fields
+distEngKeys = ["distanceToAvUSEng","distanceToAvDSEng"]; % dist to engaged avs fields
+idsKeys = ["AvIdUS","AvIdDS"]; % ids of avs fields
+idsEngKeys = ["AvIdUSEng","AvIdDSEng"]; % ids of engaged avs fields
+distDir = ["upstream","downstream"]; % position of av to ego vehicle fields
+distDirSign = [-1 ,1]; % relevant dist direction fields
+% Loop over trajectories in the data and calculate distance to avs
 num_trajs = length(dataTemp);
-for i = 1:num_trajs
-    
-    veh = dataTemp(i);
+for trjInd = 1:num_trajs
+    veh = dataTemp(trjInd);
     tempT = veh.timestamp;
     tempX = veh.x_position;
-    tempX = 0.3048*(tempX-309804.125);
+    tempX = ft2meterFactor*(tempX-originXPosition);
     tempLane = veh.lane;
     tempDir = veh.direction;
-    avsOnRoad = find([dataGPS.assigned_lane]==tempLane& [dataGPS.direction] == tempDir & tempT(1)< [dataGPS.last_timestamp] & tempT(end)>[dataGPS.first_timestamp]);
-    
+    % Find AVs on the road concurrent to the trajectory
+    avsOnRoad = find([dataGPS.assigned_lane]==tempLane & ...
+        [dataGPS.direction] == tempDir & tempT(1)< [dataGPS.last_timestamp] & ...
+        tempT(end)>[dataGPS.first_timestamp]);
     if ~isempty(avsOnRoad)
-        
-        for keyDir = 1:2
+        for keyDir = 1:2 % evaluate for down/upstream
             sn = distDirSign(keyDir);
             key = distDir(keyDir);
-            vehDistToAvs.(distDir(keyDir)) = distDirSign(keyDir)*inf*(ones(length(avsOnRoad),length(tempT)));
-            vehDistToAvsEngaged.(distDir(keyDir)) = distDirSign(keyDir)*inf*(ones(length(avsOnRoad),length(tempT)));
+            % Initialize distance to AVs to inf
+            vehDistToAvs.(distDir(keyDir)) = distDirSign(keyDir)*inf*...
+                (ones(length(avsOnRoad),length(tempT)));
+            vehDistToAvsEngaged.(distDir(keyDir)) = distDirSign(keyDir)*...
+                inf*(ones(length(avsOnRoad),length(tempT)));
             tempDistX = [];
-            for ii = 1:length(avsOnRoad)
-                
-                avInd = avsOnRoad(ii);
+            for onRoadInd = 1:length(avsOnRoad) % loop over trajectories and log distance
+                avInd = avsOnRoad(onRoadInd);
+                % Calculate distance to AV
                 projAvsX = interp1(dataGPS(avInd).timestamp,dataGPS(avInd).x_position,tempT) ;
                 tempDistX = (projAvsX - tempX )* tempDir;
-                
                 if ~isempty(dataGPS(avInd).control_car)
-                    temp_controller_active = min(1,max(0,round(interp1(dataGPS(avInd).timestamp,double(dataGPS(avInd).control_car),tempT)))) ;
+                    temp_controller_active = ...
+                        min(1,max(0,round(interp1(dataGPS(avInd).timestamp,...
+                        double(dataGPS(avInd).control_car),tempT)))) ;
                 else
-                    temp_controller_active = min(1,max(0,round(interp1(dataGPS(avInd).timestamp,double(dataGPS(avInd).controller_engaged),tempT)))) ;
+                    temp_controller_active = ...
+                        min(1,max(0,round(interp1(dataGPS(avInd).timestamp,...
+                        double(dataGPS(avInd).controller_engaged),tempT)))) ;
                 end
-                
-                vehDistToAvs.(key)(ii,:) =  tempDistX.';
-                vehDistToAvs.(key)(ii,isnan(tempDistX)) = sn*inf;
-                
-                vehDistToAvsEngaged.(key)(ii,:) =  tempDistX.';
-                vehDistToAvsEngaged.(key)(ii,isnan(tempDistX)) = sn*inf;
-                vehDistToAvsEngaged.(key)(ii,temp_controller_active==0) = sn*inf;
+                % Log calculated distance
+                vehDistToAvs.(key)(onRoadInd,:) =  tempDistX.';
+                vehDistToAvs.(key)(onRoadInd,isnan(tempDistX)) = sn*inf;
+                vehDistToAvsEngaged.(key)(onRoadInd,:) =  tempDistX.';
+                vehDistToAvsEngaged.(key)(onRoadInd,isnan(tempDistX)) = sn*inf;
+                % Set distance to inf when controller is not engaged for
+                % engaged distance
+                vehDistToAvsEngaged.(key)(onRoadInd,temp_controller_active==0) = sn*inf;
             end
         end
-        
-        for keyDir = 1:2
+        for keyDir = 1:2 % find minimum distance for down/upstream
             sn = distDirSign(keyDir);
             key = distDir(keyDir);
+            % set distance to inf if av is not in the appropriate direction
             vehDistToAvs.(key)(sn*vehDistToAvs.(key)<0) = sn*inf;
             vehDistToAvsEngaged.(key)(sn*vehDistToAvsEngaged.(key)<0) = sn*inf;
-            
+            % Find AV with minimum distance to trajectory
             [nearestDist.(key),Ind.(key)] = min(sn*vehDistToAvs.(key),[],1);
             [nearestDistEngaged.(key),indEngaged.(key)] = min(sn*vehDistToAvsEngaged.(key),[],1);
-            
-            DistToAvs(i).(distKeys(keyDir)) = nearestDist.(key);
-            DistToAvs(i).(idsKeys(keyDir)) = [dataGPS(avsOnRoad(Ind.(key))).av_id];
+            % Log output distance and AV id
+            DistToAvs(trjInd).(distKeys(keyDir)) = nearestDist.(key);
+            DistToAvs(trjInd).(idsKeys(keyDir)) = [dataGPS(avsOnRoad(Ind.(key))).av_id];
             infFlag = isinf(nearestDist.(key));
             if sum(infFlag) == length(infFlag)
-                DistToAvs(i).(distKeys(keyDir)) = [];
-                DistToAvs(i).(idsKeys(keyDir)) = [];
+                DistToAvs(trjInd).(distKeys(keyDir)) = [];
+                DistToAvs(trjInd).(idsKeys(keyDir)) = [];
             else
-                DistToAvs(i).(distKeys(keyDir))(infFlag) = nan;
-                DistToAvs(i).(idsKeys(keyDir))(infFlag) = nan;
+                DistToAvs(trjInd).(distKeys(keyDir))(infFlag) = nan;
+                DistToAvs(trjInd).(idsKeys(keyDir))(infFlag) = nan;
             end
-            
-            DistToAvs(i).(distEngKeys(keyDir)) = nearestDistEngaged.(key);
-            DistToAvs(i).(idsEngKeys(keyDir)) = [dataGPS(avsOnRoad(indEngaged.(key))).av_id];
+            % Log output engaged distance and AV id
+            DistToAvs(trjInd).(distEngKeys(keyDir)) = nearestDistEngaged.(key);
+            DistToAvs(trjInd).(idsEngKeys(keyDir)) = [dataGPS(avsOnRoad(indEngaged.(key))).av_id];
             infFlag = isinf(nearestDistEngaged.(key));
             if sum(infFlag) == length(infFlag)
-                DistToAvs(i).(distEngKeys(keyDir)) = [];
-                DistToAvs(i).(idsEngKeys(keyDir)) = [];
+                DistToAvs(trjInd).(distEngKeys(keyDir)) = [];
+                DistToAvs(trjInd).(idsEngKeys(keyDir)) = [];
             else
-                DistToAvs(i).(distEngKeys(keyDir))(infFlag) = nan;
-                DistToAvs(i).(idsEngKeys(keyDir))(infFlag) = nan;
+                DistToAvs(trjInd).(distEngKeys(keyDir))(infFlag) = nan;
+                DistToAvs(trjInd).(idsEngKeys(keyDir))(infFlag) = nan;
             end
-            
         end
-        
-        
     end
-    
 end
 end
 

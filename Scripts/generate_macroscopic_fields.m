@@ -1,11 +1,9 @@
-% Construct macroscopic fields based on I24-MOTION data files in the
-% same directory.
-% (C) Benjamin Seibold (edited by Sulaiman Almatrudi)
-clearvars -except DAY_TO_PROCESS
-if ~exist('DAY_TO_PROCESS', 'var')
-    global DAY_TO_PROCESS
-    DAY_TO_PROCESS = input(['Enter the day of Nov. 2022 MVT to generate'...
-        ' macroscopic fileds for (from 16 to 18): ']);
+function [] = generate_macroscopic_fields(processingDay)
+% Construct macroscopic fields based on I24-MOTION data files
+% (C) 2025 Benjamin Seibold (edited by Sulaiman Almatrudi)
+if nargin < 1
+    error(['Specify the day of Nov. 2022 MVT to generate'...
+        ' macroscopic fileds for (from 16 to 18)']);
 end
 %========================================================================
 % Parameters
@@ -23,13 +21,13 @@ flag_plot_field = 0; % if true, plot one field in the end
 flag_plot_trajectories = 0; % if true, overlay field with trajectory
 skip_t_plot = 20; % sub-sample trajectories for plotting
 kernel = 'box';
-created_fields = {'Rho','Q','F','F0','U','Phi','Phi0','Psi','Psi0'};
+created_fields = {'Rho','Q','F','U','Phi','Psi'};
 subfield_name_x = 'x_position_meters';
 
 %========================================================================
 % Initialize
 %========================================================================
-ht = hx/v_char;
+ht = hx/v_char; % [s] window size in time
 if strcmp(kernel,'box')
     fac = 1/(4*ht*hx); % normalizing factor
 elseif strcmp(kernel,'Gaussian')
@@ -39,9 +37,14 @@ elseif strcmp(kernel,'Gaussian')
 end
 % Find all data files in folder
 [parentDirectory, ~, ~] = fileparts(pwd);
-dataFolderPath = fullfile(parentDirectory,['Data_2022-11-' num2str(DAY_TO_PROCESS) '__MVT_Slim']);
-data_files = dir([dataFolderPath '\I-24MOTION_slim_*.json']);
-date_data = ['2022-11-' num2str(DAY_TO_PROCESS)]; % date of the data files
+dataFolderPath = fullfile(parentDirectory,'Data',...
+    ['Data_2022-11-' num2str(processingDay) '__MVT_Slim']);
+dataFiles = dir(fullfile(dataFolderPath ,'I-24MOTION_slim_*.json'));
+if length(dataFiles) < 24
+    error('I24 slim files for the day: %d, Nov. 2022 are missing or incomplete.'...
+        ,processingDay)
+end
+date_data = ['2022-11-' num2str(processingDay)]; % date of the data files
 ax_t = [posixtime(datetime([date_data,' ',ax_t{1}],'TimeZone','America/Chicago')),...
     posixtime(datetime([date_data,' ',ax_t{2}],'TimeZone','America/Chicago'))];
 
@@ -75,11 +78,11 @@ end
 %========================================================================
 % Go through files/trajectories and successively increment fields
 %========================================================================
-for file_j = 1:length(data_files) % loop over relevant files
+for fileInd = 1:length(dataFiles) % loop over relevant files
     % Load data file
-    filename = data_files(file_j).name;
+    filename = dataFiles(fileInd).name;
     fprintf('Loading and decoding %s ...',filename), tic
-    data = jsondecode(fileread(filename));
+    data = jsondecode(fileread(fullfile(dataFiles(fileInd).folder,filename)));
     fprintf(' Done (%0.0fsec).\n',toc)
     % Find indices of trajectories in direction and relevant lane(s)
     if isfield(data,'direction')
@@ -87,7 +90,7 @@ for file_j = 1:length(data_files) % loop over relevant files
     else
         ind = find(([data.lane_number]==lane|lane==0));
     end
-    % Process trajectories
+    % Process trajectories to increment each field
     fprintf('Processing %d trajectories ...',length(ind)), tic
     for j = ind % loop over used trajectories
         traj_t = data(j).timestamp;
@@ -113,30 +116,30 @@ for file_j = 1:length(data_files) % loop over relevant files
             traj_dt = (data(j).timestamp(2)-data(j).timestamp(1))*skip_t_compute;
             warning('Trajectory of length 1 encountered.')
         end
-        for i = 1:traj_n % loop over entries in given trajectory
-            ind_box_t = abs(t-traj_t(i))<=ht; % window size in t
-            ind_box_x = abs(x-traj_x(i))<=hx; % window size in x
+        for pointInd = 1:traj_n % loop over entries in given trajectory
+            ind_box_t = abs(t-traj_t(pointInd))<=ht; % window size in t
+            ind_box_x = abs(x-traj_x(pointInd))<=hx; % window size in x
             if strcmp(kernel,'Gaussian')
-                G = exp(-(((T(ind_box_t,ind_box_x)-traj_t(i))/wt).^2+...
-                    ((X(ind_box_t,ind_box_x)-traj_x(i))/wx).^2)/2);
+                G = exp(-(((T(ind_box_t,ind_box_x)-traj_t(pointInd))/wt).^2+...
+                    ((X(ind_box_t,ind_box_x)-traj_x(pointInd))/wx).^2)/2);
             elseif strcmp(kernel,'box')
                 G = T(ind_box_t,ind_box_x)*0+1;
             end
             if isfield(field.value,'Rho')
                 field.value.Rho(ind_box_t,ind_box_x) = ...
-                    field.value.Rho(ind_box_t,ind_box_x)+traj_dt(i)*G;
+                    field.value.Rho(ind_box_t,ind_box_x)+traj_dt(pointInd)*G;
             end
             if isfield(field.value,'Q')
                 field.value.Q(ind_box_t,ind_box_x) = ...
-                    field.value.Q(ind_box_t,ind_box_x)+traj_dt(i)*traj_v(i)*G;
+                    field.value.Q(ind_box_t,ind_box_x)+traj_dt(pointInd)*traj_v(pointInd)*G;
             end
             if isfield(field.value,'F')
                 field.value.F(ind_box_t,ind_box_x) = ...
-                    field.value.F(ind_box_t,ind_box_x)+traj_dt(i)*traj_f(i)*G;
+                    field.value.F(ind_box_t,ind_box_x)+traj_dt(pointInd)*traj_f(pointInd)*G;
             end
             if isfield(field.value,'F0')
                 field.value.F0(ind_box_t,ind_box_x) = ...
-                    field.value.F0(ind_box_t,ind_box_x)+traj_dt(i)*traj_f0(i)*G;
+                    field.value.F0(ind_box_t,ind_box_x)+traj_dt(pointInd)*traj_f0(pointInd)*G;
             end
         end
     end
@@ -147,7 +150,6 @@ if isfield(field.value,'Rho'), field.value.Rho = field.value.Rho*fac; end
 if isfield(field.value,'Q'), field.value.Q = field.value.Q*fac; end
 if isfield(field.value,'F'), field.value.F = field.value.F*fac; end
 if isfield(field.value,'F0'), field.value.F0 = field.value.F0*fac; end
-
 %========================================================================
 % Derived fields
 %========================================================================
@@ -180,8 +182,8 @@ end
 %========================================================================
 % Save fields
 %========================================================================
-filename = [parentDirectory '\Data_Macroscopic_Fields\fields_motion_2022-11-'...
-    num2str(DAY_TO_PROCESS)  '.mat'];
+filename = fullfile(parentDirectory ,'Data','Data_for_Figures',...
+    ['fields_motion_2022-11-' num2str(processingDay)  '.mat']);
 fprintf('Saving file %s ...',filename), tic
 save(filename,'field','t','x','direction','lane')
 fprintf(' Done (%0.0fsec).\n',toc)
@@ -189,7 +191,7 @@ fprintf(' Done (%0.0fsec).\n',toc)
 %========================================================================
 % Plot results
 %========================================================================
-field_plot = 'Rho';
+field_plot = 'U';
 n_xticks = 20; % number of time ticks
 
 if flag_plot_field
@@ -228,4 +230,5 @@ if flag_plot_field
     end
     xlabel('time'), ylabel('position / km')
     fprintf(' Done (%0.0fsec).\n',toc)
+end
 end
