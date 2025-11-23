@@ -52,7 +52,7 @@ mcDist = 0.225 ; %[mile] the distance between mill creek origin (MM58.675) and M
 % directory above contains only the git repository
 [dataRootDirectory, ~, ~] = fileparts(parentDirectory);
 % directory above that contains the data/ folder
-dataFolderPath = fullfile(dataRootDirectory, 'data', '0_base', ...
+dataFolderPath = fullfile(dataRootDirectory, 'data', 'i24motion', ...
     ['2022-11-', num2str(processingDay)]);
 
 %%
