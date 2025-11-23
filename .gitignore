@@ -33,7 +33,6 @@ codegen/
 *.json
 *.fig
 *.png
-*.csv
 *.xlsx
 *.zip
 
