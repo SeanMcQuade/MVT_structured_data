@@ -28,17 +28,22 @@ colorbarLimit.Psi =  0.22; % (g/m)
 % Load data files
 %========================================================================
 [parentDirectory, ~, ~] = fileparts(pwd);
-filename = fullfile(parentDirectory ,'Data','Data_for_Figures',['fields_motion_2022-11-'...
+% directory above contains only the git repository
+[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
+inputPath = fullfile(dataRootDirectory, 'results', 'figures', ...
+    ['2022-11-', num2str(processingDay)]);
+
+filename = fullfile(inputPath ,['fields_motion_2022-11-'...
      num2str(processingDay) '.mat']);
 fprintf('Loading %s ...',filename), tic
 load(filename)
 fprintf(' Done (%0.0fsec).\n',toc)
 if flagPlotAvTrajectories
-    dataFiles = dir(fullfile(parentDirectory, 'Data','Data_GPS',['CIRCLES_GPS_10Hz_2022-11-'...
+    dataFiles = dir(fullfile(dataRootDirectory, 'results','gps',['CIRCLES_GPS_10Hz_2022-11-'...
          num2str(processingDay)  '.json']));
     filename = dataFiles(1).name; % if multiple files, use first one
     fprintf('Loading %s ...',filename), tic
-    fid = fopen(fullfile(parentDirectory, 'Data','Data_GPS',filename));
+    fid = fopen(fullfile(dataRootDirectory, 'results','gps',filename));
     data = fread(fid,inf);
     fclose(fid);
     fprintf(' Done (%0.0fsec).\n',toc)
@@ -139,7 +144,7 @@ for i = 1:length(plotFields)
             filename = [filename,'_av'];
         end
         filename = [filename,'_nature_large'];
-        filename = fullfile(parentDirectory, 'Figures',filename);
+        filename = fullfile(inputPath,filename);
         fprintf('Save figure in %s ...',filename), tic
         set(gcf,'Position',[10 50 figRes],'PaperPositionMode','auto')
         set(gca,'Position',[.023 .093 .92 .866])

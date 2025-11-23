@@ -47,22 +47,37 @@ mcDist = 0.225 ; %[mile] the distance between mill creek origin (MM58.675) and M
 %========================================================================
 % Initilize
 %========================================================================
+% Get file path of base GPS data
 [parentDirectory, ~, ~] = fileparts(pwd);
-dataFolderPath = fullfile(parentDirectory,'Data',...
-    ['Data_2022-11-' num2str(processingDay) '__I24_Base']);
+% directory above contains only the git repository
+[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
+% directory above that contains the data/ folder
+dataFolderPath = fullfile(dataRootDirectory, 'data', '0_base', ...
+    ['2022-11-', num2str(processingDay)]);
+
+%%
+% Build the output path and filename
+outputPath = fullfile(dataRootDirectory, 'results', 'slim', ...
+    ['2022-11-', num2str(processingDay)]);
+
+% Create output directory if needed
+if ~isfolder(outputPath)
+    mkdir(outputPath)
+end
+
 dayAbbrvs = ["mon","tue","wed","thu","fri"];
 dayAbbrv = dayAbbrvs(processingDay-13);
-dataFiles = dir(fullfile(dataFolderPath ,['*_' char(dayAbbrv) '_0_*.json']));
+dataFiles = dir(fullfile(dataFolderPath ,['*_' num2str(dayAbbrv) '_0_*.json']));
 if length(dataFiles) < 24
     error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.'...
         ,processingDay)
 end
+
 %========================================================================
 % Load GPS and road grade data
 %========================================================================
 % Load road grade map
-gradeData = readmatrix(fullfile(parentDirectory,...
-    'Models','Eastbound_grade_fit.csv'));
+gradeData = readmatrix(fullfile(parentDirectory,'Models','Eastbound_grade_fit.csv'));
 gradeDataStart = gradeData(:,2);
 gradeDataEnd = gradeData(:,3);
 gradeDataPoints = [gradeDataStart; gradeDataEnd(end)];
@@ -70,8 +85,8 @@ gradeDataSlope = gradeData(:,4);
 gradeDataIntercept = gradeData(:,5);
 % GPS Data is assumed to be processed. Run create_data_GPS.m to produce processed GPS files
 fprintf('\nLoading and decoding AVs GPS data file ...'); tic
-dataGPS = jsondecode(fileread(fullfile(parentDirectory,...
-    'Data','Data_GPS',['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])));
+dataGPS = jsondecode(fileread(fullfile(dataRootDirectory,...
+    'results','gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])));
 fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Process each I24 MOTION file 
@@ -84,6 +99,26 @@ for fileNr = 1:24 % loop over base data files
         fileNr); tic
     dataTemp = jsondecode(fileread(filenameLoad));
     fprintf('Done (%0.0fsec).\n',toc)
+
+        % determine if the file already exists or not...and skip if it does
+    % using dataTemp here, since it is the most recent file, to determine
+    % what the output file name should be
+    fileStartT = (datetime(dataTemp(1).first_timestamp, 'convertfrom', 'posixtime', ...
+    'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
+    fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
+    % outputFolder comes from the top of the file
+    filenameSave = fullfile(outputPath,...
+        ['I-24MOTION_',fileStartT,'.json']);
+    % Save the processed data to a file
+    
+    % Check if file already exists
+    if isfile(filenameSave)
+        fprintf('Output file already exists: %s\nSkipping processing.\n', filenameSave);
+        continue  % advance this part of the loop
+    else
+        fprintf('File %s does not exist...starting processing.', filenameSave);
+    end
+
     % remove eastbound trajectories
     dataTemp = dataTemp([dataTemp.direction]<0); 
     % delete extra fields
@@ -101,6 +136,7 @@ for fileNr = 1:24 % loop over base data files
     fprintf('Generating v2.1 version of data ... '),tic
     n = length(dataTemp);
     data = init_data_struct(n);
+    
     for trjInd=1:floor(n) %loop over all data(vehicle) segments
         veh = dataTemp(trjInd);               % get each vehicle
         data(trjInd).trajectory_id = veh.x_id; % id for i-th vehicle trajectory
@@ -226,15 +262,15 @@ for fileNr = 1:24 % loop over base data files
     pause(5)
     fprintf('Done (%0.0fsec).\n',toc)
     fprintf('Encoding and Writing json file ... '),tic
-    fileStartT = (datetime(data(1).first_timestamp, 'convertfrom', 'posixtime',...
-        'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
-    fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
-    filenameSave = fullfile(parentDirectory, 'Data',...
-        ['Data_2022-11-' num2str(processingDay) '__MVT_Slim'],...
-        ['I-24MOTION_slim_',fileStartT]);    
+    % fileStartT = (datetime(data(1).first_timestamp, 'convertfrom', 'posixtime',...
+    %     'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
+    % fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
+    % filenameSave = fullfile(parentDirectory, 'Data',...
+    %     ['Data_2022-11-' num2str(processingDay) '__MVT_Slim'],...
+    %     ['I-24MOTION_slim_',fileStartT]);    
     jsonStr = jsonencode(data);
     clear data
-    fid = fopen([filenameSave '.json'], 'w');
+    fid = fopen(filenameSave, 'w');
     fwrite(fid, jsonStr, 'char');
     fclose(fid);
     fprintf('Done (%0.0fsec).\n',toc)
