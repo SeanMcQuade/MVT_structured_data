@@ -42,22 +42,32 @@ ft2meterFactor = 0.3048; % [m/ft] conversion factor from feet to meter
 %========================================================================
 % Find all data files in folder
 [parentDirectory, ~, ~] = fileparts(pwd);
+% directory above contains only the git repository
+[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
+
 % Use slim version of the processed data if plotting westbound 
 if direction < 0 % Westbound
-    dataVersion = 'Slim';
+    dataVersion = 'slim';
 else            % Eastbound
-    dataVersion = 'Full';
+    dataVersion = 'full';
 end
-dataFolder = fullfile(parentDirectory,'Data',...
-    ['Data_2022-11-' char(num2str(processingDay)) '__MVT_' dataVersion]);
+
+inputPath = fullfile(dataRootDirectory, 'results', dataVersion, ...
+    ['2022-11-', num2str(processingDay)]);
+
+% dataFolder = fullfile(parentDirectory,'Data',...
+%     ['Data_2022-11-' char(num2str(processingDay)) '__MVT_' dataVersion]);
 if flag_reduce_data_files 
-    data_files = dir(fullfile(dataFolder, ...
+    data_files = dir(fullfile(inputPath, ...
         '*_reduced.mat'));
     if length(data_files) < 24
-        reduce_data(dataFolder);
+        reduce_data(inputPath);
+        % now, the files should be there!
+        data_files = dir(fullfile(inputPath, ...
+            '*_reduced.mat'));
     end    
 else
-    data_files = dir(fullfile(dataFolder, ...
+    data_files = dir(fullfile(inputPath, ...
         ['I-24*' char(num2str(processingDay)) '*.json']));
 end
 date_data = ['2022-11-' num2str(processingDay)]; % date of the data files
@@ -148,7 +158,9 @@ for fileInd = 1:length(data_files) % loop over relevant files
     data = data(ind);
     % Process trajectories
     fprintf('Adding %d trajectories to plot ...',length(ind)), tic
-    for j = 1:length(data) % loop over used trajectories
+    % HACK changed to 1:3:length(data) intsead of 1:length(data) to 
+    % debug why crashing
+    for j = 1:3:length(data) % loop over used trajectories
         traj_len = data(j).length*ft2meterFactor; % length of vehicle [m]
         traj_t = data(j).timestamp; 
         traj_x = data(j).(subfield_name_x); % vehicle position [m]
@@ -185,8 +197,10 @@ fprintf(' Done (%0.0fsec).\n',toc)
 fileName = sprintf('fig_motion_trajectories_%s_%s_%s',...
     datetime(t_local(1),'Format','yyyyMMdd'),...
     direction_fname,lane_fname);
-folderName = fullfile(parentDirectory, 'Figures');
+folderName = fullfile(dataRootDirectory, 'results', 'figures', ...
+    ['2022-11-', num2str(processingDay)]);
 if ~isfolder(folderName)
+    print('Creating folder %s', folderName)
     mkdir(folderName);
 end
 fileName = fullfile(folderName,fileName);
@@ -265,7 +279,7 @@ exportgraphics(fig, filename, 'Resolution', res);
 fprintf(' Done (%0.0fsec).\n',toc)
 end
 
-function [] = reduce_data(dataFolder)
+function [] = reduce_data(inputPath)
 
 removed_fields = {
     'trajectory_id',...
@@ -294,7 +308,7 @@ removed_fields = {
     'downstream_engaged_av_id',...
     'distance_to_downstream_engaged_av_meters'};
 
-data_files = dir(fullfile(dataFolder,'*.json'));
+data_files = dir(fullfile(inputPath,'*.json'));
 for fileInd = 1:length(data_files)
     filename = data_files(fileInd).name;
     filenameSave = [filename(1:end-5),'_reduced.mat'];
