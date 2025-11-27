@@ -60,11 +60,21 @@ inputPath = fullfile(dataRootDirectory, 'results', dataVersion, ...
 if flag_reduce_data_files 
     data_files = dir(fullfile(inputPath, ...
         '*_reduced.mat'));
+    
+    % avoid processing files that start with .
+    is_dotfile = startsWith({data_files.name},'.');
+    data_files = data_files(~is_dotfile);
+
     if length(data_files) < 24
         reduce_data(inputPath);
         % now, the files should be there!
         data_files = dir(fullfile(inputPath, ...
             '*_reduced.mat'));
+
+        % avoid processing files that start with .
+        is_dotfile = startsWith({data_files.name},'.');
+        data_files = data_files(~is_dotfile);
+
     end    
 else
     data_files = dir(fullfile(inputPath, ...
@@ -160,7 +170,7 @@ for fileInd = 1:length(data_files) % loop over relevant files
     fprintf('Adding %d trajectories to plot ...',length(ind)), tic
     % HACK changed to 1:3:length(data) intsead of 1:length(data) to 
     % debug why crashing
-    for j = 1:3:length(data) % loop over used trajectories
+    for j = 1:10:length(data) % loop over used trajectories
         traj_len = data(j).length*ft2meterFactor; % length of vehicle [m]
         traj_t = data(j).timestamp; 
         traj_x = data(j).(subfield_name_x); % vehicle position [m]
@@ -309,6 +319,11 @@ removed_fields = {
     'distance_to_downstream_engaged_av_meters'};
 
 data_files = dir(fullfile(inputPath,'*.json'));
+
+% avoid processing files that start with .
+is_dotfile = startsWith({data_files.name},'.');
+data_files = data_files(~is_dotfile);
+
 for fileInd = 1:length(data_files)
     filename = data_files(fileInd).name;
     filenameSave = [filename(1:end-5),'_reduced.mat'];

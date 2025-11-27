@@ -68,6 +68,11 @@ end
 dayAbbrvs = ["mon","tue","wed","thu","fri"];
 dayAbbrv = dayAbbrvs(processingDay-13);
 dataFiles = dir(fullfile(dataFolderPath ,['*_' num2str(dayAbbrv) '_0_*.json']));
+
+% avoid processing files that start with .
+is_dotfile = startsWith({dataFiles.name},'.');
+dataFiles = dataFiles(~is_dotfile);
+
 if length(dataFiles) < 24
     error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.'...
         ,processingDay)
