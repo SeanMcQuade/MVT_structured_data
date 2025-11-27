@@ -87,7 +87,7 @@ minFileNr = max(1,floor((minAVStart-dataTLimits(1))/60/10));
 maxAVStart = max([dataGPS0([dataGPS0.starting_time]<dataTLimits(2)).ending_time]);
 maxFileNr = min(24,floor((maxAVStart-dataTLimits(1))/60/10)+1);
 % Find I24 MOTION data files in the same folder outside the repository
-dataFolderPath = fullfile(dataRootDirectory,'data','0_base', ...
+dataFolderPath = fullfile(dataRootDirectory,'data','i24motion', ...
     ['2022-11-' num2str(processingDay) ]) ;
 if ~isfolder(dataFolderPath)
     error('Folder %s does not exist.\n',dataFolderPath)
