@@ -96,6 +96,10 @@ end
 dayAbbrvs = ["wed","thu","fri"];
 dayAbbrv = dayAbbrvs(processingDay-15);
 dataFiles = dir(fullfile(dataFolderPath, ['*_', num2str(dayAbbrv), '_0_*.json']));
+% if reading from a hdd with ._ leading file metadata, everything fails! so
+% we skip those file by ignoring prefixes starting with .
+is_dotfile = startsWith({dataFiles.name},'.');
+dataFiles = dataFiles(~is_dotfile);
 % dataFiles = dir(fullfile(dataFolderPath, ['I-24MOTION_2022-11-', num2str(dayAbbrv), '_*.json']));
 if length(dataFiles) < 24
     error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.',processingDay)
@@ -111,8 +115,10 @@ segmentsCounter = 1;
 for fileNr = minFileNr:maxFileNr
     % Load MOTION data file
     filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
-    fprintf('Loading and decoding MOTION data file, %d/%d ... ', ...
+    fprintf('Loading and decoding MOTION data file, %d/%d...\n ', ...
         fileNr-minFileNr+1,maxFileNr-minFileNr+1); tic
+    fprintf('Filename=%s... ', ...
+        filenameLoad);
     dataTemp = jsondecode(fileread(filenameLoad));
     fprintf('Done (%0.0fsec).\n',toc)
     % Find AV runs concurrent to MOTION data trajectories in file
