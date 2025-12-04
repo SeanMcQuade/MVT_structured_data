@@ -23,14 +23,14 @@ dataFolderPath = fullfile(dataRootDirectory, 'results', 'slim', ...
 I24FilesInDir = dir(fullfile(dataFolderPath, ...
     ['I-24*' char(num2str(processingDay)) '*.json']));
 nrFiles = length(I24FilesInDir);
-if nrFiles < 24
+if nrFiles == 0
     % try the full data if slim is not available
     dataFolderPath = fullfile(dataRootDirectory, 'results', 'full', ...
         ['2022-11-', num2str(processingDay)]);
     I24FilesInDir = dir(fullfile(dataFolderPath, ...
         ['I-24*' char(num2str(processingDay)) '*.json']));
     nrFiles = length(I24FilesInDir);
-    if nrFiles < 24
+    if nrFiles == 0
         error(['Processed I-24 data files not found. Please generate files'...
             ' by running generate_data_mvt_slim.m first.'])
     end

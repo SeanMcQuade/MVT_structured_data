@@ -77,7 +77,7 @@ end
 % these files are NOT generated with _slim_ as a name mangle---they are
 % noted as slim b/c they are in the 'slim' directory (abovee)
 dataFiles = dir(fullfile(dataFolderPath ,'I-24MOTION_*.json'));
-if length(dataFiles) < 24
+if length(dataFiles) == 0
     error('I24 slim files for the day: %d, Nov. 2022 are missing or incomplete.'...
         ,processingDay)
 end

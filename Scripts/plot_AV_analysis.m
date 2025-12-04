@@ -1,4 +1,8 @@
-function [] = plot_AV_analysis()
+function [] = plot_AV_analysis(testDays)
+    arguments
+        testDays (1,:) {mustBeNumeric} = 16:18
+    end
+
 % Function to plot multiple analysis results for AV effect on fuel consumption 
 % for experiments run on the following dates: 11/16/2022, 11/17/2022, and 11/18/2022
 % (C) 2025 Sean McQuade and Sulaiman Almatrudi
@@ -36,12 +40,13 @@ indicesPartitions{1} = indUnmaskedLeft;
 indicesPartitions{2} = indMaskedLeft;
 indicesPartitions{3} = indMaskedRight;
 indicesPartitions{4} = indUnmaskedRight;
-testDays = [16, 17, 18]; % date of test days to analyaze 
+% testDays = [16, 17, 18]; % date of test days to analyaze 
 fprintf('Loading aggregated data samples... ') ; tic
-for dayInd=1:length(testDays) % three days, Wed thrus fri
+for testDay=testDays % three days, Wed thrus fri
+    dayInd=testDay-15;
     loadedData = load(fullfile(dataRootDirectory , 'results', ...
-        'figures', ['2022-11-', num2str(testDays(dayInd))],...
-        ['samples_for_distance_analysis_' char(num2str(testDays(dayInd))) '.mat']));
+        'figures', ['2022-11-', num2str(testDay)],...
+        ['samples_for_distance_analysis_' char(num2str(testDay)) '.mat']));
     % filter data based on x position, time, and speed
     ind = loadedData.samples_speed >= minSpdRaw; %set minSpdRaw to '0' to keep all speed samples
     if length(XWINDOW)>1
@@ -76,16 +81,27 @@ clear loadedData
 fprintf('Done (%0.0fsec).\n',toc)
 % preallocate statistics 
 fprintf('Binning data to distance from active AVs... ') ; tic
-meanFcons   = zeros(length(testDays),length(binCenters));
-binnedFcons = cell(length(testDays),length(binCenters));
-binnedFr    = cell(length(testDays),length(binCenters));
-binnedSpeed = cell(length(testDays),length(binCenters));
-effectiveFc = zeros(length(testDays),length(binCenters));
-medianFcons = zeros(length(testDays),length(binCenters));
-binCounts   = zeros(length(testDays),length(binCenters));
+% meanFcons   = zeros(length(testDays),length(binCenters));
+% binnedFcons = cell(length(testDays),length(binCenters));
+% binnedFr    = cell(length(testDays),length(binCenters));
+% binnedSpeed = cell(length(testDays),length(binCenters));
+% effectiveFc = zeros(length(testDays),length(binCenters));
+% medianFcons = zeros(length(testDays),length(binCenters));
+% binCounts   = zeros(length(testDays),length(binCenters));
+% binnedInd   = cell(1,length(binCenters));
+% reorganizing in case fewer than 3 days are passed in...
+meanFcons   = zeros(3,length(binCenters));
+binnedFcons = cell(3,length(binCenters));
+binnedFr    = cell(3,length(binCenters));
+binnedSpeed = cell(3,length(binCenters));
+effectiveFc = zeros(3,length(binCenters));
+medianFcons = zeros(3,length(binCenters));
+binCounts   = zeros(3,length(binCenters));
 binnedInd   = cell(1,length(binCenters));
 % Loop over test days and binn samples based on distance to closest av
-for dayInd=1:length(testDays) 
+% for dayInd=1:length(testDays) 
+for testDay=testDays
+    dayInd=testDay-15;
     d = samplesDistCell{dayInd}; %used to put data into bins by distance
     for binInd = 1:length(binCenters) %bin the indices by distance from AV
         binnedInd{binInd}     = find(distToA(binInd) <= d & d < distToA(binInd+1));
@@ -118,7 +134,9 @@ valMaskedRight      = zeros(length(testDays),length(indMaskedRight));
 wRegLeft            = cell(length(testDays),1);
 wRegRight           = cell(length(testDays),1);
 sRegression         = cell(length(testDays),1);
-for dayInd=1:length(testDays)
+% for dayInd=1:length(testDays)
+for testDay=testDays
+    dayInd=testDay-15;
     statsToPlot{dayInd} = [meanFcons(dayInd,:); effectiveFc(dayInd,:); medianFcons(dayInd,:)];
     % partitioned_stats{1}left, {2}masked left, {3}masked right, {4}right.
     % Each has three rows [mean_fcons; effective_fc; median_fcons]
@@ -151,15 +169,17 @@ end
 fprintf('Loading and processing GPS and field data... ') ; tic
 uTempMean = [];
 nAVsActive = [];
-for dayInd=1:3 %wed. thurs. fri. 
+% for dayInd=1:3 %wed. thurs. fri. 
+for testDay=testDays
+    dayInd=testDay-15;
     % because of this nonstandard array use, we need to get this to 16
     % instead of 1
     fieldFilename = fullfile(dataRootDirectory,'results' ,'figures',...
-        ['2022-11-', num2str(15+dayInd)], ...
+        ['2022-11-', num2str(testDay)], ...
         char(strArray(dayInd)));
     load(fieldFilename)
     GPSFilename = fullfile(dataRootDirectory, 'results',...
-        'gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(15+dayInd) '.json']);
+        'gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(testDay) '.json']);
     data = jsondecode(fileread(GPSFilename));
     tStep = floor(mean(diff(t)));    
     for tInd = 1:length(t) % loop over time grid
@@ -229,13 +249,18 @@ for figInd = figsToProduce
     else
         statsToPlotChoice = statsToPlotChoices;
     end
-    for dayInd=1:length(testDays)
-        plotStartT = datetime(2022,11,testDays(dayInd), firstHour, firstMinutes ,0,...
+    % for dayInd=1:length(testDays)
+    % a plotting index to help navigate plots
+    plotInd=1;
+    for testDay=testDays
+        dayInd=testDay-15;
+        plotStartT = datetime(2022,11,testDay, firstHour, firstMinutes ,0,...
             'TimeZone' ,'America/Chicago');
-        plotEndT = datetime(2022,11,testDays(dayInd), secondHour, secondMinutes,0, ...
+        plotEndT = datetime(2022,11,testDay, secondHour, secondMinutes,0, ...
             'TimeZone' ,'America/Chicago');
         tWindowNAvsActive = nAVsActive(dayInd,tCST(dayInd,:)>plotStartT);
-        subplot(3,3,3*dayInd-2)
+        % subplot(3,3,3*dayInd-2)
+        subplot(3,3,3*dayInd-2);
         hold on
         yyaxis right
         hold on %plot number of AVs
@@ -284,6 +309,7 @@ for figInd = figsToProduce
         cla
         plot_one_sided(dateStr,plotCol,partitionedStatsPerDay,sRegression{dayInd},...
             binCenters, indicesPartitions,statsToPlotChoice)
+        plotInd=plotInd+1;
     end   
     % Adjust subfig placements and size
     posX = [.05,.355,.76];
@@ -301,7 +327,7 @@ for figInd = figsToProduce
     fprintf('Done (%0.0fsec).\n',toc)    
     if flagSave
         fname = fullfile(dataRootDirectory,'results', 'figures', ...
-            ['2022-11-', num2str(15+dayInd)], ...
+            ['2022-11-', num2str(testDay)], ...
             ['fig_' num2str(figInd)...
             '_fuel_results_',...
             char(strjoin(statsToPlotChoice(:),'_')), ...
@@ -320,16 +346,19 @@ axy = [0, 1400000];
 equispacedBins = fix(binCenters);
 equispacedBins(floor(length(equispacedBins)/2)+1) = [];
 weekDaysStr = ["Wednesday","Thursday","Friday"];
-for dayInd =1:length(testDays)
-    subplot(3,1,dayInd)
-    countsTemp = binCounts(dayInd,:);
+% dayInd=1;
+for testDay=testDays
+    plotInd=testDay-15;
+    subplot(3,1,plotInd)
+    countsTemp = binCounts(plotInd,:);
     countsTemp(floor(length(countsTemp)/2)+1) = [];
     bar(equispacedBins,countsTemp )
     hold on
     plot([0,0],axy,'k:','LineWidth',1.5)
     plot([-30,-30],axy,'r:','LineWidth',2.5)
     plot([30,30],axy,'r:','LineWidth',2.5)
-    title(weekDaysStr(dayInd),'FontSize',fontSize)
+    % if we plot only one day, which day index is it? subtract 15
+    title(weekDaysStr(testDay-15),'FontSize',fontSize)
     % add x and y labels for missle subplot
     if dayInd ==2
         xlabel('Distance to nearest AV in same lane (m)','FontSize',fontSize)
@@ -344,10 +373,11 @@ for dayInd =1:length(testDays)
         'HorizontalAlignment','right','VerticalAlignment','bottom')
     hold off
     set(gca,'fontsize',18)
+    dayInd=dayInd+1;
 end
 if flagSave
     fname = fullfile(dataRootDirectory,'results', 'figures', ...
-        ['2022-11-', num2str(15+dayInd)], ...
+        ['2022-11-', num2str(testDay)], ...
         ['fig_SM' num2str(2)...
         '_vehicle_samples_counts_',...
         char(strjoin(statsToPlotChoice(:),'_')), ...
