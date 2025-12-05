@@ -3,6 +3,7 @@
 % (C) 2025 CIRCLES - Sulaiman Almatrudi, Jonathan Sprinkle
 clear
 % Run through each of the test days
+% the peer-review example processes only 11-17-2022 (Thursday)
 for processingDay = 17
     % Generate samples for analysis
     fprintf(['running function generate_data_samples.m for day ' num2str(processingDay)...
