@@ -7,14 +7,14 @@ The repository refers to data recorded from the I-24 MOTION observatory, as well
 
 
 # Contents
-- [Learn about the CIRCLES data.](#data-about)
+- [Learn about the CIRCLES data.](#about-circles-data-analyzed-with-this-software)
 - [Peer review](#peer-review)
 - [Data installation](#data-install)
 - [Plot data and results.](#plot-results)
 - [(Advanced) Bootrstrap: Generate integrated data.](#advanced-bootstrap)
 - [Websites](#tag3)
 
-## About CIRCLES data analyzed with this software {#data-about}
+## About CIRCLES data analyzed with this software
 
 ### About data from I-24 MOTION
 
@@ -29,7 +29,7 @@ Information from team-installed GPS sensors was collected at 10-Hz. These data i
 #### Data Collection from CIRCLES Cars with team-designed on-board data collection
 Information from team-installed computers that interface with the Controller Area Network (CAN) were critical to sensing and control of the experiment cars. These data are aligned with the raw GPS information to provide the state of the vehicle at that time (speed, assigned lane of travel, desired cruise control set point, etc.). 
 
-## Peer Review {#peer-review}
+## Peer Review
 Peer-review analysis of the energy results and this software will have access to only a subset of the overall data, due to the time to analyze and the storage and sharing challenges with the data.
 
 To carry out the analysis, the following software requirements are needed:
@@ -52,7 +52,12 @@ It should take approximately 10-12 minutes or faster to regenerate those plots. 
 
 A subset of these plots are synthesized in `results/figures/2022-11-17`.
 
-## Reproduce Plots: Scripts to plot figures from the article. {#plot-results}
+## Data Install
+
+Download the data to your computer, it will be called either `data` or `results`. In the same folder that contains the data or results, clone this repository.
+
+## Reproduce Plots: Scripts to plot figures from the article.
+
 Ensure you have downloaded all the data, and stored it according to the structure described in the next step. 
 
 ### Step 0: Correct folder structure for reproducing plots. 
@@ -118,7 +123,8 @@ Running``"Scripts\plot_macroscopic_fields.m` to generate the macroscopic fields 
 
 The outputs in `results/figures` provide reproductions of the figures used in the main graphics in the paper.
 
-## Bootstrap: generate the integrated data set. (advanced only) {#advanced-bootstrap}
+## Advanced Bootstrap
+How to generate the integrated data set. (advanced only)
 
 ***Note*** This step requires a different dataset to begin, and generates the `slim` and `full` results that are part of the release. These steps perform alignment of vehicle and I-24 MOTION data, from base files from I-24 MOTION and original GPS and vehicle CAN data files that are assigned by each car.
 
