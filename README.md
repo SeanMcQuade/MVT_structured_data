@@ -14,6 +14,108 @@ The repository refers to data recorded from the I-24 MOTION observatory, as well
 - [(Advanced) Bootrstrap: Generate integrated data.](#advanced-bootstrap)
 - [Websites](#tag3)
 
+
+## Peer Review
+Peer-review analysis of the energy results and this software will have access to only a subset of the overall data, due to the time to analyze and the storage and sharing challenges with the data.
+
+Peer review analysis and testing is self-contained: it is not required to perform any of the data installation, advanced plotting, or other result plotting. 
+
+### 1. System Requirements
+
+To carry out the analysis, the following software requirements are needed:
+
+#### Software Dependencies:
+
+- Install [MATLAB](https://mathworks.com/)
+- Only `Matlab` must be installed as a required toolbox
+- MATLAB v2025a and v2025b have both been tested
+- Tested on Mac Sequoia 15.6, Windows 11
+
+#### Installation Guide
+- Install MATLAB (approximately 20 minutes, depending on download speeds)
+- Extract the archive file `circles-peer-review.tgz` (2-3 minutes, depending on download speeds). The extraction should be to a hard drive with at least 10GB of available space, to ensure enough space to generate additional files.
+
+#### Demo
+
+##### Instructions to run the demo:
+
+- Navigate to the folder `MVT_structured_data/Scripts` which was extracted in the `circles-peer-review` folder.
+- Run the file `peer_review_example.m`
+
+The execution of this file will reproduce the style of plot for the data provided, which is a subset from the data from 11-17-2022 (Thursday) of the overall data that represents 10 minutes of data from that day. 
+
+- Generate structured collections of data samples for this day from the `results/` folder
+- Generate the macroscopic fields (from the provided data)
+- Plot the macroscopic fields (from the provided data) with the GPS data from the cars (across the entire day)
+- Plot the microscopic fields of all cars (from above)
+- Carry out the analysis of fuel usage and comparisons (from the provided data)
+- Plot the fuel usage and comparisons (from above)
+
+A subset of these plots are synthesized in `results/figures/2022-11-17`.
+
+##### Expected output: 
+
+Resulting files should be generated in the following folders
+
+###### Found in `results/figures/2022-11-17`
+```
+fields_motion_2022-11-17.mat
+fig_2_fuel_results_effective_645_915.fig
+fig_2_fuel_results_effective_645_915.png
+fig_3_fuel_results_effective_mean_median_645_915.fig
+fig_3_fuel_results_effective_mean_median_645_915.png
+fig_field_20221117_west_laneall_motion_F_av_nature_large.png
+fig_field_20221117_west_laneall_motion_Phi_av_nature_large.png
+fig_field_20221117_west_laneall_motion_Psi_av_nature_large.png
+fig_field_20221117_west_laneall_motion_Q_av_nature_large.png
+fig_field_20221117_west_laneall_motion_Rho_av_nature_large.png
+fig_field_20221117_west_laneall_motion_U_av_nature_large.png
+fig_motion_trajectories_20221117_west_laneall_lowres.png
+fig_motion_trajectories_20221117_west_laneall_zoom_lowres.png
+fig_motion_trajectories_20221117_west_laneall_zoomwin_lowres.png
+fig_SM2_vehicle_samples_counts_effective_mean_median_645_915.fig
+fig_SM2_vehicle_samples_counts_effective_mean_median_645_915.png
+samples_for_distance_analysis_17.mat
+```
+
+An example image that should be produced represents the macroscopic flow rates, with overlay  is `results/figures/2022-11-17/fig_field_20221117_west_laneall_motion_Psi_av_nature_large.png` which describes the bulk fuel consumption with overlay of GPS data from our control cars, indicating when their control was active (or not) during their drives.
+
+![Bulk Fuel results (partial) with only a subset of data from 2022-11-17](../results/figures/2022-11-17/fig_field_20221117_west_laneall_motion_Psi_av_nature_large.png)
+
+**Note** there may be minor errors or warnings thrown, since the data pipeline is intended to reproduce exact figures with comparable max/min values and colors across multiple plots. Since only one day, with a subset of data into that anaysis, is included, plots may have
+
+- what seems to be missing large portions on the left/right of presented data
+- what seems to indicate that axes are 'zoomed out'
+
+These are artifacts of axes bounds that are normalized across multiple days for comparison, and thus the appropriate approach is to open those .fig files as plots with MATLAB, and then zoom in to explore.
+
+###### Found in `results/slim/2022-11-17`
+
+This will include a single .mat file that represents binary data in MATLAB format for quick review and analysis in subsequent plots.
+
+```
+I-24MOTION_2022-11-17_07-59-59_reduced.mat
+```
+
+###### Notes on warning messages
+
+*Note* several output messages will show in the MATLAB window that show warnings for additional legend entries that are not used. This is due to only a subset of data being shown for the demonstration data.
+
+```
+Warning: Ignoring extra legend entries. 
+> In legend>process_inputs (line 575)
+In legend>make_legend (line 294)
+In legend (line 245)
+In plot_AV_analysis>plot_one_sided (line 473)
+In plot_AV_analysis (line 310)
+In reproduce_plots (line 27) 
+```
+
+##### Expected Runtime
+
+It should take approximately 4-5 minutes or faster to regenerate those plots. 
+
+
 ## About CIRCLES data analyzed with this software
 
 ### About data from I-24 MOTION
@@ -28,29 +130,6 @@ Information from team-installed GPS sensors was collected at 10-Hz. These data i
 
 #### Data Collection from CIRCLES Cars with team-designed on-board data collection
 Information from team-installed computers that interface with the Controller Area Network (CAN) were critical to sensing and control of the experiment cars. These data are aligned with the raw GPS information to provide the state of the vehicle at that time (speed, assigned lane of travel, desired cruise control set point, etc.). 
-
-## Peer Review
-Peer-review analysis of the energy results and this software will have access to only a subset of the overall data, due to the time to analyze and the storage and sharing challenges with the data.
-
-To carry out the analysis, the following software requirements are needed:
-
-- Install [MATLAB](https://mathworks.com/)
-- Only `Matlab` must be installed as a required toolbox
-- Extract the software and results archives
-- Run the file `Scripts/peer_review_example.m`
-
-The execution of this file will reproduce the style of plot for the data provided, which is a subset from the data from 11-17-2022 (Thursday) of the overall data that represents 10 minutes of data from that day. 
-
-It should take approximately 10-12 minutes or faster to regenerate those plots. The `peer_review_example.m` script will 
-
-- Generate structured collections of data samples for this day from the `results/` folder
-- Generate the macroscopic fields (from the provided data)
-- Plot the macroscopic fields (from the provided data) with the GPS data from the cars (across the entire day)
-- Plot the microscopic fields of all cars (from above)
-- Carry out the analysis of fuel usage and comparisons (from the provided data)
-- Plot the fuel usage and comparisons (from above)
-
-A subset of these plots are synthesized in `results/figures/2022-11-17`.
 
 ## Data Install
 

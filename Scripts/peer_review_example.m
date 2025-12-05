@@ -22,6 +22,8 @@ for processingDay = 17
         '-11-2022\n'])
     plot_microscopic_trajectories(processingDay)
 end
+% close other plots
+close all
 % Plot stats of contorlled AVs and sampled leaders/followers and compare
 % days
 fprintf('running function plot_AV_stats.m for \n')
