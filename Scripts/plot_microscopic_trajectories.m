@@ -19,7 +19,8 @@ direction = -1; % -1=Westbound, 1=Eastbound
 lane = 0; % 0=all lanes
 ax_t = {'06:00:00','10:00:00'}; % time interval for trajectories
 ax_x = [0,6500]; % space interval for trajectories 
-skip_t_plot = 5; % sub-sample trajectories for plotting
+skip_t_plot = 50; % sub-sample trajectories for plotting
+% skip_t_plot = 5; % sub-sample trajectories for plotting
 subfield_name_x = 'x_position_meters'; % name of x position field in the data
 fig_res = [2500 800]; % figure base resolution
 timeZoomWin = [0612 0619]; % time window to zoom into (in military time)
@@ -168,9 +169,7 @@ for fileInd = 1:length(data_files) % loop over relevant files
     data = data(ind);
     % Process trajectories
     fprintf('Adding %d trajectories to plot ...',length(ind)), tic
-    % HACK changed to 1:3:length(data) intsead of 1:length(data) to 
-    % debug why crashing
-    for j = 1:10:length(data) % loop over used trajectories
+    for j = 1:length(data) % loop over used trajectories
         traj_len = data(j).length*ft2meterFactor; % length of vehicle [m]
         traj_t = data(j).timestamp; 
         traj_x = data(j).(subfield_name_x); % vehicle position [m]
