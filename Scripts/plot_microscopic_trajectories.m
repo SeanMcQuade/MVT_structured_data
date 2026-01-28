@@ -143,7 +143,7 @@ fprintf(' Done (%0.0fsec).\n',toc)
 %========================================================================
 % Go through files/trajectories and plot them
 %========================================================================
-for fileInd = 2:2:length(data_files) % loop over relevant files
+for fileInd = 1:2:length(data_files) % loop over relevant files
     % Load data file
     fileName = data_files(fileInd).name;
     fprintf('Loading %s ...',fileName), tic
