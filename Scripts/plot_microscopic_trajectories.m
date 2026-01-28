@@ -4,13 +4,13 @@ function [] = plot_microscopic_trajectories(processingDay)
 % vehicle's position and length. Also produces an example zoom window,
 % both added to the full trajectory plot, and zoomed in.
 % The code can produce low resolution (1600 figure rows) and high
-% resolution versions of the figurem, which are of the following sizes,
+% resolution versions of the figure, which are of the following sizes,
 % which can then be downscaled post-hoc as needed:
 % Full: 12800, With zoom window added: 6400, Zoom itself: 6400.
 % (C) 2025 by Benjamin Seibold and Sulaiman Almatrudi
 if nargin < 1
     error(['Specify the day of Nov. 2022 MVT to generate'...
-        ' macroscopic fileds for (from 16 to 18)']);
+        ' microscopic fields for (from 16 to 18)']);
 end
 %========================================================================
 % Parameters
@@ -19,7 +19,7 @@ direction = -1; % -1=Westbound, 1=Eastbound
 lane = 0; % 0=all lanes
 ax_t = {'06:00:00','10:00:00'}; % time interval for trajectories
 ax_x = [0,6500]; % space interval for trajectories 
-skip_t_plot = 5; % sub-sample trajectories for plotting
+skip_t_plot = 200; % sub-sample trajectories for plotting; use 5 to 50
 subfield_name_x = 'x_position_meters'; % name of x position field in the data
 fig_res = [2500 800]; % figure base resolution
 timeZoomWin = [0612 0619]; % time window to zoom into (in military time)
@@ -143,7 +143,7 @@ fprintf(' Done (%0.0fsec).\n',toc)
 %========================================================================
 % Go through files/trajectories and plot them
 %========================================================================
-for fileInd = 1:length(data_files) % loop over relevant files
+for fileInd = 2:2:length(data_files) % loop over relevant files
     % Load data file
     fileName = data_files(fileInd).name;
     fprintf('Loading %s ...',fileName), tic
@@ -168,9 +168,8 @@ for fileInd = 1:length(data_files) % loop over relevant files
     data = data(ind);
     % Process trajectories
     fprintf('Adding %d trajectories to plot ...',length(ind)), tic
-    % HACK changed to 1:3:length(data) intsead of 1:length(data) to 
-    % debug why crashing
-    for j = 1:10:length(data) % loop over used trajectories
+    % iterate over all trajectories
+    for j = 1:length(data) % loop over used trajectories
         traj_len = data(j).length*ft2meterFactor; % length of vehicle [m]
         traj_t = data(j).timestamp; 
         traj_x = data(j).(subfield_name_x); % vehicle position [m]
@@ -194,12 +193,14 @@ for fileInd = 1:length(data_files) % loop over relevant files
         end
          patch(patch_t, patch_x, patch_v,'EdgeColor','None')
     end
+    drawnow limitrate nocallbacks
     fprintf(' Done (%0.0fsec).\n',toc)
 end
 clear data  veh_lengths
 % Finish drawing everything 
 fprintf('Drawing full plot ...'), tic
-drawnow
+% drawnow
+drawnow limitrate nocallbacks
 fprintf(' Done (%0.0fsec).\n',toc)
 %========================================================================
 % Save figure
@@ -283,6 +284,7 @@ end
 %========================================================================
 %========================================================================
 function print_figure(filename,res)
+drawnow limitrate nocallbacks
 fprintf('Save figure in %s ...',filename), tic
 fig = gcf; 
 exportgraphics(fig, filename, 'Resolution', res);
