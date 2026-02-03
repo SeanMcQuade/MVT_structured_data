@@ -4,13 +4,13 @@ function [] = plot_microscopic_trajectories(processingDay)
 % vehicle's position and length. Also produces an example zoom window,
 % both added to the full trajectory plot, and zoomed in.
 % The code can produce low resolution (1600 figure rows) and high
-% resolution versions of the figurem, which are of the following sizes,
+% resolution versions of the figure, which are of the following sizes,
 % which can then be downscaled post-hoc as needed:
 % Full: 12800, With zoom window added: 6400, Zoom itself: 6400.
 % (C) 2025 by Benjamin Seibold and Sulaiman Almatrudi
 if nargin < 1
     error(['Specify the day of Nov. 2022 MVT to generate'...
-        ' macroscopic fileds for (from 16 to 18)']);
+        ' microscopic fields for (from 16 to 18)']);
 end
 %========================================================================
 % Parameters
@@ -19,7 +19,7 @@ direction = -1; % -1=Westbound, 1=Eastbound
 lane = 0; % 0=all lanes
 ax_t = {'06:00:00','10:00:00'}; % time interval for trajectories
 ax_x = [0,6500]; % space interval for trajectories 
-skip_t_plot = 5; % sub-sample trajectories for plotting
+skip_t_plot = 200; % sub-sample trajectories for plotting; use 5 to 50
 subfield_name_x = 'x_position_meters'; % name of x position field in the data
 fig_res = [2500 800]; % figure base resolution
 timeZoomWin = [0612 0619]; % time window to zoom into (in military time)
@@ -42,22 +42,42 @@ ft2meterFactor = 0.3048; % [m/ft] conversion factor from feet to meter
 %========================================================================
 % Find all data files in folder
 [parentDirectory, ~, ~] = fileparts(pwd);
+% directory above contains only the git repository
+[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
+
 % Use slim version of the processed data if plotting westbound 
 if direction < 0 % Westbound
-    dataVersion = 'Slim';
+    dataVersion = 'slim';
 else            % Eastbound
-    dataVersion = 'Full';
+    dataVersion = 'full';
 end
-dataFolder = fullfile(parentDirectory,'Data',...
-    ['Data_2022-11-' char(num2str(processingDay)) '__MVT_' dataVersion]);
+
+inputPath = fullfile(dataRootDirectory, 'results', dataVersion, ...
+    ['2022-11-', num2str(processingDay)]);
+
+% dataFolder = fullfile(parentDirectory,'Data',...
+%     ['Data_2022-11-' char(num2str(processingDay)) '__MVT_' dataVersion]);
 if flag_reduce_data_files 
-    data_files = dir(fullfile(dataFolder, ...
+    data_files = dir(fullfile(inputPath, ...
         '*_reduced.mat'));
+    
+    % avoid processing files that start with .
+    is_dotfile = startsWith({data_files.name},'.');
+    data_files = data_files(~is_dotfile);
+
     if length(data_files) < 24
-        reduce_data(dataFolder);
+        reduce_data(inputPath);
+        % now, the files should be there!
+        data_files = dir(fullfile(inputPath, ...
+            '*_reduced.mat'));
+
+        % avoid processing files that start with .
+        is_dotfile = startsWith({data_files.name},'.');
+        data_files = data_files(~is_dotfile);
+
     end    
 else
-    data_files = dir(fullfile(dataFolder, ...
+    data_files = dir(fullfile(inputPath, ...
         ['I-24*' char(num2str(processingDay)) '*.json']));
 end
 date_data = ['2022-11-' num2str(processingDay)]; % date of the data files
@@ -123,7 +143,7 @@ fprintf(' Done (%0.0fsec).\n',toc)
 %========================================================================
 % Go through files/trajectories and plot them
 %========================================================================
-for fileInd = 1:length(data_files) % loop over relevant files
+for fileInd = 1:2:length(data_files) % loop over relevant files
     % Load data file
     fileName = data_files(fileInd).name;
     fprintf('Loading %s ...',fileName), tic
@@ -148,6 +168,7 @@ for fileInd = 1:length(data_files) % loop over relevant files
     data = data(ind);
     % Process trajectories
     fprintf('Adding %d trajectories to plot ...',length(ind)), tic
+    % iterate over all trajectories
     for j = 1:length(data) % loop over used trajectories
         traj_len = data(j).length*ft2meterFactor; % length of vehicle [m]
         traj_t = data(j).timestamp; 
@@ -172,12 +193,14 @@ for fileInd = 1:length(data_files) % loop over relevant files
         end
          patch(patch_t, patch_x, patch_v,'EdgeColor','None')
     end
+    drawnow limitrate nocallbacks
     fprintf(' Done (%0.0fsec).\n',toc)
 end
 clear data  veh_lengths
 % Finish drawing everything 
 fprintf('Drawing full plot ...'), tic
-drawnow
+% drawnow
+drawnow limitrate nocallbacks
 fprintf(' Done (%0.0fsec).\n',toc)
 %========================================================================
 % Save figure
@@ -185,8 +208,10 @@ fprintf(' Done (%0.0fsec).\n',toc)
 fileName = sprintf('fig_motion_trajectories_%s_%s_%s',...
     datetime(t_local(1),'Format','yyyyMMdd'),...
     direction_fname,lane_fname);
-folderName = fullfile(parentDirectory, 'Figures');
+folderName = fullfile(dataRootDirectory, 'results', 'figures', ...
+    ['2022-11-', num2str(processingDay)]);
 if ~isfolder(folderName)
+    print('Creating folder %s', folderName)
     mkdir(folderName);
 end
 fileName = fullfile(folderName,fileName);
@@ -259,13 +284,14 @@ end
 %========================================================================
 %========================================================================
 function print_figure(filename,res)
+drawnow limitrate nocallbacks
 fprintf('Save figure in %s ...',filename), tic
 fig = gcf; 
 exportgraphics(fig, filename, 'Resolution', res);
 fprintf(' Done (%0.0fsec).\n',toc)
 end
 
-function [] = reduce_data(dataFolder)
+function [] = reduce_data(inputPath)
 
 removed_fields = {
     'trajectory_id',...
@@ -294,7 +320,12 @@ removed_fields = {
     'downstream_engaged_av_id',...
     'distance_to_downstream_engaged_av_meters'};
 
-data_files = dir(fullfile(dataFolder,'*.json'));
+data_files = dir(fullfile(inputPath,'*.json'));
+
+% avoid processing files that start with .
+is_dotfile = startsWith({data_files.name},'.');
+data_files = data_files(~is_dotfile);
+
 for fileInd = 1:length(data_files)
     filename = data_files(fileInd).name;
     filenameSave = [filename(1:end-5),'_reduced.mat'];

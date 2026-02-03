@@ -10,16 +10,24 @@ end
 %========================================================================
 % Generate samples_for_distance_analysis
 %========================================================================
+% Get file path of slim data
 [parentDirectory, ~, ~] = fileparts(pwd);
-dataFolder = fullfile(parentDirectory,'Data',...
-    ['Data_2022-11-' char(num2str(processingDay)) '__MVT_Slim']);
-I24FilesInDir = dir(fullfile(dataFolder, ...
+% directory above contains only the git repository
+[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
+% directory above that contains the data/ folder
+dataFolderPath = fullfile(dataRootDirectory, 'results', 'slim', ...
+    ['2022-11-', num2str(processingDay)]);
+
+
+
+I24FilesInDir = dir(fullfile(dataFolderPath, ...
     ['I-24*' char(num2str(processingDay)) '*.json']));
 nrFiles = length(I24FilesInDir);
 if nrFiles < 24
-    dataFolder = fullfile(parentDirectory,'Data',...
-        ['Data_2022-11-' char(num2str(processingDay)) '__MVT_Full']);
-    I24FilesInDir = dir(fullfile(dataFolder, ...
+    % try the full data if slim is not available
+    dataFolderPath = fullfile(dataRootDirectory, 'results', 'full', ...
+        ['2022-11-', num2str(processingDay)]);
+    I24FilesInDir = dir(fullfile(dataFolderPath, ...
         ['I-24*' char(num2str(processingDay)) '*.json']));
     nrFiles = length(I24FilesInDir);
     if nrFiles < 24
@@ -27,6 +35,26 @@ if nrFiles < 24
             ' by running generate_data_mvt_slim.m first.'])
     end
 end
+
+% create the save output folder if it does not already exist
+
+outputPath = fullfile(dataRootDirectory, 'results', 'figures', ...
+    ['2022-11-', num2str(processingDay)]);
+
+if ~isfolder(outputPath)
+    mkdir(outputPath)
+end
+
+
+% skip the output file, if it already exists
+filenameSave = fullfile(outputPath, ['samples_for_distance_analysis_' char(num2str(processingDay)) ...
+    '.mat']);
+if isfile(filenameSave)
+    % file already exists, time to leave
+    fprintf('Output file already exists: %s\nSkipping processing.\n', filenameSave);
+    return % return fr this function
+end
+
 %% script outputs
 samples_dist = []; %distance relative to engaged av (positive = behind an av, negative = ahead of an av)
 samples_speed = []; %speed samples with downstream/upstream av
@@ -41,7 +69,7 @@ for file_nr =1:nrFiles % loop over data files and append samples
     fprintf('Loading original data file %d / %d ...', file_nr,nrFiles )
     tic
     % Load MOTION data file
-    filenameLoad = fullfile(dataFolder , I24FilesInDir(file_nr).name);
+    filenameLoad = fullfile(dataFolderPath , I24FilesInDir(file_nr).name);
     data = jsondecode(fileread(filenameLoad));
     fprintf('Done (%0.0fsec).\n',toc)
     % Skip file if no AVs are active
@@ -66,10 +94,8 @@ for file_nr =1:nrFiles % loop over data files and append samples
     samples_fcons = [samples_fcons;fcons];
     fprintf('Done (%0.0fsec).\n',toc)
 end
-%% save the output file to .mat data file
-saveFolder = fullfile(parentDirectory,'Data','Data_for_Figures');
-save(fullfile(saveFolder, ['samples_for_distance_analysis_' char(num2str(processingDay)) ...
-    '.mat']),'samples_*','-v7.3')
+% filenameSave comes from up above
+save(filenameSave,'samples_*','-v7.3')
 end
 %%%%%%%%%%%%%%%%%%%%%% local function %%%%%%%%%%%%%%%%%%%%%%
 function [all_d, all_v, all_vc, all_fr, all_x, all_t, all_lane, all_fcons] = ...

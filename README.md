@@ -10,38 +10,59 @@ installed raspberri pi and several flags to indicate the state of the vehicle) a
 
 ## Scripts to generate the integrated data set.
 
-Step 0: Have the correct folder structure before you begin. In the main folder '/' one must create the following subfolders /Data, /Models, and /Scripts. 
-There should be 11 folders in the Data/ folder.
-Three correspond to 11/16/2022: "Data_2022-11-16__I24_Base", "Data_2022-11-16__I24_Slim", "Data_2022-11-16__I24_Full",
-Three correspond to 11/17/2022: "Data_2022-11-17__I24_Base", "Data_2022-11-17__I24_Slim", "Data_2022-11-17__I24_Full", and
-Three correspond to 11/18/2022: "Data_2022-11-18__I24_Base", "Data_2022-11-18__I24_Slim", "Data_2022-11-18__I24_Full".
-There are two additional folders: "Data_GPS", and "Data_for_Figures".
+### Step 0: Correct folder structure before you begin. 
 
-\Models contains 9 files:
-Eastbound_grade_fit.csv,
-fuel_model_Class4PND_simplified.m
-fuel_model_Class8Tractor_simplified.m
-fuel_model_Compact_simplified.m
-fuel_model_midBase_simplified.m
-fuel_model_midSUV_simplified.m
-fuel_model_Pickup_simplified.m
-README.txt
-save_i24motiondata_v2_point_1_slim.m
+This git repository should be a *sibling* folder to the data folder. 
 
-\Scripts contains 9 files:
-assemble_data_GPS.m
-generate_data_mvt_full.m
-generate_data_mvt_slim.m
-generate_data_samples.m
-generate_macroscopic_fields.m
-plot_AV_analysis.m
-plot_macroscopic_fields.m
-plot_microscopic_trajectories.m
-run_all_scripts.m
+```
+cd MVT_structured_data
+ls ..
+```
+This command should show you 
 
-The base data .json files go into "Data_2022-11-1*__I24_Base" then create the folders "Data_2022-11-16__I24_Slim" and "Data_2022-11-16__I24_Full". The slim and full data writes to these folders respectively.
+```
+data/
+MVT_structured_data
+```
 
-Step 1: Run "Scripts\generate_data_mvt_full" or "Scripts\generate_data_mvt_slim.":This load files from Data_GPS and saves assembled GPS.json into Data_2022-11-??__I24_Base for each day. 
+A folder named `results` will be created as part of these scripts.
+
+If you want to confirm what it should look like from the 'parent' directory:
+
+```
+[Parent]
+  - data/
+  | - cars
+    | - cars_gps
+      | - circles_v2_1_car1.csv
+      | - circles_v2_1_car2.csv
+      | - circles_v2_1_car3.csv
+      ...
+    | - cars_vins.csv
+    | - veh_ping_ ...
+    | - ...
+  | - i24motion
+    | - 2022-11-16
+      | - 64888dc ....wed_0_00.json
+      | - 64888dc ....wed_0_01.json
+      | - 64888dc ....wed_0_02.json
+      | - ...
+    | - 2022-11-17
+      | - ...
+    | - 2022-11-18
+      | - ...
+  | - README.md
+  - MVT_structured_data
+  - results
+```
+
+
+### Step 1: run some scripts to generate the data
+
+You have a couple options here.
+
+---
+Run "Scripts\generate_data_mvt_full" or "Scripts\generate_data_mvt_slim.":This load files from `../data/cars/gps` and saves assembled GPS.json into Data_2022-11-??__I24_Base for each day. 
 
 Step 2: Once the slimmed or full data is generated, run "Scripts\generate_data_samples.m." It produces mat-files in the Folder called 'Data_Analysis,' one for each day.
 

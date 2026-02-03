@@ -35,18 +35,57 @@ elseif strcmp(kernel,'Gaussian')
     ht = wt*3; hx = wx*3; % make box size 3 times the std
     fac = 1/(2*pi*wt*wx); % normalizing factor
 end
-% Find all data files in folder
+
+
+
+% Get file path of slim data
 [parentDirectory, ~, ~] = fileparts(pwd);
-dataFolderPath = fullfile(parentDirectory,'Data',...
-    ['Data_2022-11-' num2str(processingDay) '__MVT_Slim']);
-dataFiles = dir(fullfile(dataFolderPath ,'I-24MOTION_slim_*.json'));
+% directory above contains only the git repository
+[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
+% directory above that contains the data/ folder
+dataFolderPath = fullfile(dataRootDirectory, 'results', 'slim', ...
+    ['2022-11-', num2str(processingDay)]);
+
+outputPath = fullfile(dataRootDirectory, 'results', 'figures', ...
+    ['2022-11-', num2str(processingDay)]);
+
+if ~isfolder(outputPath)
+    mkdir(outputPath)
+end
+
+% filename = fullfile(dataRootDirectory ,'results','figures',...
+%     ['2022-11-', num2str(processingDay)], ...
+%     ['fields_motion_2022-11-' num2str(processingDay)  '.mat']);
+
+% check to see if file exists, and exit if so
+
+% skip the output file, if it already exists
+filenameSave = fullfile(outputPath, ...
+    ['fields_motion_2022-11-' num2str(processingDay)  '.mat']);
+if isfile(filenameSave)
+    % file already exists, time to leave
+    fprintf('Output file already exists: %s\nSkipping processing.\n', filenameSave);
+    return % return fr this function
+end
+
+
+% % Find all data files in folder
+% [parentDirectory, ~, ~] = fileparts(pwd);
+% dataFolderPath = fullfile(parentDirectory,'Data',...
+%     ['Data_2022-11-' num2str(processingDay) '__MVT_Slim']);
+
+% these files are NOT generated with _slim_ as a name mangle---they are
+% noted as slim b/c they are in the 'slim' directory (abovee)
+dataFiles = dir(fullfile(dataFolderPath ,'I-24MOTION_*.json'));
 if length(dataFiles) < 24
     error('I24 slim files for the day: %d, Nov. 2022 are missing or incomplete.'...
         ,processingDay)
 end
+
 date_data = ['2022-11-' num2str(processingDay)]; % date of the data files
 ax_t = [posixtime(datetime([date_data,' ',ax_t{1}],'TimeZone','America/Chicago')),...
     posixtime(datetime([date_data,' ',ax_t{2}],'TimeZone','America/Chicago'))];
+
 
 %========================================================================
 % Create grid in (t,x) plane and initialize fields
@@ -80,9 +119,9 @@ end
 %========================================================================
 for fileInd = 1:length(dataFiles) % loop over relevant files
     % Load data file
-    filename = dataFiles(fileInd).name;
-    fprintf('Loading and decoding %s ...',filename), tic
-    data = jsondecode(fileread(fullfile(dataFiles(fileInd).folder,filename)));
+    indexFilename = dataFiles(fileInd).name;
+    fprintf('Loading and decoding %s ...',indexFilename), tic
+    data = jsondecode(fileread(fullfile(dataFiles(fileInd).folder,indexFilename)));
     fprintf(' Done (%0.0fsec).\n',toc)
     % Find indices of trajectories in direction and relevant lane(s)
     if isfield(data,'direction')
@@ -182,10 +221,12 @@ end
 %========================================================================
 % Save fields
 %========================================================================
-filename = fullfile(parentDirectory ,'Data','Data_for_Figures',...
-    ['fields_motion_2022-11-' num2str(processingDay)  '.mat']);
-fprintf('Saving file %s ...',filename), tic
-save(filename,'field','t','x','direction','lane')
+% filename = fullfile(parentDirectory ,'Data','Data_for_Figures',...
+%     ['fields_motion_2022-11-' num2str(processingDay)  '.mat']);
+
+% filename comes from way up top
+fprintf('Saving file %s ...',filenameSave), tic
+save(filenameSave,'field','t','x','direction','lane')
 fprintf(' Done (%0.0fsec).\n',toc)
 
 %========================================================================

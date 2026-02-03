@@ -6,6 +6,8 @@ if nargin < 1
 error(['Specify the day of Nov. 2022 MVT to generate AVs '...
         'GPS data files (from 16 to 18) to run assemble_data_GPS ']);
 end
+
+% Continue with processing...
 fprintf('Starting the assembly of AV GPS data for %dth Nov. 2022\n', processingDay);
 %========================================================================
 % Parameters
@@ -17,15 +19,54 @@ maxMatchLaneDiff = 0.5; %[lane] maximum estimated lane difference
 minMatchTime = 3; % [s] minimum matching time
 originXPosition = 309804.0625; % [ft] location of the origin for the x-coordinates 
 ft2meterFactor = 0.3048; % [m/ft] conversion factor from feet to meter
+
 %========================================================================
 % Load, parse, and preprocess AVs GPS data
 %========================================================================
 % Get file path of base GPS data
 [parentDirectory, ~, ~] = fileparts(pwd);
-gpsFolderPath = fullfile(parentDirectory,'Data','Data_GPS') ;
-if ~isfolder(gpsFolderPath)
-    error('Folder %s does not exist.\n',gpsFolderPath)
+% directory above contains only the git repository
+[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
+% directory above that contains the data/ folder
+gpsFolderPath = fullfile(dataRootDirectory, 'data', 'cars', 'cars_gps');
+
+% Build the output path and filename
+outputPath = fullfile(dataRootDirectory, 'results', 'gps');
+filenameWrite = ['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'];
+fullOutputPath = fullfile(outputPath, filenameWrite);
+
+% Check if file already exists
+if isfile(fullOutputPath)
+    fprintf('Output file already exists: %s\nSkipping processing.\n', fullOutputPath);
+    return  % Exit the function
 end
+
+% Create output directory if needed
+if ~isfolder(outputPath)
+    mkdir(outputPath)
+end
+
+
+
+if ~isfolder(gpsFolderPath)
+    % Prompt user to select the folder
+    warning('Expected folder %s does not exist.', gpsFolderPath);
+    gpsFolderPath = uigetdir(parentDirectory, 'Select the Data_GPS folder');
+    gpsFolderPath = uigetdir(parentDirectory, 'Select the Data_GPS folder');
+    
+    % Check if user cancelled
+    if gpsFolderPath == 0
+        error('No folder selected. Cannot proceed without GPS data folder.');
+    end
+    
+    % Verify the selected folder exists
+    if ~isfolder(gpsFolderPath)
+        error('Selected path is not a valid folder.');
+    end
+    
+    fprintf('Using GPS data folder: %s\n', gpsFolderPath);
+end
+
 % Parse AV files into trajectories of individual runs
 fprintf('Parsing AV data... ') ; tic
 dataGPS0 = parse_gps_data(gpsFolderPath,processingDay);
@@ -45,16 +86,21 @@ minFileNr = max(1,floor((minAVStart-dataTLimits(1))/60/10));
 % Find end of last AV run during the test
 maxAVStart = max([dataGPS0([dataGPS0.starting_time]<dataTLimits(2)).ending_time]);
 maxFileNr = min(24,floor((maxAVStart-dataTLimits(1))/60/10)+1);
-% Find I24 MOTION data files in the folder
-dataFolderPath = fullfile(parentDirectory,'Data',['Data_2022-11-' num2str(processingDay) ...
-    '__I24_Base']) ;
+% Find I24 MOTION data files in the same folder outside the repository
+dataFolderPath = fullfile(dataRootDirectory,'data','i24motion', ...
+    ['2022-11-' num2str(processingDay) ]) ;
 if ~isfolder(dataFolderPath)
     error('Folder %s does not exist.\n',dataFolderPath)
 end
 % Use day abbreviation to identify base data files
 dayAbbrvs = ["wed","thu","fri"];
 dayAbbrv = dayAbbrvs(processingDay-15);
-dataFiles = dir(fullfile(dataFolderPath ,['*_' char(dayAbbrv) '_0_*.json']));
+dataFiles = dir(fullfile(dataFolderPath, ['*_', num2str(dayAbbrv), '_0_*.json']));
+% if reading from a hdd with ._ leading file metadata, everything fails! so
+% we skip those file by ignoring prefixes starting with .
+is_dotfile = startsWith({dataFiles.name},'.');
+dataFiles = dataFiles(~is_dotfile);
+% dataFiles = dir(fullfile(dataFolderPath, ['I-24MOTION_2022-11-', num2str(dayAbbrv), '_*.json']));
 if length(dataFiles) < 24
     error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.',processingDay)
 end
@@ -69,8 +115,10 @@ segmentsCounter = 1;
 for fileNr = minFileNr:maxFileNr
     % Load MOTION data file
     filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
-    fprintf('Loading and decoding MOTION data file, %d/%d ... ', ...
+    fprintf('Loading and decoding MOTION data file, %d/%d...\n ', ...
         fileNr-minFileNr+1,maxFileNr-minFileNr+1); tic
+    fprintf('Filename=%s... ', ...
+        filenameLoad);
     dataTemp = jsondecode(fileread(filenameLoad));
     fprintf('Done (%0.0fsec).\n',toc)
     % Find AV runs concurrent to MOTION data trajectories in file
@@ -180,9 +228,9 @@ end
 % Add controller status and clean data structure
 %========================================================================
 fprintf('Adding controller status and preparing output data... ');tic
-avPingsData = readtable(fullfile(gpsFolderPath, ['veh_ping_202211' ...
+avPingsData = readtable(fullfile(dataRootDirectory,'data', 'cars', ['veh_ping_202211' ...
     num2str(processingDay) '.csv']));
-avVINs = readtable(fullfile(gpsFolderPath ,'veh_vins.csv'));
+avVINs = readtable(fullfile(dataRootDirectory,'data', 'cars','cars_vins.csv'));
 avConnectionStatus  = get_connection_status(avPingsData,avVINs);
 nAVs = length(dataGPS0);
 clear dataGPS
@@ -266,10 +314,12 @@ fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Encode and write to file
 %========================================================================
-filenameWrite = ['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'];
+% use the output build directory we created above, with the filenameWrite
+% that was designed above
 fprintf('Encoding and writing file %s to file... ',filenameWrite);tic
 jsonStr = jsonencode(dataGPS);
-fid = fopen(fullfile(gpsFolderPath, filenameWrite), 'w');
+
+fid = fopen(fullfile(outputPath, filenameWrite), 'w');
 fwrite(fid, jsonStr, 'char');
 fclose(fid);
 clear jsonStr
@@ -402,7 +452,11 @@ function dataGPS0 = preproc_gps(dataGPS0,gpsDataFolder)
 % samples/sec
 inVehShift = 7; % [ft] x position shift from GPS unit position to AV rear bumper
 nAVrunss = length(dataGPS0);
-avVINData = readtable(fullfile(gpsDataFolder ,'veh_vins.csv'));
+% the parent folder holds the metadata for the cars, since they are useful
+% even if not considering their GPS information
+[dataRootFolder, ~, ~] = fileparts(gpsDataFolder);
+% name is cars_vins to be consistent with cars_gps
+avVINData = readtable(fullfile(dataRootFolder,'cars_vins.csv'));
 for runIdx = 1:nAVrunss % loop over AV runs and sample data at 10 hz
     % Initialize time grid at 10hz
     t10Hz = floor(dataGPS0(runIdx).timestamp(1)*10)/10:.1:ceil(dataGPS0(runIdx).timestamp(end)*10)/10;
