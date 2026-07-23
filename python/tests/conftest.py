@@ -43,6 +43,58 @@ def _read_records(path: Path, count: int):
     return matjson.loads(extract_prefix_records(text, count))
 
 
+#: Trajectories to run through lane assignment in the parity fixtures. The
+#: driving line always uses the whole file (it is a whole-file statistic); only
+#: the per-trajectory stage is limited, to keep the suite quick.
+LANE_TRAJECTORIES = 200
+
+
+@pytest.fixture(scope="session")
+def raw_segment_path():
+    if not RAW_SEGMENT.is_file():
+        pytest.skip("raw data/ not available")
+    return RAW_SEGMENT
+
+
+@pytest.fixture(scope="session")
+def driving_line(raw_segment_path):
+    """Stage-1 driving line, estimated by streaming the entire raw segment."""
+    from mvtpy import lanes
+    from mvtpy.rawio import iter_trajectories
+
+    westbound = (record for record in iter_trajectories(raw_segment_path)
+                 if record["direction"] < 0)
+    return lanes.estimate_driving_line(westbound)
+
+
+@pytest.fixture(scope="session")
+def released_segments():
+    """Released slim segments, keyed by their full trajectory id."""
+    if not SLIM_SEGMENT.is_file():
+        pytest.skip("released results/ not available")
+    return {segment["trajectory_id"]["x_oid"]: segment
+            for segment in _read_records(SLIM_SEGMENT, SLIM_RECORDS)}
+
+
+@pytest.fixture(scope="session")
+def produced_segments(raw_segment_path, driving_line):
+    """Segments this port produces from the raw data, keyed by trajectory id."""
+    from itertools import islice
+
+    from mvtpy import lanes
+    from mvtpy.rawio import iter_trajectories
+
+    westbound = (record for record in iter_trajectories(raw_segment_path)
+                 if record["direction"] < 0)
+
+    produced = {}
+    for record in islice(westbound, LANE_TRAJECTORIES):
+        y_corr, lane = lanes.assign_lanes(record, driving_line)
+        for segment in lanes.clip_lane_changes(record, y_corr, lane):
+            produced[segment["trajectory_id"]] = segment
+    return produced
+
+
 @pytest.fixture(scope="session")
 def grade_map():
     from mvtpy.kinematics import GradeMap

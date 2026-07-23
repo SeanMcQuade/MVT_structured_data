@@ -16,9 +16,14 @@ kinematics
     expression from generate_data_mvt_slim.m.
 fuel
     The CIRCLES simplified fuel-consumption models from Models/.
+lanes
+    Lane identification and lane-change clipping, which decide how a raw
+    trajectory becomes released segments.
+rawio
+    Streaming reader for the multi-gigabyte raw MOTION segment files.
 """
 
-from . import fuel, kinematics, matjson, matround
+from . import fuel, kinematics, lanes, matjson, matround, rawio
 
-__all__ = ["fuel", "kinematics", "matjson", "matround"]
+__all__ = ["fuel", "kinematics", "lanes", "matjson", "matround", "rawio"]
 __version__ = "0.1.0"

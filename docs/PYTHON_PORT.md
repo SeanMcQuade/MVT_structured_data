@@ -18,18 +18,25 @@ without a MATLAB license.
 | Road grade from the fit map | `mvtpy.kinematics.GradeMap` | ditto | exact |
 | Trapezoidal fuel totals, gallons, mpg | `mvtpy.kinematics` | ditto | exact |
 | Fuel models (6 vehicles, 2 families) | `mvtpy.fuel` | constants re-parsed from `Models/*.m`; rates compared to released values | exact |
+| Streaming reader for raw segments | `mvtpy.rawio` | full 2 GB segment traversed in ~6 s, 272 MB peak RSS | done |
+| Lane identification and clipping | `mvtpy.lanes` | released segmentation reproduced from raw data | exact |
 
 "Exact" means: run the Python code on the raw I-24 MOTION samples, round to
 four decimals the way the pipeline does, and every value equals what MATLAB
-wrote — across all 120 released trajectory segments the tests currently match,
-with zero differences in any field.
+wrote — with zero differences in any field.
+
+For lane work specifically, the port reproduces **every** released segment of
+the trajectories it processes: the same `-N` segment identifiers, the same
+sample windows and first/last timestamps, the same corrected lateral position
+(`y_position_corrected_meters`), and the same `lane_number`. That includes the
+driving-line estimate, which is a whole-file statistic — hence the streaming
+reader, which makes two bounded-memory passes instead of decoding 2 GB at once.
 
 ## What is not ported yet
 
 | Piece | Where it lives in MATLAB | Notes |
 | --- | --- | --- |
-| Lane identification and lane-change clipping | `assign_lanes`, `clip_lane_changes` (local functions in `generate_data_mvt_slim.m`) | Determines how a raw trajectory is split into released segments. Needed before whole-file byte parity is possible. |
-| Distance to upstream/downstream AVs | `calculate_distance_to_avs` | Needs the assembled GPS file. |
+| Distance to upstream/downstream AVs | `calculate_distance_to_avs` | Needs the assembled GPS file; the last piece before whole-file byte parity. |
 | GPS assembly | `assemble_data_GPS.m` | Vehicle CSVs, VIN mapping, ping merge, MOTION matching. |
 | Samples, macroscopic fields, figures | stages 3-6 | Later; `.mat` writers and matplotlib equivalents. |
 
