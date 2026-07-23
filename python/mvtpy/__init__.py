@@ -11,9 +11,14 @@ matjson
 matround
     MATLAB rounding semantics (round-half-away-from-zero), used by the 4-decimal
     rounding the pipeline applies before encoding.
+kinematics
+    Speed, acceleration, road grade, and quadrature, ported expression by
+    expression from generate_data_mvt_slim.m.
+fuel
+    The CIRCLES simplified fuel-consumption models from Models/.
 """
 
-from . import matjson, matround
+from . import fuel, kinematics, matjson, matround
 
-__all__ = ["matjson", "matround"]
+__all__ = ["fuel", "kinematics", "matjson", "matround"]
 __version__ = "0.1.0"
