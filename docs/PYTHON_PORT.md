@@ -20,6 +20,7 @@ without a MATLAB license.
 | Fuel models (6 vehicles, 2 families) | `mvtpy.fuel` | constants re-parsed from `Models/*.m`; rates compared to released values | exact |
 | Streaming reader for raw segments | `mvtpy.rawio` | full 2 GB segment traversed in ~6 s, 272 MB peak RSS | done |
 | Lane identification and clipping | `mvtpy.lanes` | released segmentation reproduced from raw data | exact |
+| Distance to upstream/downstream AVs | `mvtpy.avdist` | all four distance fields and their vehicle ids, including empty/null handling | exact |
 
 "Exact" means: run the Python code on the raw I-24 MOTION samples, round to
 four decimals the way the pipeline does, and every value equals what MATLAB
@@ -32,11 +33,16 @@ sample windows and first/last timestamps, the same corrected lateral position
 driving-line estimate, which is a whole-file statistic — hence the streaming
 reader, which makes two bounded-memory passes instead of decoding 2 GB at once.
 
+Every ingredient of `generate_data_mvt_slim` is now ported. What remains for a
+whole-file byte comparison is the assembly step: build the output record in the
+released field order and encode the entire segment, then compare md5 against
+`results/slim/...`.
+
 ## What is not ported yet
 
 | Piece | Where it lives in MATLAB | Notes |
 | --- | --- | --- |
-| Distance to upstream/downstream AVs | `calculate_distance_to_avs` | Needs the assembled GPS file; the last piece before whole-file byte parity. |
+| Segment assembly and file write | body of `generate_data_mvt_slim.m` | Field order, rounding, `jsonencode`; all the parts exist, they need wiring together. |
 | GPS assembly | `assemble_data_GPS.m` | Vehicle CSVs, VIN mapping, ping merge, MOTION matching. |
 | Samples, macroscopic fields, figures | stages 3-6 | Later; `.mat` writers and matplotlib equivalents. |
 

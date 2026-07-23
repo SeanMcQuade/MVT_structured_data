@@ -53,6 +53,33 @@ make clean-figures-17    # narrow, explicit cleanup
 
 Set `MATLAB=/path/to/matlab` if MATLAB is not at the default macOS location.
 
+### Writing results somewhere else (for comparison)
+
+`RESULTS=` (or the `MVT_RESULTS_DIR` environment variable) sends output to a
+different tree, so a new run can be compared against an existing one without
+overwriting it:
+
+```bash
+make RESULTS=$PWD/../results_verify SHARDS=1 slim-16
+md5 ../results/slim/2022-11-16/I-24MOTION_2022-11-16_05-59-59.json \
+    ../results_verify/slim/2022-11-16/I-24MOTION_2022-11-16_05-59-59.json
+```
+
+`MVT_DATA_DIR` does the same for the raw inputs.
+
+### Accepting existing outputs after a no-op code change
+
+Because staleness is decided from timestamps, editing a stage marks its outputs
+for rebuild even when the edit cannot change results. Once you have confirmed
+that (by rebuilding into a separate tree and comparing checksums, as above):
+
+```bash
+make accept              # all days; mvt.accept('DryRun', true) to preview
+make DAYS=17 accept      # one day
+```
+
+This only updates timestamps of files that already exist; it never writes data.
+
 Choose the number of concurrent processes by memory, not cores: each worker
 peaks in the multi-GB range while decoding a raw segment and encoding its
 output. Two to four workers is a reasonable start on a 32 GB machine.

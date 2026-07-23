@@ -38,15 +38,20 @@ REPO_ROOT := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 WORKSPACE := $(patsubst %/,%,$(dir $(REPO_ROOT)))
 SCRIPTS   := $(REPO_ROOT)/Scripts
 MODELS    := $(REPO_ROOT)/Models
-DATA      := $(WORKSPACE)/data
-RESULTS   := $(WORKSPACE)/results
+DATA      ?= $(WORKSPACE)/data
+# Override to write a second copy of the outputs for comparison, e.g.
+#   make RESULTS=$(WORKSPACE)/results_verify slim-16
+RESULTS   ?= $(WORKSPACE)/results
 STATE     := $(RESULTS)/.mvt
 STAMPS    := $(STATE)/stamps
 
-# Options are passed to MATLAB through the environment (see mvt.options).
-export MVT_FORCE   := $(FORCE)
-export MVT_CLEAN   := $(CLEAN)
-export MVT_VERBOSE := $(VERBOSE)
+# Options and locations are passed to MATLAB through the environment
+# (see mvt.options and mvt.paths).
+export MVT_FORCE       := $(FORCE)
+export MVT_CLEAN       := $(CLEAN)
+export MVT_VERBOSE     := $(VERBOSE)
+export MVT_DATA_DIR    := $(DATA)
+export MVT_RESULTS_DIR := $(RESULTS)
 ifneq ($(strip $(SETTLE)),)
 export MVT_SETTLE_SECONDS := $(SETTLE)
 endif
@@ -100,7 +105,7 @@ endef
 # Aggregate targets
 # ---------------------------------------------------------------------------
 .PHONY: all data figures gps slim full samples fields macro micro av \
-        status config test help migrate-cache
+        status config test help migrate-cache accept
 
 all: figures av
 
@@ -179,6 +184,13 @@ $(STAMPS)/av: $(SRC_av) $(foreach d,$(DAYS),$(STAMPS)/samples-$(d)) | $(STAMPS)
 # ---------------------------------------------------------------------------
 status:
 	@cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) "mvt.status()"
+
+# Mark existing outputs as current, for code changes that provably do not alter
+# results. Verify first by rebuilding into a separate tree and comparing:
+#   make RESULTS=$(WORKSPACE)/results_verify slim-16 && md5 <old> <new>
+accept:
+	@cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) "mvt.accept()"
+	@touch $(STAMPS)/* 2>/dev/null || true
 
 config:
 	@echo "MATLAB    = $(MATLAB)"

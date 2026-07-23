@@ -68,6 +68,17 @@ def driving_line(raw_segment_path):
 
 
 @pytest.fixture(scope="session")
+def av_runs():
+    """Control-vehicle runs from the assembled GPS file for the same day."""
+    from mvtpy import avdist
+
+    gps_file = (WORKSPACE / "results" / "gps" / "CIRCLES_GPS_10Hz_2022-11-16.json")
+    if not gps_file.is_file():
+        pytest.skip("assembled GPS results not available")
+    return avdist.load_av_runs(gps_file)
+
+
+@pytest.fixture(scope="session")
 def released_segments():
     """Released slim segments, keyed by their full trajectory id."""
     if not SLIM_SEGMENT.is_file():

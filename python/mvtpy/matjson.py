@@ -42,7 +42,8 @@ __all__ = ["dumps", "loads", "encode_number", "SCI_EXP_MIN", "SCI_EXP_MAX"]
 #: Scientific notation is used when the decimal exponent is below this value.
 SCI_EXP_MIN = -4
 #: Scientific notation is used when the decimal exponent is at or above this.
-SCI_EXP_MAX = 9
+#: Confirmed by probe: 123456.789 prints fixed, 1e6 prints as "1.0E+6".
+SCI_EXP_MAX = 6
 
 _ESCAPES = {
     '"': '\\"',
@@ -218,5 +219,9 @@ def _scientific(negative: bool, digits: str, exponent: int) -> str:
     mantissa = digits[0]
     if len(digits) > 1:
         mantissa += "." + digits[1:]
+    elif exponent >= 0:
+        # Quirk confirmed by probe: a one-digit mantissa is padded for positive
+        # exponents ("1.0E+6") but not for negative ones ("1E-5").
+        mantissa += ".0"
     exponent_sign = "+" if exponent >= 0 else "-"
     return f"{sign}{mantissa}E{exponent_sign}{abs(exponent)}"
