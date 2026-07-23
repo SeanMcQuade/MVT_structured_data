@@ -41,3 +41,8 @@ octave-workspace
 
 # macOS metadata
 .DS_Store
+
+# Python build artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
