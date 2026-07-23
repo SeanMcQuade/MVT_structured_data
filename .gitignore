@@ -46,3 +46,11 @@ octave-workspace
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Verification / scratch result trees (not the real results, which live outside the repo anyway)
+results_verify/
+results_python/
+results_groundtruth/
+
+# Test manifests are committed fixtures, not generated data
+!tests/manifests/*.json

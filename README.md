@@ -97,6 +97,35 @@ memory bandwidth rather than CPU. Shards stayed well balanced (583-634 s each),
 which is what the interleaved assignment is for. All 24 outputs were
 byte-identical to a serial reference run.
 
+### Tests
+
+Two levels, both driven from `make`:
+
+```bash
+make test           # fast suite: ~40 tests, seconds, no data tree required
+make verify-full    # check real outputs against the recorded manifests
+```
+
+`make test` runs `tests/` through MATLAB's `runtests`: options parsing and
+sharding, the staleness rule that decides every rebuild, path and output-name
+conventions, and the `.mat` comparators. It works on a machine with no data,
+using temporary files.
+
+`make verify-full` compares the actual outputs against `tests/manifests/`,
+which record what a known-good run produced: md5 for the JSON files (which are
+deterministic), `mvt.matHash` content hashes for the `.mat` files (whose bytes
+are not comparable — v7 stores a gzip timestamp, v7.3 is HDF5), and sizes for
+figures, reported but never failed since pixels vary with renderer and MATLAB
+release.
+
+To record manifests from a tree you trust:
+
+```bash
+make RESULTS=$PWD/../results_groundtruth manifests
+```
+
+The manifests are small (about 10 KB per day) and belong in version control.
+
 ### Derived caches and generated state
 
 Build state lives under `results/.mvt/`:

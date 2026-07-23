@@ -207,9 +207,28 @@ config:
 	@echo "SHARDS    = $(SHARDS)"
 	@echo "FORCE     = $(FORCE)"
 
+# Fast suite: temporary files only, no data tree needed. Seconds to run.
 test:
 	@cd $(SCRIPTS) && $(MATLAB) $(MATLAB_FLAGS) \
-	  "results = runtests('$(REPO_ROOT)/tests'); disp(results); exit(any([results.Failed]))"
+	  "r = runtests('$(REPO_ROOT)/tests'); \
+	   fprintf('\n%d passed, %d failed (%.1f s)\n', sum([r.Passed]), sum([r.Failed]), sum([r.Duration])); \
+	   if any([r.Failed]), exit(1); end"
+
+# Full check: compare real outputs against the recorded manifests.
+.PHONY: verify-full manifests
+verify-full:
+	@for d in $(DAYS); do \
+	  cd $(SCRIPTS) && $(MATLAB) $(MATLAB_FLAGS) \
+	    "addpath('$(REPO_ROOT)/tests'); verify_outputs($$d)" || exit 1; \
+	done
+
+# Record manifests from a known-good tree, e.g.
+#   make RESULTS=$(WORKSPACE)/results_groundtruth manifests
+manifests:
+	@for d in $(DAYS); do \
+	  cd $(SCRIPTS) && $(MATLAB) $(MATLAB_FLAGS) \
+	    "addpath('$(REPO_ROOT)/tests'); generate_manifest($$d)" || exit 1; \
+	done
 
 help:
 	@sed -n '1,20p' $(lastword $(MAKEFILE_LIST))
