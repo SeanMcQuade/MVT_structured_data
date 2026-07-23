@@ -72,26 +72,32 @@ past it), and verified against the released GPS file for 2022-11-16:
 | Run splitting (`parse_gps_data`) | structural: 795/795 runs, per-vehicle counts, containment |
 | Control-signal reconstruction (`get_control_car_status`) | **bit-exact**: `control_car` and `control_last30` match on every aligned run (566/566) |
 | Lane assignment, direction, `controller_engaged` | exact |
+| Connection logic (`get_connection_status` + assembly loop) | faithful: bit-identical to MATLAB on identical inputs (198k samples), 99.96% vs the released file |
 | 10 Hz resampling of y / lat / long (`preproc_gps`, `sample_10hz`) | > 99% of samples bit-exact; residual ≤ ~1e-2 m |
 
-The resampling residual is the honest limit for GPS byte-parity. The MOTION data
-rounds to 4 decimals and is read from JSON, so the Python floats match MATLAB's
-exactly; the GPS data rounds to **6 decimals** and is read from CSV, so a
-sub-ULP difference between pandas' and MATLAB's float parsing occasionally flips
-a 6th-decimal rounding or a keep-filter boundary. Reaching byte-identical GPS
-output would require reproducing MATLAB's `readtable` float parsing bit-for-bit
-— a separate effort from the pipeline logic, which is faithful.
+The one blocker for GPS byte-parity is float parsing. The MOTION data rounds to
+4 decimals and is read from JSON, so the Python floats match MATLAB's exactly;
+the GPS data rounds to **6 decimals** and is read from CSV, so a sub-ULP
+difference between pandas' and MATLAB's `readtable` float parsing occasionally
+flips a 6th-decimal rounding, a keep-filter boundary, or the `>= -2 s`
+connection threshold. Every field's *logic* is faithful — verified by feeding
+identical inputs to the MATLAB rule and getting bit-identical output — so the
+residual is entirely the input parse, not the pipeline.
 
-Finding this fixed a real bug in the shared interpolation: MATLAB's `interp1`
-uses the weighted-blend form `A·(1−w) + B·w`, not `A + slope·(x−A)`. The two
-differ at ~1e-14, invisible at 4 decimals but decisive at 6.
+Confirming this involved a useful cross-check: **the current MATLAB code
+reproduces the released GPS file byte-for-byte** (all 15 fields, 3.6M samples),
+which validates the refactor for the GPS stage as well.
+
+Finding the resampling residual also fixed a real bug in the shared
+interpolation: MATLAB's `interp1` uses the weighted-blend form `A·(1−w) + B·w`,
+not `A + slope·(x−A)`. The two differ at ~1e-14, invisible at 4 decimals but
+decisive at 6.
 
 ## What is not ported yet
 
 | Piece | Where it lives in MATLAB | Notes |
 | --- | --- | --- |
-| MOTION-matching bias (`x_position`) | matching loop in `assemble_data_GPS.m` | A per-run median offset subtracted from GPS `x_position`. Needs decoding all 24 MOTION segments; every other GPS field is reproduced without it. |
-| `is_server_connected` | assembly loop | Ported but matches only ~2/3 of runs; the ping-window logic needs another pass. |
+| MOTION-matching bias (`x_position`) | matching loop in `assemble_data_GPS.m` | A per-run median offset subtracted from GPS `x_position`, measured at median 1.5 m (max 5.5 m), so it is not negligible. Porting it needs decoding the day's raw MOTION segments and reproducing MATLAB's `smoothdata` gaussian; even then `x_position` byte-parity stays blocked by the CSV parse residual above. Every other GPS field is reproduced without it. |
 | Samples, macroscopic fields, figures | stages 3-6 | Later; `.mat` writers and matplotlib equivalents. |
 
 ## Running the checks

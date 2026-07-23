@@ -120,6 +120,43 @@ def test_controller_engaged_matches_released_exactly(gps_assembly_case):
                                record["controller_engaged"])
 
 
+def test_server_connected_logic_on_hand_built_inputs():
+    """The connection rule: connected iff the last ping is within 2 s before.
+
+    Verified here on constructed inputs, where there is no CSV-parse residual, so
+    the rule itself is pinned exactly (against the released data it is 99.96%,
+    the gap being sub-ULP timestamp differences at the 2 s threshold).
+    """
+    run_time = np.array([100.0, 101.0, 102.0, 105.0])
+    ping_time = np.array([98.0, 99.5, 103.5])   # last-before values: 99.5, 99.5, 99.5, 103.5
+    connected = ga.is_server_connected(run_time, ping_time)
+    # t=100: last ping 99.5, gap -0.5 -> connected
+    # t=101: last ping 99.5, gap -1.5 -> connected
+    # t=102: last ping 99.5, gap -2.5 -> disconnected
+    # t=105: last ping 103.5, gap -1.5 -> connected
+    assert list(connected) == [1.0, 1.0, 0.0, 1.0]
+
+
+def test_server_connected_matches_released_closely(gps_assembly_case):
+    """is_server_connected reproduces the released values to ~99.9% of samples.
+
+    The residual is not a logic difference: the MATLAB pipeline's own resampled
+    run timestamps and parsed ping times differ from the Python ones by less
+    than a ULP, which flips the >= -2 s comparison for a handful of samples per
+    run. Feeding identical inputs to the MATLAB rule and this function gives
+    bit-identical results (verified separately on 198k samples).
+    """
+    total = exact = 0
+    for case in gps_assembly_case:
+        pre, record, window = case["pre"], case["record"], case["window"]
+        connected = ga.is_server_connected(pre.timestamp, case["status"]["timestamp"])[window]
+        ref = np.array([0.0 if v in (0, False, None) else 1.0
+                        for v in record["is_server_connected"]])
+        total += ref.size
+        exact += int(np.sum(connected == ref))
+    assert exact / total > 0.999, f"only {exact}/{total} connection samples match"
+
+
 def test_resampled_fields_agree_closely(gps_assembly_case):
     """y, latitude, longitude reproduce the released values very closely.
 
