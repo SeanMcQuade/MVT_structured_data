@@ -84,6 +84,19 @@ Choose the number of concurrent processes by memory, not cores: each worker
 peaks in the multi-GB range while decoding a raw segment and encoding its
 output. Two to four workers is a reasonable start on a 32 GB machine.
 
+Measured on an Apple Silicon Mac (137 GB RAM), rebuilding one day of `slim`:
+
+| Run | Wall time | Per segment |
+| --- | --- | --- |
+| serial | ~24 min (est. from 59 s/segment) | 59 s |
+| `SHARDS=4` | 10 min 43 s at 402% CPU | ~100 s |
+
+That is a 2.2x speedup rather than 4x: the stage is dominated by reading a
+~2 GB raw segment and writing a ~800 MB result, so workers contend for I/O and
+memory bandwidth rather than CPU. Shards stayed well balanced (583-634 s each),
+which is what the interleaved assignment is for. All 24 outputs were
+byte-identical to a serial reference run.
+
 ### Derived caches and generated state
 
 Build state lives under `results/.mvt/`:
