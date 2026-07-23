@@ -21,6 +21,7 @@ without a MATLAB license.
 | Streaming reader for raw segments | `mvtpy.rawio` | full 2 GB segment traversed in ~6 s, 272 MB peak RSS | done |
 | Lane identification and clipping | `mvtpy.lanes` | released segmentation reproduced from raw data | exact |
 | Distance to upstream/downstream AVs | `mvtpy.avdist` | all four distance fields and their vehicle ids, including empty/null handling | exact |
+| **Whole segment: assemble, round, encode, write** | `mvtpy.slim` | **full 409 MB released segment reproduced from raw data, md5 identical** | **byte-identical** |
 
 "Exact" means: run the Python code on the raw I-24 MOTION samples, round to
 four decimals the way the pipeline does, and every value equals what MATLAB
@@ -33,10 +34,33 @@ sample windows and first/last timestamps, the same corrected lateral position
 driving-line estimate, which is a whole-file statistic — hence the streaming
 reader, which makes two bounded-memory passes instead of decoding 2 GB at once.
 
-Every ingredient of `generate_data_mvt_slim` is now ported. What remains for a
-whole-file byte comparison is the assembly step: build the output record in the
-released field order and encode the entire segment, then compare md5 against
-`results/slim/...`.
+`generate_data_mvt_slim` is fully reproduced. Segment 00 of 2022-11-16 was
+rebuilt from the raw MOTION file and matched the released output exactly:
+
+```
+409,331,812 bytes   md5 3a7bfc02d454c195f2966caa41d6cdff   (MATLAB and mvtpy)
+```
+
+That run took 60 s to build 17,058 trajectory records and 51 s to encode and
+write, at 5.8 GB peak RSS.
+
+### The rule that decided it
+
+Getting there required one non-obvious discovery about `round(x, 4)`. MATLAB
+snaps near-ties: a scaled value within **one ULP** below the midpoint is
+treated as a tie and rounded away from zero, compensating for binary
+representation error. It is the same behavior that makes `round(2.675, 2)`
+return `2.68` in MATLAB.
+
+For the timestamp 1668600000.1863499 the exact scaled value is
+16686000001863.4986877 — below the midpoint, so exact decimal rounding gives
+`.1863`, while MATLAB writes `.1864`. Before this was understood, a whole
+segment differed from the reference by exactly 73 bytes out of 409 MB.
+
+The tolerance was fitted against 80 values evaluated by MATLAB itself
+(`matlab_probes/probe_round.m` → `round_probe_2025b.json`) and is bracketed:
+0.5 ULP mismatches 40 of them, 2 ULP mismatches 14, 1 ULP matches all 80.
+`tests/test_matround.py` asserts both the rule and its bracketing.
 
 ## What is not ported yet
 
