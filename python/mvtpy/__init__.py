@@ -21,9 +21,17 @@ lanes
     trajectory becomes released segments.
 rawio
     Streaming reader for the multi-gigabyte raw MOTION segment files.
+avdist
+    Distance from each trajectory to the nearest control vehicle.
+slim
+    Whole-segment assembly and writing; byte-identical to MATLAB's output.
+gpsruns
+    Control-vehicle GPS files split into testbed runs (first stage of
+    assemble_data_GPS).
 """
 
-from . import fuel, kinematics, lanes, matjson, matround, rawio
+from . import avdist, fuel, gpsruns, kinematics, lanes, matjson, matround, rawio, slim
 
-__all__ = ["fuel", "kinematics", "lanes", "matjson", "matround", "rawio"]
+__all__ = ["avdist", "fuel", "gpsruns", "kinematics", "lanes", "matjson",
+           "matround", "rawio", "slim"]
 __version__ = "0.1.0"
