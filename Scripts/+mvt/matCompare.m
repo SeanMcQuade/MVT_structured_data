@@ -102,10 +102,11 @@ if isnumeric(expectedValue) || islogical(expectedValue)
         entry.firstDiffIndex = find(differing, 1);
     end
 else
+    % Structs, cells, strings: compared whole rather than element-wise, so the
+    % numeric difference columns stay empty rather than reporting a misleading
+    % NaN. mvt.matHash still covers these contents, recursively.
     entry.equal = isequaln(expectedValue, actualValue);
-    if ~entry.equal
-        entry.note = 'values differ (non-numeric comparison)';
-    end
+    entry.note = sprintf('%s compared with isequaln', class(expectedValue));
 end
 end
 
@@ -128,8 +129,12 @@ for iVar = 1:numel(report.variables)
     else
         state = 'DIFFERS';
     end
-    fprintf('%-34s %-8s %12.4g %12.4g %10d', entry.name, state, ...
-        entry.maxAbsDiff, entry.maxRelDiff, entry.nDiffering);
+    if isnan(entry.maxAbsDiff)
+        fprintf('%-34s %-8s %12s %12s %10s', entry.name, state, '-', '-', '-');
+    else
+        fprintf('%-34s %-8s %12.4g %12.4g %10d', entry.name, state, ...
+            entry.maxAbsDiff, entry.maxRelDiff, entry.nDiffering);
+    end
     if ~isempty(entry.note)
         fprintf('  %s', entry.note);
     elseif ~entry.equal
