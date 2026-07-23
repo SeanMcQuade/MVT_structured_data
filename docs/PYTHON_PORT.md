@@ -112,11 +112,42 @@ A useful cross-check along the way: **the current MATLAB code reproduces the
 released GPS file byte-for-byte** (all 15 fields, 3.6M samples), validating the
 refactor for the GPS stage as well.
 
+### MOTION-matching bias (`x_position`)
+
+Ported in `mvtpy.gpsmatch`. Each run's `x_position` is corrected by a per-run
+median offset (`median_xd`) measured against the MOTION trajectories the vehicle
+was observed as — median 1.5 m, up to 5.5 m, so it is not negligible.
+
+The two primitives that had to be reverse-engineered from MATLAB were pinned
+against MATLAB output:
+
+* **`smoothdata` gaussian** — MATLAB uses standard deviation `window/5`,
+  truncates at `window/2`, and normalizes the weights per point. Matches a
+  MATLAB delta probe to ~1e-11.
+* **Both-direction lane assignment** — unlike the westbound-only `assign_lanes`
+  in `mvtpy.lanes`, this builds a driving line per direction. Matches MATLAB's
+  `assign_lanes` on a real segment to ~1e-14.
+
+End-to-end, the per-run `median_xd` reproduces the value recovered from MATLAB's
+own output (a two-segment run reproduced one run's offset exactly, −2.6576 m).
+`x_position` byte-parity still waits on the CSV-parse residual above, but the
+bias itself — the piece that makes `x_position` correct rather than 1.5 m off —
+is faithful.
+
+The implementation is pure-Python and slow (tens of minutes per day); vectorizing
+the lane median filter and the smoothing is the obvious optimization before
+production use. The full-day check is opt-in (`MVT_RUN_SLOW=1`).
+
 ## What is not ported yet
 
-| Piece | Where it lives in MATLAB | Notes |
-| --- | --- | --- |
-| MOTION-matching bias (`x_position`) | matching loop in `assemble_data_GPS.m` | A per-run median offset subtracted from GPS `x_position`, measured at median 1.5 m (max 5.5 m), so it is not negligible. Porting it needs decoding the day's raw MOTION segments and reproducing MATLAB's `smoothdata` gaussian; even then `x_position` byte-parity stays blocked by the CSV parse residual above. Every other GPS field is reproduced without it. |
+Every stage of the JSON-producing pipeline is now ported. What remains is
+optional polish, not new stages:
+
+| Piece | Notes |
+| --- | --- |
+| Byte-exact GPS output | Blocked only by MATLAB `readtable` CSV float parsing; fixed on the Python side with `float_precision='round_trip'` for lat/long, with a sub-ULP residual remaining on `y`/`speed`/`x`. |
+| `gpsmatch` performance | Correct but slow; needs vectorization for routine use. |
+| `.mat` writers and figures (stages 3–6) | Not started; the analysis/plotting half of the pipeline. |
 | Samples, macroscopic fields, figures | stages 3-6 | Later; `.mat` writers and matplotlib equivalents. |
 
 ## Running the checks

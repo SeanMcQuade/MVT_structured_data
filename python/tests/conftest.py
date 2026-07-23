@@ -130,6 +130,88 @@ def gps_assembly_case():
     return pairs
 
 
+MOTION_2022_11_16 = WORKSPACE / "data" / "i24motion" / "2022-11-16"
+LANE_FIXTURE = (Path(__file__).resolve().parent / "fixtures"
+                / "motion_lanes_2022-11-16_seg08.npz")
+
+
+@pytest.fixture(scope="session")
+def motion_segment_lanes():
+    """(python lanes, MATLAB lanes) for one MOTION segment's trajectories.
+
+    MATLAB reference is committed (tests/fixtures); the Python side is computed
+    from the raw segment, so it skips when the raw MOTION data is not present.
+    """
+    if not LANE_FIXTURE.is_file():
+        pytest.skip("committed lane reference missing")
+    reference = np.load(LANE_FIXTURE, allow_pickle=True)
+    segment = MOTION_2022_11_16 / str(reference["segment"])
+    if not segment.is_file():
+        pytest.skip("raw MOTION segment not available")
+
+    from mvtpy.gpsmatch import assign_lanes_bidirectional
+    from mvtpy.rawio import iter_trajectories
+
+    trajectories = list(iter_trajectories(segment))
+    ours = assign_lanes_bidirectional(trajectories)
+    n = int(reference["n"])
+    matlab = [reference[f"lane_{k}"] for k in range(n)]
+    return ours[:n], matlab
+
+
+@pytest.fixture(scope="session")
+def matching_bias_case():
+    """(computed bias, recovered target) per run for 2022-11-16.
+
+    Skips unless both the raw data and a current-code GPS reference are present.
+    The recovered target is median(ft2m*x_python - x_matlab) per run, which is
+    exactly what the matching pass computes. Running the matching is slow
+    (streams the day's MOTION segments), so this is opt-in via the data.
+    """
+    cars = WORKSPACE / "data" / "cars"
+    reference = WORKSPACE / "results" / "gps" / "CIRCLES_GPS_10Hz_2022-11-16.json"
+    if not ((cars / "cars_gps").is_dir() and MOTION_2022_11_16.is_dir()
+            and reference.is_file()):
+        pytest.skip("raw data or GPS reference not available")
+
+    from mvtpy import gpsassemble as ga, gpsmatch, gpsruns
+    from mvtpy.kinematics import FT_TO_METER
+    from mvtpy.matround import round_decimals
+    from mvtpy.rawio import iter_trajectories
+
+    runs = gpsruns.parse_gps_data(cars / "cars_gps", 16)
+    lane_map = ga.load_lane_map(cars / "cars_vins.csv")
+    preprocessed = [ga.preprocess_run(run, index + 1, lane_map)
+                    for index, run in enumerate(runs)]
+
+    released = list(iter_trajectories(reference))
+    target = {}
+    for pre in preprocessed:
+        best, best_overlap = None, 0.0
+        for record in released:
+            if int(record["av_id"]) != pre.vin:
+                continue
+            overlap = (min(pre.timestamp[-1], record["timestamp"][-1])
+                       - max(pre.timestamp[0], record["timestamp"][0]))
+            if overlap > best_overlap:
+                best, best_overlap = record, overlap
+        if best is None:
+            continue
+        grid = round_decimals(pre.timestamp, 6)
+        released_time = np.asarray(best["timestamp"])
+        start = int(np.searchsorted(grid, released_time[0] - 1e-7))
+        if start + len(released_time) > len(grid):
+            continue
+        window = slice(start, start + len(released_time))
+        if not np.allclose(grid[window], released_time, atol=1e-6):
+            continue
+        our_x = round_decimals(FT_TO_METER * pre.x_position, 6)[window]
+        target[pre.index] = float(np.median(our_x - np.asarray(best["x_position"])))
+
+    bias = gpsmatch.matching_bias(preprocessed, MOTION_2022_11_16, 16)
+    return bias, target
+
+
 @pytest.fixture(scope="session")
 def av_runs():
     """Control-vehicle runs from the assembled GPS file for the same day."""
