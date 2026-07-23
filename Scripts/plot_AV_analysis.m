@@ -280,7 +280,12 @@ fprintf('Done (%0.0fsec).\n',toc)
 % Plot in 3x3 grid
 fprintf('Plotting stats... ') ; tic
 figure(1);
-clf
+% `clf` clears the children but keeps figure properties, so a figure left over
+% from plot_microscopic_trajectories (which sets Color to black for its dark
+% trajectory plot) would render these panels on black with unreadable text.
+% Reset the figure and state the background explicitly.
+clf reset
+set(gcf, 'Color', 'w')
 firstHour = floor(TWINDOW(1)/100); firstMinutes = mod(TWINDOW(1),100);
 secondHour = floor(TWINDOW(2)/100); secondMinutes = mod(TWINDOW(2),100);
 timeString = [num2str(firstHour), ':', num2str(firstMinutes), ' to ',...
@@ -384,7 +389,8 @@ for figInd = figsToProduce
 end
 % Plot histogram of samples used in analysis
 figure(2)
-clf
+clf reset
+set(gcf, 'Color', 'w')   % see the note on figure(1) above
 fontSize = 18;
 axx = 350;
 axy = [0, 1400000]; 

@@ -189,8 +189,13 @@ status:
 # results. Verify first by rebuilding into a separate tree and comparing:
 #   make RESULTS=$(WORKSPACE)/results_verify slim-16 && md5 <old> <new>
 accept:
-	@cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) "mvt.accept()"
-	@touch $(STAMPS)/* 2>/dev/null || true
+	@cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) \
+	  "files = mvt.accept(); fprintf('accepted %d files\n', numel(files));"
+	@mkdir -p $(STAMPS)
+	@for d in $(DAYS); do \
+	  for s in gps slim full samples fields macro micro; do touch $(STAMPS)/$$s-$$d; done; \
+	done
+	@echo "[make] stamps refreshed; 'make' will not revisit accepted stages"
 
 config:
 	@echo "MATLAB    = $(MATLAB)"
