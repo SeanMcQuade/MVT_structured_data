@@ -1,10 +1,44 @@
-function [] = plot_macroscopic_fields(processingDay)
-% Plot macroscopic fields based on I24-MOTION data for Nature.
-% (C) 2025 Benjamin Seibold (edited by Sulaiman Almatrudi)
+function [] = plot_macroscopic_fields(processingDay, varargin)
+% PLOT_MACROSCOPIC_FIELDS  Plot the macroscopic traffic fields (Fig. 3, SM5).
+%
+% Purpose
+%   Renders the time-space fields produced by GENERATE_MACROSCOPIC_FIELDS, one
+%   figure per field, optionally overlaid with the CIRCLES control-vehicle GPS
+%   traces coloured by whether control was engaged.
+%
+% Inputs
+%   processingDay  16, 17, or 18 (November 2022)
+%   varargin       options struct and/or name/value pairs (see mvt.options);
+%                  Force, Clean, DryRun, Verbose
+%   Files:
+%     <results>/figures/2022-11-DD/fields_motion_2022-11-DD.mat
+%     <results>/gps/CIRCLES_GPS_10Hz_2022-11-DD.json   (when overlaying AVs)
+%
+% Outputs
+%   <results>/figures/2022-11-DD/
+%     fig_field_<yyyyMMdd>_<direction>_<lane>_motion_<field>[_av]_nature_large.png
+%   for field in {Rho, Q, F, U, Phi, Psi}
+%
+% Parameters (constants at the top of this file)
+%   direction = -1 (westbound), lane = 0 (all lanes), AV overlay on, and the
+%   per-field colorbar limits that make the days comparable to one another.
+%
+% Parallel safety
+%   Writes only into this day's figures folder; days may run concurrently.
+%   Requires a working graphics stack (see README for headless notes).
+%
+% Dependencies
+%   mvt.options, mvt.paths, mvt.dayDir, mvt.isStale, mvt.sources,
+%   mvt.expectedOutputs, mvt.log
+%
+% (C) 2025-2026 CIRCLES Consortium. Author: Benjamin Seibold, edited by
+% Sulaiman Almatrudi. BSD-3-Clause.
 if nargin < 1
     error(['Specify the day of Nov. 2022 MVT to plot'...
         ' macroscopic fileds for (from 16 to 18)']);
 end
+mvt.assertDay(processingDay)
+opts = mvt.options(varargin{:});
 %========================================================================
 % Parameters
 %========================================================================
@@ -27,14 +61,36 @@ colorbarLimit.Psi =  0.22; % (g/m)
 %========================================================================
 % Load data files
 %========================================================================
-[parentDirectory, ~, ~] = fileparts(pwd);
-% directory above contains only the git repository
-[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
-inputPath = fullfile(dataRootDirectory, 'results', 'figures', ...
-    ['2022-11-', num2str(processingDay)]);
+% mvt.paths resolves the layout from the location of the code, so this no
+% longer depends on the current folder being Scripts/.
+p = mvt.paths();
+parentDirectory = p.repoRoot; %#ok<NASGU> % retained for local edits/debugging
+dataRootDirectory = p.dataRoot;
+inputPath = mvt.dayDir('figures', processingDay);
 
 filename = fullfile(inputPath ,['fields_motion_2022-11-'...
      num2str(processingDay) '.mat']);
+
+% Skip re-plotting when every expected figure is newer than the fields file,
+% the GPS overlay, and this script; Force overrides.
+stageInputs = {filename, fullfile(mvt.dayDir('gps', processingDay), ...
+    ['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])};
+[stale, staleReason] = mvt.isStale( ...
+    mvt.expectedOutputs('macro', processingDay, opts), stageInputs, ...
+    mvt.sources('plot_macroscopic_fields', opts), opts);
+if ~stale
+    mvt.log(opts, 'skip macroscopic field figures for 2022-11-%d: %s', ...
+        processingDay, staleReason);
+    return
+end
+mvt.log(opts, 'plot macroscopic fields for 2022-11-%d: %s', processingDay, staleReason);
+if opts.Clean && ~opts.DryRun
+    mvt.removeOutputs(mvt.expectedOutputs('macro', processingDay, opts), opts);
+end
+if opts.DryRun
+    return
+end
+
 fprintf('Loading %s ...',filename), tic
 load(filename)
 fprintf(' Done (%0.0fsec).\n',toc)

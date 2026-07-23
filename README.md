@@ -4,9 +4,81 @@ This repository contains data recorded from the partially automated vehicles, ca
 installed raspberri pi and several flags to indicate the state of the vehicle) and data recorded by the I-24 MOTION observatory.
 
 # Contents
+- [Running the pipeline](#running-the-pipeline)
 - [Generate integrated data.](#tag1)
 - [Plot data and results.](#tag2)
 - [Websites](#tag3)
+
+## Running the pipeline
+
+The pipeline is incremental: every stage checks whether its outputs are
+missing, older than their inputs, or older than the code that produced them,
+and does nothing otherwise. Editing a script therefore causes exactly the
+affected outputs to rebuild — the older behavior ("output file exists, skip")
+meant a code change silently produced nothing until you deleted files by hand.
+
+### From MATLAB
+
+Run from the `Scripts` folder as before:
+
+```matlab
+run_all_scripts                        % all three days, skipping fresh work
+run_all_scripts('Days', 17)            % one day
+run_all_scripts('Force', true)         % rebuild everything
+run_all_scripts('DryRun', true)        % show what would run, change nothing
+generate_data_mvt_slim(17)             % single stage, unchanged call style
+generate_data_mvt_slim(17, 'Force', true)
+mvt.status('Days', 17)                 % what is stale, and why
+```
+
+Options (see `Scripts/+mvt/options.m`): `Force`, `Clean`, `DryRun`, `Verbose`,
+`Shard`, `Days`, `SettleSeconds`. They may be given as name/value pairs or as an
+options struct.
+
+### With make (parallel)
+
+`make` encodes the same dependency graph and runs independent work
+concurrently, using ordinary MATLAB batch processes — no Parallel Computing
+Toolbox required.
+
+```bash
+make config              # show resolved paths and settings
+make status              # what is stale, and why
+make -n all              # dry run: print the plan
+make -j3 all             # everything, three days in parallel
+make SHARDS=4 slim-17    # one day, four processes over its 24 segments
+make FORCE=1 fields-17   # rebuild even if outputs look fresh
+make clean-figures-17    # narrow, explicit cleanup
+```
+
+Set `MATLAB=/path/to/matlab` if MATLAB is not at the default macOS location.
+
+Choose the number of concurrent processes by memory, not cores: each worker
+peaks in the multi-GB range while decoding a raw segment and encoding its
+output. Two to four workers is a reasonable start on a 32 GB machine.
+
+### Derived caches and generated state
+
+Build state lives under `results/.mvt/`:
+
+| Path | Contents |
+| --- | --- |
+| `results/.mvt/manifests/` | raw segment → output filename maps |
+| `results/.mvt/deps/` | cached per-stage code dependency lists |
+| `results/.mvt/stamps/` | make stamp files |
+| `results/.mvt/cache/` | `*_reduced.mat` plotting caches |
+
+The `*_reduced.mat` plotting caches used to be written next to the released
+JSON in `results/slim/<day>/`. They now live in `results/.mvt/cache/<day>/` so
+that `results/slim` contains only published artifacts. If you already have the
+old caches, move them once with:
+
+```bash
+make migrate-cache
+```
+
+Everything under `results/.mvt/` is derived and safe to delete; the next run
+rebuilds it.
 
 ## Scripts to generate the integrated data set.
 

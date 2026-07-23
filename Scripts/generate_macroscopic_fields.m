@@ -1,10 +1,51 @@
-function [] = generate_macroscopic_fields(processingDay)
-% Construct macroscopic fields based on I24-MOTION data files
-% (C) 2025 Benjamin Seibold (edited by Sulaiman Almatrudi)
+function [] = generate_macroscopic_fields(processingDay, varargin)
+% GENERATE_MACROSCOPIC_FIELDS  Kernel-average MOTION trajectories into fields.
+%
+% Purpose
+%   Converts the microscopic trajectory data for one day into the macroscopic
+%   traffic-state fields used by Figure 3 and SM5: density (Rho), flow (Q),
+%   fuel rate (F), speed (U), and the derived fields Phi and Psi, on a regular
+%   time-space grid.
+%
+% Inputs
+%   processingDay  16, 17, or 18 (November 2022)
+%   varargin       options struct and/or name/value pairs (see mvt.options);
+%                  Force, Clean, DryRun, Verbose
+%   Files:
+%     <results>/slim/2022-11-DD/I-24MOTION_*.json
+%
+% Outputs
+%   <results>/figures/2022-11-DD/fields_motion_2022-11-DD.mat
+%     variables field, t, x, direction, lane
+%
+% Parameters (constants at the top of this file)
+%   hx = 100 m window in space, v_char = 20 m/s giving ht = hx/v_char in time,
+%   grid resolution t_res = 5 s and x_res = 50 m, kernel 'box' (or 'Gaussian'),
+%   direction = -1 (westbound), lane = 0 (all lanes), 06:00-10:00 local time,
+%   x in [0, 6500] m, skip_t_compute = 5 sub-sampling for the integrals.
+%
+% Algorithm
+%   1. Build the (t, x) grid and the kernel normalization factor.
+%   2. Stream each segment's trajectories; for every sub-sampled sample add its
+%      contribution to the accumulators within the kernel window.
+%   3. Normalize the accumulators into Rho, Q, F, U and derive Phi and Psi.
+%   4. Save the fields plus their grid axes.
+%
+% Parallel safety
+%   Single output file per day; not shardable. Days are independent.
+%
+% Dependencies
+%   mvt.options, mvt.paths, mvt.dayDir, mvt.isStale, mvt.sources,
+%   mvt.ensureDir, mvt.log
+%
+% (C) 2025-2026 CIRCLES Consortium. Author: Benjamin Seibold, edited by
+% Sulaiman Almatrudi. BSD-3-Clause.
 if nargin < 1
     error(['Specify the day of Nov. 2022 MVT to generate'...
         ' macroscopic fileds for (from 16 to 18)']);
 end
+mvt.assertDay(processingDay)
+opts = mvt.options(varargin{:});
 %========================================================================
 % Parameters
 %========================================================================
@@ -38,34 +79,34 @@ end
 
 
 
-% Get file path of slim data
-[parentDirectory, ~, ~] = fileparts(pwd);
-% directory above contains only the git repository
-[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
-% directory above that contains the data/ folder
-dataFolderPath = fullfile(dataRootDirectory, 'results', 'slim', ...
-    ['2022-11-', num2str(processingDay)]);
+% Get file path of slim data. mvt.paths resolves the layout from the location
+% of the code, so this no longer depends on the current folder being Scripts/.
+p = mvt.paths();
+parentDirectory = p.repoRoot; %#ok<NASGU> % retained for local edits/debugging
+dataRootDirectory = p.dataRoot;
+dataFolderPath = mvt.dayDir('slim', processingDay);
 
-outputPath = fullfile(dataRootDirectory, 'results', 'figures', ...
-    ['2022-11-', num2str(processingDay)]);
+outputPath = mvt.dayDir('figures', processingDay);
 
-if ~isfolder(outputPath)
-    mkdir(outputPath)
-end
+mvt.ensureDir(outputPath)
 
-% filename = fullfile(dataRootDirectory ,'results','figures',...
-%     ['2022-11-', num2str(processingDay)], ...
-%     ['fields_motion_2022-11-' num2str(processingDay)  '.mat']);
-
-% check to see if file exists, and exit if so
-
-% skip the output file, if it already exists
+% Rebuild when the output is missing, older than the segments it summarizes,
+% or older than the code that produced it; Force overrides.
 filenameSave = fullfile(outputPath, ...
     ['fields_motion_2022-11-' num2str(processingDay)  '.mat']);
-if isfile(filenameSave)
-    % file already exists, time to leave
-    fprintf('Output file already exists: %s\nSkipping processing.\n', filenameSave);
+[stale, staleReason] = mvt.isStale(filenameSave, ...
+    fullfile(dataFolderPath, 'I-24MOTION_*.json'), ...
+    mvt.sources('generate_macroscopic_fields', opts), opts);
+if ~stale
+    mvt.log(opts, 'skip fields_motion_2022-11-%d.mat: %s', processingDay, staleReason);
     return % return fr this function
+end
+mvt.log(opts, 'build fields_motion_2022-11-%d.mat: %s', processingDay, staleReason);
+if opts.Clean && isfile(filenameSave) && ~opts.DryRun
+    delete(filenameSave)
+end
+if opts.DryRun
+    return
 end
 
 

@@ -1,17 +1,53 @@
-function [] = plot_microscopic_trajectories(processingDay)
-% Produces time-space plots of I24-MOTION trajectories, visualizing each
-% trajectory as a patch whose vertical extension precisely represents the
-% vehicle's position and length. Also produces an example zoom window,
-% both added to the full trajectory plot, and zoomed in.
-% The code can produce low resolution (1600 figure rows) and high
-% resolution versions of the figure, which are of the following sizes,
-% which can then be downscaled post-hoc as needed:
-% Full: 12800, With zoom window added: 6400, Zoom itself: 6400.
-% (C) 2025 by Benjamin Seibold and Sulaiman Almatrudi
+function [] = plot_microscopic_trajectories(processingDay, varargin)
+% PLOT_MICROSCOPIC_TRAJECTORIES  Time-space plots of individual trajectories.
+%
+% Purpose
+%   Produces time-space plots of I24-MOTION trajectories, visualizing each
+%   trajectory as a patch whose vertical extension precisely represents the
+%   vehicle's position and length. Also produces an example zoom window,
+%   both added to the full trajectory plot, and zoomed in.
+%   The code can produce low resolution (1600 figure rows) and high
+%   resolution versions of the figure, which are of the following sizes,
+%   which can then be downscaled post-hoc as needed:
+%   Full: 12800, With zoom window added: 6400, Zoom itself: 6400.
+%
+% Inputs
+%   processingDay  16, 17, or 18 (November 2022)
+%   varargin       options struct and/or name/value pairs (see mvt.options);
+%                  Force, Clean, DryRun, Verbose
+%   Files:
+%     <results>/slim/2022-11-DD/I-24MOTION_*.json   (full/ when eastbound)
+%
+% Outputs
+%   <results>/figures/2022-11-DD/fig_motion_trajectories_*_lowres.png
+%   (plus _highres and _zoom variants, controlled by the flags below)
+%   <results>/.mvt/cache/2022-11-DD/*_reduced.mat  derived plotting caches
+%
+% Algorithm
+%   1. Build (or reuse) the reduced .mat caches: each released JSON segment
+%      with the fields this plot does not need removed.
+%   2. Assemble patch vertices for every trajectory, sub-sampled by
+%      skip_t_plot, optionally converted to int32 to bound memory use.
+%   3. Render the full time-space plot, then the zoom window and the inset.
+%   4. Export low- and/or high-resolution PNGs.
+%
+% Performance
+%   This is the most memory-hungry stage: it holds every trajectory patch in
+%   memory. High-resolution output (flag_save_highres) can exhaust RAM on
+%   smaller machines; prefer the low-resolution figures and downscale.
+%
+% Dependencies
+%   mvt.options, mvt.paths, mvt.dayDir, mvt.isStale, mvt.sources,
+%   mvt.expectedOutputs, mvt.ensureDir, mvt.removeOutputs, mvt.log
+%
+% (C) 2025-2026 CIRCLES Consortium. Authors: Benjamin Seibold and
+% Sulaiman Almatrudi. BSD-3-Clause.
 if nargin < 1
     error(['Specify the day of Nov. 2022 MVT to generate'...
         ' microscopic fields for (from 16 to 18)']);
 end
+mvt.assertDay(processingDay)
+opts = mvt.options(varargin{:});
 %========================================================================
 % Parameters
 %========================================================================
@@ -40,42 +76,67 @@ ft2meterFactor = 0.3048; % [m/ft] conversion factor from feet to meter
 %========================================================================
 % Initialize
 %========================================================================
-% Find all data files in folder
-[parentDirectory, ~, ~] = fileparts(pwd);
-% directory above contains only the git repository
-[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
+% Find all data files in folder. mvt.paths resolves the layout from the
+% location of the code, so this no longer depends on the current folder.
+p = mvt.paths();
+parentDirectory = p.repoRoot; %#ok<NASGU> % retained for local edits/debugging
+dataRootDirectory = p.dataRoot;
 
-% Use slim version of the processed data if plotting westbound 
+% Use slim version of the processed data if plotting westbound
 if direction < 0 % Westbound
     dataVersion = 'slim';
 else            % Eastbound
     dataVersion = 'full';
 end
 
-inputPath = fullfile(dataRootDirectory, 'results', dataVersion, ...
-    ['2022-11-', num2str(processingDay)]);
+inputPath = mvt.dayDir(dataVersion, processingDay);
 
-% dataFolder = fullfile(parentDirectory,'Data',...
-%     ['Data_2022-11-' char(num2str(processingDay)) '__MVT_' dataVersion]);
-if flag_reduce_data_files 
-    data_files = dir(fullfile(inputPath, ...
+% Derived *_reduced.mat caches live under results/.mvt/cache, NOT next to the
+% released JSON: results/slim and results/full must contain exactly the
+% published artifacts, and a stage must never write into another stage's
+% input folder while sharded runs are reading it.
+cachePath = mvt.dayDir('cache', processingDay);
+
+% Skip re-plotting when the figures are newer than their inputs and this
+% script; Force overrides.
+[stale, staleReason] = mvt.isStale( ...
+    mvt.expectedOutputs('micro', processingDay, opts), ...
+    fullfile(inputPath, ['I-24*' char(num2str(processingDay)) '*.json']), ...
+    mvt.sources('plot_microscopic_trajectories', opts), opts);
+if ~stale
+    mvt.log(opts, 'skip microscopic trajectory figures for 2022-11-%d: %s', ...
+        processingDay, staleReason);
+    return
+end
+mvt.log(opts, 'plot microscopic trajectories for 2022-11-%d: %s', ...
+    processingDay, staleReason);
+if opts.Clean && ~opts.DryRun
+    mvt.removeOutputs(mvt.expectedOutputs('micro', processingDay, opts), opts);
+end
+if opts.DryRun
+    return
+end
+
+if flag_reduce_data_files
+    mvt.ensureDir(cachePath)
+    data_files = dir(fullfile(cachePath, ...
         '*_reduced.mat'));
-    
+
     % avoid processing files that start with .
     is_dotfile = startsWith({data_files.name},'.');
     data_files = data_files(~is_dotfile);
 
     if length(data_files) < 24
-        reduce_data(inputPath);
+        reduce_data(inputPath, cachePath);
         % now, the files should be there!
-        data_files = dir(fullfile(inputPath, ...
+        data_files = dir(fullfile(cachePath, ...
             '*_reduced.mat'));
 
         % avoid processing files that start with .
         is_dotfile = startsWith({data_files.name},'.');
         data_files = data_files(~is_dotfile);
 
-    end    
+    end
 else
     data_files = dir(fullfile(inputPath, ...
         ['I-24*' char(num2str(processingDay)) '*.json']));
@@ -208,12 +269,12 @@ fprintf(' Done (%0.0fsec).\n',toc)
 fileName = sprintf('fig_motion_trajectories_%s_%s_%s',...
     datetime(t_local(1),'Format','yyyyMMdd'),...
     direction_fname,lane_fname);
-folderName = fullfile(dataRootDirectory, 'results', 'figures', ...
-    ['2022-11-', num2str(processingDay)]);
+folderName = mvt.dayDir('figures', processingDay);
 if ~isfolder(folderName)
-    print('Creating folder %s', folderName)
-    mkdir(folderName);
+    % (was: print('Creating folder %s', ...), which prints a *figure*, not text)
+    fprintf('Creating folder %s\n', folderName);
 end
+mvt.ensureDir(folderName);
 fileName = fullfile(folderName,fileName);
 % Save figure
 if flag_save_lowres
@@ -291,7 +352,10 @@ exportgraphics(fig, filename, 'Resolution', res);
 fprintf(' Done (%0.0fsec).\n',toc)
 end
 
-function [] = reduce_data(inputPath)
+function [] = reduce_data(inputPath, cachePath)
+% Build the *_reduced.mat plotting caches: decode each released JSON segment,
+% drop the fields the trajectory plot does not use, and save the result under
+% cachePath (results/.mvt/cache/...), leaving the released data untouched.
 
 removed_fields = {
     'trajectory_id',...
@@ -335,8 +399,8 @@ for fileInd = 1:length(data_files)
     % Reduce data
     fieldsToDelete = intersect(fieldnames(data(1)), removed_fields);
     data = rmfield(data,fieldsToDelete);
-    % Save new data file
-    save(fullfile(data_files(fileInd).folder,filenameSave),'data')
+    % Save new data file into the cache folder
+    save(fullfile(cachePath,filenameSave),'data')
     fprintf(' Done (%0.0fsec).\n',toc)
 end
 end

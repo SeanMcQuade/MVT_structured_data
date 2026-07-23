@@ -1,32 +1,65 @@
-function [] = generate_data_samples(processingDay)
-% Run to generate data samples in .mat format for generating fuel consumption figures.
-% (C) 2025 by Sulaiman Almatrudi for CIRCLES energy team;
-% further adapted by Sean McQuade for CIRCLES scenario team.
-% This is licensed under BSD-3 clause license: https://opensource.org/license/bsd-3-clause
+function [] = generate_data_samples(processingDay, varargin)
+% GENERATE_DATA_SAMPLES  Collect per-sample data used by the fuel-consumption figures.
+%
+% Purpose
+%   Walks one day of processed MOTION trajectories and collects, for every
+%   sample within MAX_DIST of an engaged CIRCLES control vehicle, the distance
+%   to that vehicle together with speed, fuel rate, fuel consumption, vehicle
+%   class, lane, position, and time. plot_AV_analysis bins these samples to
+%   produce the article's fuel-consumption-versus-distance results.
+%
+% Inputs
+%   processingDay  16, 17, or 18 (November 2022)
+%   varargin       options struct and/or name/value pairs (see mvt.options);
+%                  Force, Clean, DryRun, Verbose
+%   Files:
+%     <results>/slim/2022-11-DD/I-24MOTION_*.json   (falls back to full/)
+%
+% Outputs
+%   <results>/figures/2022-11-DD/samples_for_distance_analysis_DD.mat
+%     variables samples_dist, samples_speed, samples_fr, samples_fcons,
+%     samples_class, samples_xpos, samples_lane, samples_t   (saved as -v7.3)
+%
+% Algorithm
+%   1. Prefer the slim data set; fall back to full when fewer than 24 slim
+%      segments are present.
+%   2. For each segment, skip files with no engaged AV present.
+%   3. For every trajectory sample, compute signed distance to the nearest
+%      engaged AV (upstream negative, downstream positive) and keep samples
+%      within Max_Dist (1000 m).
+%   4. Append per-file samples into day-level column vectors and save.
+%
+% Parallel safety
+%   Single output file per day; not shardable. Days are independent.
+%
+% Dependencies
+%   mvt.options, mvt.paths, mvt.dayDir, mvt.isStale, mvt.sources,
+%   mvt.ensureDir, mvt.log
+%
+% (C) 2025-2026 CIRCLES Consortium. Authors: Sulaiman Almatrudi (energy team),
+% adapted by Sean McQuade (scenario team). BSD-3-Clause.
 if nargin < 1
     error(['Specify the day of Nov. 2022 MVT to collect samples from '...
         'MVT data files (from 16 to 18)']);
 end
+mvt.assertDay(processingDay)
+opts = mvt.options(varargin{:});
 %========================================================================
 % Generate samples_for_distance_analysis
 %========================================================================
-% Get file path of slim data
-[parentDirectory, ~, ~] = fileparts(pwd);
-% directory above contains only the git repository
-[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
-% directory above that contains the data/ folder
-dataFolderPath = fullfile(dataRootDirectory, 'results', 'slim', ...
-    ['2022-11-', num2str(processingDay)]);
-
-
+% Get file path of slim data. mvt.paths resolves the layout from the location
+% of the code, so this no longer depends on the current folder being Scripts/.
+p = mvt.paths();
+parentDirectory = p.repoRoot; %#ok<NASGU> % retained for local edits/debugging
+dataRootDirectory = p.dataRoot;
+dataFolderPath = mvt.dayDir('slim', processingDay);
 
 I24FilesInDir = dir(fullfile(dataFolderPath, ...
     ['I-24*' char(num2str(processingDay)) '*.json']));
 nrFiles = length(I24FilesInDir);
 if nrFiles < 24
     % try the full data if slim is not available
-    dataFolderPath = fullfile(dataRootDirectory, 'results', 'full', ...
-        ['2022-11-', num2str(processingDay)]);
+    dataFolderPath = mvt.dayDir('full', processingDay);
     I24FilesInDir = dir(fullfile(dataFolderPath, ...
         ['I-24*' char(num2str(processingDay)) '*.json']));
     nrFiles = length(I24FilesInDir);
@@ -38,21 +71,29 @@ end
 
 % create the save output folder if it does not already exist
 
-outputPath = fullfile(dataRootDirectory, 'results', 'figures', ...
-    ['2022-11-', num2str(processingDay)]);
+outputPath = mvt.dayDir('figures', processingDay);
 
-if ~isfolder(outputPath)
-    mkdir(outputPath)
-end
+mvt.ensureDir(outputPath)
 
-
-% skip the output file, if it already exists
+% Rebuild when the output is missing, older than the processed segments it
+% summarizes, or older than the code that produced it; Force overrides.
 filenameSave = fullfile(outputPath, ['samples_for_distance_analysis_' char(num2str(processingDay)) ...
     '.mat']);
-if isfile(filenameSave)
-    % file already exists, time to leave
-    fprintf('Output file already exists: %s\nSkipping processing.\n', filenameSave);
+[stale, staleReason] = mvt.isStale(filenameSave, ...
+    fullfile(dataFolderPath, ['I-24*' char(num2str(processingDay)) '*.json']), ...
+    mvt.sources('generate_data_samples', opts), opts);
+if ~stale
+    mvt.log(opts, 'skip %s: %s', ...
+        ['samples_for_distance_analysis_' char(num2str(processingDay)) '.mat'], staleReason);
     return % return fr this function
+end
+mvt.log(opts, 'build samples_for_distance_analysis_%d.mat: %s', ...
+    processingDay, staleReason);
+if opts.Clean && isfile(filenameSave) && ~opts.DryRun
+    delete(filenameSave)
+end
+if opts.DryRun
+    return
 end
 
 %% script outputs
