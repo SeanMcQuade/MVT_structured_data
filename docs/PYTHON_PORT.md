@@ -62,12 +62,36 @@ The tolerance was fitted against 80 values evaluated by MATLAB itself
 0.5 ULP mismatches 40 of them, 2 ULP mismatches 14, 1 ULP matches all 80.
 `tests/test_matround.py` asserts both the rule and its bracketing.
 
+### GPS assembly (`assemble_data_GPS.m`)
+
+Ported in `mvtpy.gpsruns` (run splitting) and `mvtpy.gpsassemble` (everything
+past it), and verified against the released GPS file for 2022-11-16:
+
+| Piece | Result |
+| --- | --- |
+| Run splitting (`parse_gps_data`) | structural: 795/795 runs, per-vehicle counts, containment |
+| Control-signal reconstruction (`get_control_car_status`) | **bit-exact**: `control_car` and `control_last30` match on every aligned run (566/566) |
+| Lane assignment, direction, `controller_engaged` | exact |
+| 10 Hz resampling of y / lat / long (`preproc_gps`, `sample_10hz`) | > 99% of samples bit-exact; residual ≤ ~1e-2 m |
+
+The resampling residual is the honest limit for GPS byte-parity. The MOTION data
+rounds to 4 decimals and is read from JSON, so the Python floats match MATLAB's
+exactly; the GPS data rounds to **6 decimals** and is read from CSV, so a
+sub-ULP difference between pandas' and MATLAB's float parsing occasionally flips
+a 6th-decimal rounding or a keep-filter boundary. Reaching byte-identical GPS
+output would require reproducing MATLAB's `readtable` float parsing bit-for-bit
+— a separate effort from the pipeline logic, which is faithful.
+
+Finding this fixed a real bug in the shared interpolation: MATLAB's `interp1`
+uses the weighted-blend form `A·(1−w) + B·w`, not `A + slope·(x−A)`. The two
+differ at ~1e-14, invisible at 4 decimals but decisive at 6.
+
 ## What is not ported yet
 
 | Piece | Where it lives in MATLAB | Notes |
 | --- | --- | --- |
-| Segment assembly and file write | body of `generate_data_mvt_slim.m` | Field order, rounding, `jsonencode`; all the parts exist, they need wiring together. |
-| GPS assembly | `assemble_data_GPS.m` | Vehicle CSVs, VIN mapping, ping merge, MOTION matching. |
+| MOTION-matching bias (`x_position`) | matching loop in `assemble_data_GPS.m` | A per-run median offset subtracted from GPS `x_position`. Needs decoding all 24 MOTION segments; every other GPS field is reproduced without it. |
+| `is_server_connected` | assembly loop | Ported but matches only ~2/3 of runs; the ping-window logic needs another pass. |
 | Samples, macroscopic fields, figures | stages 3-6 | Later; `.mat` writers and matplotlib equivalents. |
 
 ## Running the checks

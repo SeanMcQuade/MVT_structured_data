@@ -67,6 +67,69 @@ def driving_line(raw_segment_path):
     return lanes.estimate_driving_line(westbound)
 
 
+CARS_DIR = WORKSPACE / "data" / "cars"
+
+
+@pytest.fixture(scope="session")
+def gps_assembly_case():
+    """Preprocessed runs, connection status, and released records for day 16.
+
+    Pairs each resampled control-vehicle run with the released GPS record it
+    produced (aligned on the 10 Hz grid), for field-by-field parity checks.
+    Skips cleanly without the raw vehicle CSVs or the released GPS file.
+    """
+    pytest.importorskip("pandas")
+    cars_gps = CARS_DIR / "cars_gps"
+    vins = CARS_DIR / "cars_vins.csv"
+    pings = CARS_DIR / "veh_ping_20221116.csv"
+    released_file = WORKSPACE / "results" / "gps" / "CIRCLES_GPS_10Hz_2022-11-16.json"
+    if not (cars_gps.is_dir() and vins.is_file() and pings.is_file()
+            and released_file.is_file()):
+        pytest.skip("raw vehicle GPS data or released GPS file not available")
+
+    from mvtpy import gpsassemble as ga, gpsruns
+    from mvtpy.matround import round_decimals
+    from mvtpy.rawio import iter_trajectories
+
+    runs = gpsruns.parse_gps_data(cars_gps, 16)
+    lane_map = ga.load_lane_map(vins)
+    preprocessed = [ga.preprocess_run(run, index + 1, lane_map)
+                    for index, run in enumerate(runs)]
+    status = ga.connection_status(pings, vins)
+    released = list(iter_trajectories(released_file))
+
+    def released_for(pre):
+        best, best_overlap = None, 0.0
+        for record in released:
+            if int(record["av_id"]) != pre.vin:
+                continue
+            overlap = (min(pre.timestamp[-1], record["timestamp"][-1])
+                       - max(pre.timestamp[0], record["timestamp"][0]))
+            if overlap > best_overlap:
+                best, best_overlap = record, overlap
+        return best
+
+    pairs = []
+    for pre in preprocessed:
+        record = released_for(pre)
+        if record is None:
+            continue
+        grid = round_decimals(pre.timestamp, 6)
+        released_time = np.asarray(record["timestamp"])
+        start = int(np.searchsorted(grid, released_time[0] - 1e-7))
+        if start + len(released_time) > len(grid):
+            continue
+        window = slice(start, start + len(released_time))
+        if not np.allclose(grid[window], released_time, atol=1e-6):
+            continue
+        pairs.append({"pre": pre, "record": record, "window": window,
+                      "status": status[pre.vin]})
+
+    if not pairs:
+        pytest.skip("no GPS runs could be aligned to released records")
+    return pairs
+
+
 @pytest.fixture(scope="session")
 def av_runs():
     """Control-vehicle runs from the assembled GPS file for the same day."""

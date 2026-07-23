@@ -28,10 +28,14 @@ slim
 gpsruns
     Control-vehicle GPS files split into testbed runs (first stage of
     assemble_data_GPS).
+gpsassemble
+    GPS resampling, control-signal reconstruction, and record assembly (the
+    rest of assemble_data_GPS, bar the MOTION-matching bias).
 """
 
-from . import avdist, fuel, gpsruns, kinematics, lanes, matjson, matround, rawio, slim
+from . import (avdist, fuel, gpsassemble, gpsruns, kinematics, lanes, matjson,
+               matround, rawio, slim)
 
-__all__ = ["avdist", "fuel", "gpsruns", "kinematics", "lanes", "matjson",
-           "matround", "rawio", "slim"]
+__all__ = ["avdist", "fuel", "gpsassemble", "gpsruns", "kinematics", "lanes",
+           "matjson", "matround", "rawio", "slim"]
 __version__ = "0.1.0"
