@@ -128,11 +128,15 @@ against MATLAB output:
   in `mvtpy.lanes`, this builds a driving line per direction. Matches MATLAB's
   `assign_lanes` on a real segment to ~1e-14.
 
-End-to-end, the per-run `median_xd` reproduces the value recovered from MATLAB's
-own output (a two-segment run reproduced one run's offset exactly, −2.6576 m).
-`x_position` byte-parity still waits on the CSV-parse residual above, but the
-bias itself — the piece that makes `x_position` correct rather than 1.5 m off —
-is faithful.
+End-to-end over the full day (all 22 relevant MOTION segments), the per-run
+`median_xd` reproduces the value recovered from MATLAB's own output on
+**564 of 566 runs to within 1e-6 m** (median difference 2.4e-7 m). The two
+outliers differ by 0.045 m and 0.006 m — a run-level constant offset whose
+median shifts slightly because a few boundary samples flip in or out of a
+matched stretch (the sub-ULP resample residual feeding the match threshold),
+not an algorithm difference. `x_position` byte-parity still waits on that
+residual, but the bias itself — the piece that makes `x_position` correct rather
+than 1.5 m off — is faithful.
 
 The implementation is pure-Python and slow (tens of minutes per day); vectorizing
 the lane median filter and the smoothing is the obvious optimization before
