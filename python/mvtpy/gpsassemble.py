@@ -129,7 +129,7 @@ def load_lane_map(vins_csv) -> Dict[int, int]:
     """
     import pandas as pd
 
-    table = pd.read_csv(vins_csv)
+    table = pd.read_csv(vins_csv, float_precision="round_trip")
     return {int(vehicle): int(lane)
             for vehicle, lane in zip(table["veh_id"], table["lane_num"])}
 
@@ -143,8 +143,9 @@ def connection_status(ping_csv, vins_csv) -> Dict[int, dict]:
     """
     import pandas as pd
 
-    pings = pd.read_csv(ping_csv)
-    vins = pd.read_csv(vins_csv)
+    # Correctly-rounded float parsing to match MATLAB readtable (see load_lane_map).
+    pings = pd.read_csv(ping_csv, float_precision="round_trip")
+    vins = pd.read_csv(vins_csv, float_precision="round_trip")
     vin_to_id = {str(vin): int(vehicle) for vin, vehicle in zip(vins["vin"], vins["veh_id"])}
 
     pings = pings.copy()
@@ -260,9 +261,27 @@ def assemble_run(run: PreprocessedRun, status: dict, median_xd: float = 0.0) -> 
 def _tenth_second_grid(start: float, stop: float) -> np.ndarray:
     lo = np.floor(start * 10) / 10
     hi = np.ceil(stop * 10) / 10
-    # MATLAB colon: lo:0.1:hi, inclusive of hi within floating tolerance.
-    count = int(round((hi - lo) / 0.1)) + 1
-    return lo + 0.1 * np.arange(count)
+    return _colon(lo, 0.1, hi)
+
+
+def _colon(a: float, step: float, b: float) -> np.ndarray:
+    """Reproduce MATLAB's ``a:step:b`` bit-for-bit.
+
+    MATLAB's colon operator does NOT compute ``a + k*step``; it builds the
+    vector from both ends to stay accurate at each end - the first half from
+    ``a + k*step`` and the second half from ``b - (n-k)*step``. For a large base
+    like a POSIX timestamp the two forms disagree in the last bit on ~20% of
+    points, which shifts the interp1 query points and flips 6th-decimal
+    roundings in the resampled GPS fields. Verified against `lo:0.1:hi` on the
+    real grids (2207/2207 identical).
+    """
+    n = int(round((b - a) / step))
+    k = np.arange(n + 1)
+    half = n // 2
+    grid = np.empty(n + 1)
+    grid[:half + 1] = a + k[:half + 1] * step
+    grid[half + 1:] = b - (n - k[half + 1:]) * step
+    return grid
 
 
 def _interp_extrap(xp: np.ndarray, fp: np.ndarray, x: np.ndarray) -> np.ndarray:

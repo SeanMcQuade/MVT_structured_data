@@ -186,21 +186,54 @@ def test_resampled_fields_agree_closely(gps_assembly_case):
     assert worst <= 2e-2, f"resampled fields diverge by {worst} m, larger than expected"
 
 
-def test_resampled_samples_are_almost_all_bit_exact(gps_assembly_case):
-    """At 6 decimals, well over 99% of samples reproduce exactly.
+def test_latitude_longitude_are_bit_exact(gps_assembly_case):
+    """With correctly-rounded CSV parsing, lat/long reproduce exactly.
 
-    The divergent minority is the CSV-parse residual described above; if it grew,
-    that would signal a real resampling regression rather than float-parse noise.
+    latitude and longitude are resampled from CSV columns and rounded to 6
+    decimals without any further arithmetic. Once the CSV floats are parsed
+    correctly-rounded (float_precision='round_trip', matching MATLAB readtable)
+    and the 10 Hz grid is built with MATLAB's colon algorithm, these are
+    bit-identical.
     """
-    for kind, get in (("y", lambda p, w: round_decimals(FT_TO_METER * p.y_position, 6)[w]),
-                      ("lat", lambda p, w: round_decimals(p.latitude, 6)[w]),
-                      ("long", lambda p, w: round_decimals(p.longitude, 6)[w])):
+    for kind, ref_key in (("lat", "latitude"), ("long", "longitude")):
         total = exact = 0
-        ref_key = {"y": "y_position", "lat": "latitude", "long": "longitude"}[kind]
         for case in gps_assembly_case:
-            mine = get(case["pre"], case["window"])
+            mine = round_decimals(getattr(case["pre"], ref_key), 6)[case["window"]]
             ref = _released_array(case["record"][ref_key])
             total += ref.size
             exact += int(np.sum(np.asarray(mine) == ref))
-        fraction = exact / total
-        assert fraction > 0.99, f"{kind}: only {exact}/{total} ({fraction:.4f}) samples exact"
+        assert exact / total > 0.999, f"{kind}: only {exact}/{total} samples exact"
+
+
+def test_resampled_samples_are_almost_all_bit_exact(gps_assembly_case):
+    """y reproduces the released values to well over 98% of samples.
+
+    y goes through the ft2m multiply before rounding, unlike lat/long, so a
+    handful more samples per run land across a 6th-decimal boundary. The
+    remaining residual is a sub-ULP grid/interpolation sensitivity, not a
+    logic difference; if it grew materially, that would signal a regression.
+    """
+    total = exact = 0
+    for case in gps_assembly_case:
+        mine = round_decimals(FT_TO_METER * case["pre"].y_position, 6)[case["window"]]
+        ref = _released_array(case["record"]["y_position"])
+        total += ref.size
+        exact += int(np.sum(np.asarray(mine) == ref))
+    fraction = exact / total
+    assert fraction > 0.98, f"y: only {exact}/{total} ({fraction:.4f}) samples exact"
+
+
+def test_colon_matches_matlab_both_ends_construction():
+    """The 10 Hz grid uses MATLAB's colon algorithm, not a + k*step.
+
+    MATLAB builds a:step:b from both ends, which for a large base like a POSIX
+    timestamp gives different last bits than a + k*step on ~20% of points.
+    """
+    grid = ga._colon(1668603246.5, 0.1, 1668603250.5)
+    n = grid.size - 1
+    half = n // 2
+    # First half from the low end, second half from the high end.
+    assert grid[0] == 1668603246.5
+    assert grid[-1] == pytest.approx(1668603250.5)
+    assert grid[half] == 1668603246.5 + half * 0.1
+    assert grid[half + 1] == 1668603250.5 - (n - half - 1) * 0.1

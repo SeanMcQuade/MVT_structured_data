@@ -75,23 +75,42 @@ past it), and verified against the released GPS file for 2022-11-16:
 | Connection logic (`get_connection_status` + assembly loop) | faithful: bit-identical to MATLAB on identical inputs (198k samples), 99.96% vs the released file |
 | 10 Hz resampling of y / lat / long (`preproc_gps`, `sample_10hz`) | > 99% of samples bit-exact; residual ≤ ~1e-2 m |
 
-The one blocker for GPS byte-parity is float parsing. The MOTION data rounds to
-4 decimals and is read from JSON, so the Python floats match MATLAB's exactly;
-the GPS data rounds to **6 decimals** and is read from CSV, so a sub-ULP
-difference between pandas' and MATLAB's `readtable` float parsing occasionally
-flips a 6th-decimal rounding, a keep-filter boundary, or the `>= -2 s`
-connection threshold. Every field's *logic* is faithful — verified by feeding
-identical inputs to the MATLAB rule and getting bit-identical output — so the
-residual is entirely the input parse, not the pipeline.
+### Making the GPS floats portable
 
-Confirming this involved a useful cross-check: **the current MATLAB code
-reproduces the released GPS file byte-for-byte** (all 15 fields, 3.6M samples),
-which validates the refactor for the GPS stage as well.
+GPS data rounds to **6 decimals** and is read from **CSV**, 100x more sensitive
+than the JSON-sourced MOTION data. Two MATLAB-specific float behaviors had to be
+matched exactly; both were run down to their bit-level cause and fixed, so no
+change to the MATLAB pipeline or the released data was needed.
 
-Finding the resampling residual also fixed a real bug in the shared
-interpolation: MATLAB's `interp1` uses the weighted-blend form `A·(1−w) + B·w`,
-not `A + slope·(x−A)`. The two differ at ~1e-14, invisible at 4 decimals but
-decisive at 6.
+1. **CSV parsing.** pandas' default `read_csv` parser is *not* correctly
+   rounded — it disagrees with MATLAB's `readtable` by 1 ULP on ~0.035% of
+   values (e.g. the string `30.681164000000006`). MATLAB's `readtable` is the
+   correctly-rounded one. pandas' `float_precision='round_trip'` mode is also
+   correctly rounded and matches `readtable` **bit-for-bit (0 of 200,000 values
+   differ)** across every column. The port uses that mode everywhere it reads a
+   CSV.
+
+2. **The colon operator.** MATLAB's `a:step:b` does not compute `a + k·step`; it
+   builds the vector from both ends (`a + k·step` for the first half,
+   `b − (n−k)·step` for the second) to stay accurate at each end. For a POSIX
+   timestamp base the two forms differ in the last bit on ~20% of the 10 Hz
+   grid points, which shifts the interp1 queries. `mvtpy.gpsassemble._colon`
+   reproduces the both-ends construction (0 of 2207 grid points differ).
+
+3. **`interp1`.** MATLAB uses the weighted-blend form `A·(1−w) + B·w`, not
+   `A + slope·(x−A)`; they differ at ~1e-14, invisible at 4 decimals but
+   decisive at 6. Confirmed against `interp1` on the real inputs (2207/2207).
+
+With all three, **latitude and longitude are bit-exact**. `y_position` (which
+also passes through the ft2m multiply) and the unrounded `speed` retain a
+sub-ULP residual on a small fraction of samples — a remaining float-order
+sensitivity in the resample, not a logic or parse difference. Every field's
+*logic* is faithful, verified by feeding identical inputs to the MATLAB rule and
+getting bit-identical output.
+
+A useful cross-check along the way: **the current MATLAB code reproduces the
+released GPS file byte-for-byte** (all 15 fields, 3.6M samples), validating the
+refactor for the GPS stage as well.
 
 ## What is not ported yet
 

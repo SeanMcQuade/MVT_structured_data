@@ -88,7 +88,12 @@ def parse_gps_data(gps_folder, day: int,
         if not path.is_file():
             continue
 
-        table = pd.read_csv(path, dtype={"control_active": "string"})
+        # float_precision='round_trip' selects pandas' correctly-rounded (IEEE
+        # nearest) float parser, which matches MATLAB's readtable bit-for-bit.
+        # The default parser is off by 1 ULP on some values, which flips
+        # 6th-decimal roundings in the output. See docs/PYTHON_PORT.md.
+        table = pd.read_csv(path, dtype={"control_active": "string"},
+                            float_precision="round_trip")
         table = table[(table["Systime"] > lower) & (table["Systime"] < upper)]
         if table.empty:
             continue
