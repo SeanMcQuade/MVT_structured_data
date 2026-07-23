@@ -5,9 +5,19 @@ installed raspberri pi and several flags to indicate the state of the vehicle) a
 
 # Contents
 - [Running the pipeline](#running-the-pipeline)
+- [Documentation](#documentation)
 - [Generate integrated data.](#tag1)
 - [Plot data and results.](#tag2)
 - [Websites](#tag3)
+
+## Documentation
+
+| Document | What it covers |
+| --- | --- |
+| [`docs/ALGORITHMS.md`](docs/ALGORITHMS.md) | The data-flow graph and what each stage computes, with the mapping to the paper's figures. Start here. |
+| [`docs/DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md) | Every field of every output: units, dtype, rounding, null/empty semantics, and which stage writes it. |
+| [`docs/MATLAB_JSON_FORMAT.md`](docs/MATLAB_JSON_FORMAT.md) | How MATLAB's `jsonencode` formats numbers, needed for byte-identical output. |
+| [`docs/PYTHON_PORT.md`](docs/PYTHON_PORT.md) | Status of the Python implementation and how its parity is verified. |
 
 ## Running the pipeline
 
