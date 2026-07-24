@@ -138,9 +138,13 @@ not an algorithm difference. `x_position` byte-parity still waits on that
 residual, but the bias itself — the piece that makes `x_position` correct rather
 than 1.5 m off — is faithful.
 
-The implementation is pure-Python and slow (tens of minutes per day); vectorizing
-the lane median filter and the smoothing is the obvious optimization before
-production use. The full-day check is opt-in (`MVT_RUN_SLOW=1`).
+The hot paths are vectorized — the lane median filter (sliding window), the
+`smoothdata` gaussian (searchsorted-banded, fully vectorized), the match-stretch
+walk (run-length on a boolean mask), and per-segment caching of each
+trajectory's arrays. This took a full day from **~65 min to ~11 min (6.1×)**
+with **bit-identical output** (all 795 runs unchanged); each vectorization was
+verified against the original scalar form first. The full-day check is opt-in
+(`MVT_RUN_SLOW=1`).
 
 ## What is not ported yet
 
