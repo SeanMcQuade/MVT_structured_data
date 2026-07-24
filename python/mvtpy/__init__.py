@@ -36,11 +36,14 @@ gpsmatch
     assemble_data_GPS.
 samples
     Per-sample data near engaged control vehicles (generate_data_samples).
+fields
+    Macroscopic traffic-state fields on a time-space grid
+    (generate_macroscopic_fields).
 """
 
-from . import (avdist, fuel, gpsassemble, gpsmatch, gpsruns, kinematics, lanes,
-               matjson, matround, rawio, samples, slim)
+from . import (avdist, fields, fuel, gpsassemble, gpsmatch, gpsruns, kinematics,
+               lanes, matjson, matround, rawio, samples, slim)
 
-__all__ = ["avdist", "fuel", "gpsassemble", "gpsmatch", "gpsruns", "kinematics",
-           "lanes", "matjson", "matround", "rawio", "samples", "slim"]
+__all__ = ["avdist", "fields", "fuel", "gpsassemble", "gpsmatch", "gpsruns",
+           "kinematics", "lanes", "matjson", "matround", "rawio", "samples", "slim"]
 __version__ = "0.1.0"
