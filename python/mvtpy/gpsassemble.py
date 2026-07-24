@@ -40,6 +40,7 @@ __all__ = [
     "control_car_status",
     "assemble_run",
     "load_lane_map",
+    "assemble_day",
 ]
 
 #: [ft] x shift from the GPS antenna to the AV rear bumper (``inVehShift``).
@@ -252,6 +253,55 @@ def assemble_run(run: PreprocessedRun, status: dict, median_xd: float = 0.0) -> 
         "control_last30": control_last30,
     }
     return _clip_to_testbed(record)
+
+
+def assemble_day(day: int, data_dir, timings: Optional[dict] = None) -> List[dict]:
+    """Full Python equivalent of assemble_data_GPS for one day.
+
+    Ties the whole GPS stage together: parse runs, resample to 10 Hz, load
+    server connectivity, compute the MOTION-matching bias, and assemble one
+    released record per run (with x_position corrected by the bias). Returns the
+    list of records in run order, ready for mvtpy.matjson.dumps.
+
+    Parameters
+    ----------
+    day:       16, 17, or 18
+    data_dir:  the workspace ``data`` folder (contains cars/ and i24motion/)
+    timings:   optional dict; populated with per-phase wall-clock seconds
+
+    Notes
+    -----
+    Byte-parity with MATLAB's output is limited by the CSV float-parse residual
+    (see docs/PYTHON_PORT.md); the values are correct to ~1e-6. This is the
+    heaviest stage - the matching pass streams the day's raw MOTION segments.
+    """
+    import time
+
+    from . import gpsmatch, gpsruns
+
+    data_dir = Path(data_dir)
+    cars = data_dir / "cars"
+    motion = data_dir / "i24motion" / f"2022-11-{day}"
+    clock = {} if timings is None else timings
+
+    def phase(name, fn):
+        start = time.time()
+        result = fn()
+        clock[name] = time.time() - start
+        return result
+
+    runs = phase("parse_runs", lambda: gpsruns.parse_gps_data(cars / "cars_gps", day))
+    lane_map = load_lane_map(cars / "cars_vins.csv")
+    pre = phase("preprocess", lambda: [preprocess_run(run, index + 1, lane_map)
+                                       for index, run in enumerate(runs)])
+    status = phase("connection_status",
+                   lambda: connection_status(cars / f"veh_ping_202211{day}.csv",
+                                             cars / "cars_vins.csv"))
+    bias = phase("matching_bias", lambda: gpsmatch.matching_bias(pre, motion, day))
+    records = phase("assemble", lambda: [assemble_run(run, status[run.vin],
+                                                      bias.get(run.index, 0.0))
+                                         for run in pre])
+    return records
 
 
 # ---------------------------------------------------------------------------

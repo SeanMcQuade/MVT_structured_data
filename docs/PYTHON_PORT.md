@@ -112,6 +112,26 @@ A useful cross-check along the way: **the current MATLAB code reproduces the
 released GPS file byte-for-byte** (all 15 fields, 3.6M samples), validating the
 refactor for the GPS stage as well.
 
+### End-to-end timing
+
+`mvtpy.gpsassemble.assemble_day` runs the whole GPS stage. For 2022-11-16:
+
+| Phase | Time |
+| --- | --- |
+| parse runs (CSV, correctly-rounded) | 40 s |
+| preprocess (10 Hz resample) | 0.6 s |
+| connection status | 0.4 s |
+| **matching bias** | **649 s** |
+| assemble records | 13 s |
+| encode + write 304 MB JSON | 36 s |
+| **total** | **~12 min** |
+
+The matching pass is 92% of the run — which is why it was the optimization
+target — and MATLAB's whole `assemble_data_GPS` is a comparable ~14 min. The
+assembled fields match MATLAB as above: control/lane/direction exact, lat/long
+~99.99%, with the timestamp/x/speed residual being the documented CSV-parse and
+grid float sensitivity.
+
 ### MOTION-matching bias (`x_position`)
 
 Ported in `mvtpy.gpsmatch`. Each run's `x_position` is corrected by a per-run
