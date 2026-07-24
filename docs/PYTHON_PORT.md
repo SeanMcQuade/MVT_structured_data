@@ -23,6 +23,14 @@ without a MATLAB license.
 | Sample collection (`generate_data_samples`) | `mvtpy.samples` | all 8 arrays, all 88.8M samples identical to the `.mat` | **exact** |
 | Macroscopic fields (`generate_macroscopic_fields`) | `mvtpy.fields` | Rho bit-exact; Q/F/U/Phi/Psi to ~1e-11, NaN layout identical | float-exact |
 | AV-effect binning (`plot_AV_analysis` core) | `mvtpy.avanalysis` | median and count bit-exact; effective/mean to ~1e-16 | float-exact |
+| Figures (field heatmaps, AV fuel curves) | `mvtpy.plotting` | matplotlib, same colors/colormap/layout, not pixel-exact | visual |
+
+`mvtpy.plotting` renders the two main figure families in matplotlib using
+MATLAB's `parula` colormap, the same per-field color-scale limits, the same
+engaged-red / disengaged-white AV overlay, the same per-day blue/red/green, and
+a matching layout. It is deliberately visually close rather than pixel-for-pixel
+(matplotlib cannot reproduce MATLAB's renderer exactly). matplotlib is imported
+lazily, so the rest of `mvtpy` does not depend on it.
 | Distance to upstream/downstream AVs | `mvtpy.avdist` | all four distance fields and their vehicle ids, including empty/null handling | exact |
 | **Whole segment: assemble, round, encode, write** | `mvtpy.slim` | **full 409 MB released segment reproduced from raw data, md5 identical** | **byte-identical** |
 
