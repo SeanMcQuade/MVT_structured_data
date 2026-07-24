@@ -185,6 +185,11 @@ $(STAMPS)/av: $(SRC_av) $(foreach d,$(DAYS),$(STAMPS)/samples-$(d)) | $(STAMPS)
 status:
 	@cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) "mvt.status()"
 
+# Check the data are laid out where the pipeline expects them.
+.PHONY: check-data
+check-data:
+	@MVT_DATA_DIR="$(DATA)" MVT_RESULTS_DIR="$(RESULTS)" $(REPO_ROOT)/check_data.sh
+
 # Mark existing outputs as current, for code changes that provably do not alter
 # results. Verify first by rebuilding into a separate tree and comparing:
 #   make RESULTS=$(WORKSPACE)/results_verify slim-16 && md5 <old> <new>

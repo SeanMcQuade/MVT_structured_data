@@ -4,11 +4,79 @@ This repository contains data recorded from the partially automated vehicles, ca
 installed raspberri pi and several flags to indicate the state of the vehicle) and data recorded by the I-24 MOTION observatory.
 
 # Contents
+- [Quick start](#quick-start)
 - [Running the pipeline](#running-the-pipeline)
 - [Documentation](#documentation)
 - [Generate integrated data.](#tag1)
 - [Plot data and results.](#tag2)
 - [Websites](#tag3)
+
+## Quick start
+
+### 1. Put the data in place
+
+The pipeline expects this repository to sit **next to** the `data/` and
+`results/` folders:
+
+```
+<some folder>/
+  MVT_structured_data/   <- this repository
+  data/                  <- raw inputs (cars/, i24motion/)   — for bootstrapping
+  results/               <- processed inputs and outputs (slim/, gps/, figures/)
+```
+
+The data are distributed separately (see the download instructions further
+down). Once you have them, check the layout is correct:
+
+```bash
+./check_data.sh          # reports what's present and which workflows can run
+```
+
+It tells you whether you can **plot/analyze** (needs `results/slim` + `results/gps`)
+and/or **bootstrap from raw data** (needs `data/cars` + `data/i24motion`). If the
+folders are elsewhere, point it at them:
+
+```bash
+MVT_DATA_DIR=/abs/data MVT_RESULTS_DIR=/abs/results ./check_data.sh
+```
+
+### 2. Run — pick one
+
+**A. From within MATLAB** (interactive; the reference implementation)
+
+```matlab
+cd MVT_structured_data/Scripts
+run_all_scripts                 % all three days, skipping work already done
+run_all_scripts('Days', 17)     % one day
+mvt.status                      % what is stale and why (nothing runs)
+```
+
+**B. MATLAB from the command line** (headless, incremental, parallel)
+
+```bash
+cd MVT_structured_data
+make check-data                 # same layout check as above
+make status                     # what would run
+make -j3 all                    # everything, three days in parallel
+make figures                    # just the plots (needs processed data)
+make SHARDS=4 slim-17           # one stage, one day, 4 processes
+```
+
+Set `MATLAB=/path/to/matlab` if MATLAB is not at the default macOS location.
+
+**C. Python from the command line** (no MATLAB needed; see `python/README.md`)
+
+```bash
+cd MVT_structured_data/python
+./setup_venv.sh --full          # create .venv and install (numpy, pandas, matplotlib, ...)
+source .venv/bin/activate
+mvt fields  --day 16            # macroscopic fields  -> .npz
+mvt figures --day 16            # field heatmaps + AV fuel curves -> .png
+mvt all     --day 16            # gps, samples, fields, figures
+```
+
+The Python port also runs in Docker against a mounted data directory — see
+[`python/README.md`](python/README.md).
 
 ## Documentation
 

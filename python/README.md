@@ -36,6 +36,13 @@ Python 3.9+ is required. The core install (numpy + pandas) is enough to run the
 `gps`, `samples`, and `fields` stages; `full` adds matplotlib for figures and
 h5py/scipy for reading MATLAB `.mat` reference files.
 
+Before running, confirm the data are laid out where the pipeline expects
+(this repository as a sibling of `data/` and `results/`):
+
+```bash
+../check_data.sh          # or: MVT_DATA_DIR=/abs/data MVT_RESULTS_DIR=/abs/results ../check_data.sh
+```
+
 ## Run
 
 The CLI (`mvt`, or `python -m mvtpy`) runs one stage for one or more days:
