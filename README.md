@@ -18,6 +18,12 @@ installed raspberri pi and several flags to indicate the state of the vehicle) a
 | [`docs/DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md) | Every field of every output: units, dtype, rounding, null/empty semantics, and which stage writes it. |
 | [`docs/MATLAB_JSON_FORMAT.md`](docs/MATLAB_JSON_FORMAT.md) | How MATLAB's `jsonencode` formats numbers, needed for byte-identical output. |
 | [`docs/PYTHON_PORT.md`](docs/PYTHON_PORT.md) | Status of the Python implementation and how its parity is verified. |
+| [`python/README.md`](python/README.md) | The Python port: install (venv), run (CLI), Docker, and test. |
+
+The pipeline runs two ways: the **MATLAB** scripts under `Scripts/` (the
+reference implementation, driven by `make` or `run_all_scripts`), and the
+**Python** port under `python/` (`mvtpy`, runnable from a venv or a container).
+This README covers the MATLAB side; see `python/README.md` for the Python side.
 
 ## Running the pipeline
 
