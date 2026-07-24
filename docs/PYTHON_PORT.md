@@ -22,6 +22,7 @@ without a MATLAB license.
 | Lane identification and clipping | `mvtpy.lanes` | released segmentation reproduced from raw data | exact |
 | Sample collection (`generate_data_samples`) | `mvtpy.samples` | all 8 arrays, all 88.8M samples identical to the `.mat` | **exact** |
 | Macroscopic fields (`generate_macroscopic_fields`) | `mvtpy.fields` | Rho bit-exact; Q/F/U/Phi/Psi to ~1e-11, NaN layout identical | float-exact |
+| AV-effect binning (`plot_AV_analysis` core) | `mvtpy.avanalysis` | median and count bit-exact; effective/mean to ~1e-16 | float-exact |
 | Distance to upstream/downstream AVs | `mvtpy.avdist` | all four distance fields and their vehicle ids, including empty/null handling | exact |
 | **Whole segment: assemble, round, encode, write** | `mvtpy.slim` | **full 409 MB released segment reproduced from raw data, md5 identical** | **byte-identical** |
 

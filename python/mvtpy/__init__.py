@@ -39,11 +39,14 @@ samples
 fields
     Macroscopic traffic-state fields on a time-space grid
     (generate_macroscopic_fields).
+avanalysis
+    Distance-binning of fuel samples (numerical core of plot_AV_analysis).
 """
 
-from . import (avdist, fields, fuel, gpsassemble, gpsmatch, gpsruns, kinematics,
-               lanes, matjson, matround, rawio, samples, slim)
+from . import (avanalysis, avdist, fields, fuel, gpsassemble, gpsmatch, gpsruns,
+               kinematics, lanes, matjson, matround, rawio, samples, slim)
 
-__all__ = ["avdist", "fields", "fuel", "gpsassemble", "gpsmatch", "gpsruns",
-           "kinematics", "lanes", "matjson", "matround", "rawio", "samples", "slim"]
+__all__ = ["avanalysis", "avdist", "fields", "fuel", "gpsassemble", "gpsmatch",
+           "gpsruns", "kinematics", "lanes", "matjson", "matround", "rawio",
+           "samples", "slim"]
 __version__ = "0.1.0"
