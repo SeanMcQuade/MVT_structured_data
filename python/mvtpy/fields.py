@@ -46,10 +46,12 @@ class FieldOptions:
 
     @property
     def ht(self) -> float:
+        """[s] temporal window half-width, hx / v_char."""
         return self.hx / self.v_char
 
     @property
     def factor(self) -> float:
+        """Box-kernel normalization, 1 / (4 * ht * hx)."""
         return 1.0 / (4 * self.ht * self.hx)
 
 

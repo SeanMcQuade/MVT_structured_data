@@ -41,6 +41,7 @@ class AvRun:
 
     @classmethod
     def from_record(cls, record: dict) -> "AvRun":
+        """Build an AvRun from a released GPS record."""
         timestamp = np.asarray(record["timestamp"], dtype=float)
         # MATLAB prefers control_car and falls back to controller_engaged when
         # that field is empty.
