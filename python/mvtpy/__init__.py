@@ -34,11 +34,13 @@ gpsassemble
 gpsmatch
     The MOTION-matching x_position bias (median_xd), the last piece of
     assemble_data_GPS.
+samples
+    Per-sample data near engaged control vehicles (generate_data_samples).
 """
 
 from . import (avdist, fuel, gpsassemble, gpsmatch, gpsruns, kinematics, lanes,
-               matjson, matround, rawio, slim)
+               matjson, matround, rawio, samples, slim)
 
 __all__ = ["avdist", "fuel", "gpsassemble", "gpsmatch", "gpsruns", "kinematics",
-           "lanes", "matjson", "matround", "rawio", "slim"]
+           "lanes", "matjson", "matround", "rawio", "samples", "slim"]
 __version__ = "0.1.0"
