@@ -55,7 +55,7 @@ direction = -1; % -1=Westbound, 1=Eastbound
 lane = 0; % 0=all lanes
 ax_t = {'06:00:00','10:00:00'}; % time interval for trajectories
 ax_x = [0,6500]; % space interval for trajectories 
-skip_t_plot = 200; % sub-sample trajectories for plotting; use 5 to 50
+skip_t_plot = 50; % sub-sample trajectories for plotting; use 5 to 50
 subfield_name_x = 'x_position_meters'; % name of x position field in the data
 fig_res = [2500 800]; % figure base resolution
 timeZoomWin = [0612 0619]; % time window to zoom into (in military time)
@@ -204,7 +204,7 @@ fprintf(' Done (%0.0fsec).\n',toc)
 %========================================================================
 % Go through files/trajectories and plot them
 %========================================================================
-for fileInd = 1:2:length(data_files) % loop over relevant files
+for fileInd = 1:1:length(data_files) % loop over relevant files
     % Load data file
     fileName = data_files(fileInd).name;
     fprintf('Loading %s ...',fileName), tic
