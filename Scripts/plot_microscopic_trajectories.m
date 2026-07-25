@@ -227,12 +227,19 @@ for fileInd = 1:2:length(data_files) % loop over relevant files
     [~,si] = sort(veh_lengths,'descend'); % sort by decreasing vehicle length
     ind = ind(si); % reorder index set accordingly
     data = data(ind);
-    % Process trajectories
+    % Process trajectories: collect each trajectory's polygon into shared
+    % vertex/face/color arrays, then draw them ALL as one patch object per
+    % file. Calling patch() once per trajectory creates ~10^5 persistent HG2
+    % objects for a full day (each with kByte-scale fixed overhead regardless
+    % of vertex count) and exhausts RAM; one patch/file keeps memory bounded.
     fprintf('Adding %d trajectories to plot ...',length(ind)), tic
-    % iterate over all trajectories
-    for j = 1:length(data) % loop over used trajectories
+    nTraj = length(data);
+    vertsC = cell(nTraj,1);    % per-trajectory polygon vertices [2*ns x 2]
+    cdataC = cell(nTraj,1);    % per-trajectory vertex colors     [2*ns x 1]
+    faceLens = zeros(nTraj,1); % vertex count of each polygon
+    for j = 1:nTraj % loop over used trajectories
         traj_len = data(j).length*ft2meterFactor; % length of vehicle [m]
-        traj_t = data(j).timestamp; 
+        traj_t = data(j).timestamp;
         traj_x = data(j).(subfield_name_x); % vehicle position [m]
         % Calculate velocity
         traj_v = (traj_x([2:end,end])-traj_x([1,1:end-1]))./...
@@ -244,7 +251,7 @@ for fileInd = 1:2:length(data_files) % loop over relevant files
         traj_t = traj_t(traj_ind);
         traj_x = traj_x(traj_ind);
         traj_v = traj_v(traj_ind);
-        patch_t = [traj_t;traj_t(end:-1:1)] - ax_t(1) ; 
+        patch_t = [traj_t;traj_t(end:-1:1)] - ax_t(1) ;
         patch_x = [traj_x;traj_x(end:-1:1)+traj_len*direction]/1000;
         patch_v = [traj_v;traj_v(end:-1:1)];
         if flag_use_int32_vars
@@ -252,9 +259,26 @@ for fileInd = 1:2:length(data_files) % loop over relevant files
             patch_x = int32(patch_x*toInt32Factor);
             patch_v = int32(patch_v*toInt32Factor);
         end
-         patch(patch_t, patch_x, patch_v,'EdgeColor','None')
+        vertsC{j} = [patch_t(:), patch_x(:)];
+        cdataC{j} = patch_v(:);
+        faceLens(j) = numel(patch_t);
     end
-    drawnow limitrate nocallbacks
+    % Stack all polygons and build a NaN-padded face-index matrix: row j
+    % lists the vertex indices of trajectory j, so one patch renders them all
+    % as separate filled faces. Cast to double at the boundary because the
+    % Vertices/FaceVertexCData properties reject integer types (the int32
+    % rounding above is preserved, so pixel output is unchanged).
+    V = double(vertcat(vertsC{:}));
+    C = double(vertcat(cdataC{:}));
+    maxLen = max(faceLens);
+    F = nan(nTraj,maxLen);
+    voff = 0;
+    for j = 1:nTraj
+        F(j,1:faceLens(j)) = voff + (1:faceLens(j));
+        voff = voff + faceLens(j);
+    end
+    patch('Faces',F,'Vertices',V,'FaceVertexCData',C,...
+        'FaceColor','interp','EdgeColor','none')
     fprintf(' Done (%0.0fsec).\n',toc)
 end
 clear data  veh_lengths
@@ -310,17 +334,12 @@ if flag_zoom_plot
     %========================================================================
     % Show zoom itself
     %========================================================================
-    % Remove all trajectories fully outside of zoom window
-    fprintf('Remove trajectories outside zoom window, and zoom in ...'), tic
-    h_traj = findobj(gca,'type','patch');
-    ind_delete = false(1,length(h_traj));
-    for j = 1:length(h_traj)
-        ind_delete(j) = all(h_traj(j).Vertices(:,1)<zoom_t(1))||...
-            all(h_traj(j).Vertices(:,1)>zoom_t(2))||...
-            all(h_traj(j).Vertices(:,2)<zoom_x(1)/1000)||...
-            all(h_traj(j).Vertices(:,2)>zoom_x(2)/1000);
-    end
-    delete(h_traj(ind_delete))
+    % Zoom in. (Previously this walked every patch object and deleted those
+    % outside the window to lighten the render -- a second O(#trajectories)
+    % pass that spiked RAM and rebooted the machine. With one patch/file the
+    % objects are few, and setting xlim/ylim below lets axes clipping discard
+    % off-window faces at draw time, so no deletion is needed.)
+    fprintf('Zoom in ...'), tic
     % Zoom into zoom window
     posgca = get(gca,'Position');
     fac = (diff(zoom_t)/diff(xlim))/(diff(zoom_x/1000)/diff(ylim))*posgca(3)/posgca(4);
