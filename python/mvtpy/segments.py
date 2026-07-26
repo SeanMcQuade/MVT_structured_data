@@ -33,6 +33,13 @@ DAY_ABBREV = {16: "wed", 17: "thu", 18: "fri"}
 
 _FIRST_TIMESTAMP = re.compile(r'"first_timestamp"\s*:\s*([-+0-9.eE]+)')
 
+#: Bumped whenever the raw timestamp -> output name mapping changes. The cache
+#: fingerprint only covers the raw listing, so without this a cached manifest
+#: would keep serving names computed by superseded code.
+#:   1 -> truncate to the second
+#:   2 -> round to milliseconds, then truncate (matches segmentName.m)
+_CACHE_VERSION = 2
+
 #: Prefix sizes tried in order when scanning for the first timestamp.
 _PREFIX_BYTES = (4_000_000, 64_000_000)
 
@@ -58,8 +65,16 @@ def segment_name(first_timestamp: float) -> str:
     ``I-24MOTION_2022-11-18_05-59-59.json``. Released filenames must not
     change, so this is the single place the conversion happens - as in MATLAB,
     where both the stage and the manifest call ``mvt.segmentName``.
+
+    The millisecond step is load-bearing. ``segmentName.m`` builds the datetime
+    with ``'Format','HH:mm:ss.SSS'`` before handing it to ``datestr``, so the
+    value is rounded to milliseconds and only then truncated to the second.
+    Truncating the raw timestamp instead gets 71 of the 72 released segments
+    right and fails on 2022-11-16 08:09:59.999880, which rounds up to
+    ``08-10-00`` - a 120 microsecond difference that renames an output file.
+    Rounding straight to seconds is wrong in the other direction (27/72).
     """
-    stamp = datetime.fromtimestamp(first_timestamp, _CENTRAL)
+    stamp = datetime.fromtimestamp(round(first_timestamp * 1000) / 1000, _CENTRAL)
     return f"I-24MOTION_{stamp.strftime('%Y-%m-%d_%H-%M-%S')}.json"
 
 
@@ -111,7 +126,8 @@ def manifest(data_dir: "str | Path", results_dir: "str | Path", day: int,
     if not force and cache.is_file():
         try:
             cached = json.loads(cache.read_text(encoding="utf-8"))
-            if cached.get("fingerprint") == fingerprint:
+            if (cached.get("version") == _CACHE_VERSION
+                    and cached.get("fingerprint") == fingerprint):
                 return [Segment(seq=entry["seq"], raw_name=entry["raw_name"],
                                 raw_path=Path(entry["raw_path"]),
                                 first_timestamp=entry["first_timestamp"],
@@ -131,7 +147,7 @@ def manifest(data_dir: "str | Path", results_dir: "str | Path", day: int,
     try:
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(json.dumps(
-            {"fingerprint": fingerprint,
+            {"version": _CACHE_VERSION, "fingerprint": fingerprint,
              "segments": [{"seq": s.seq, "raw_name": s.raw_name,
                            "raw_path": str(s.raw_path),
                            "first_timestamp": s.first_timestamp,

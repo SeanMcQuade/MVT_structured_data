@@ -112,3 +112,41 @@ def test_manifest_errors_clearly_on_a_missing_or_empty_day(tmp_path):
     empty.mkdir(parents=True)
     with pytest.raises(FileNotFoundError, match="No raw MOTION files"):
         segments.manifest(data, results, 17)
+
+
+#: 2022-11-16 08:09:59.999880 local - 120 microseconds short of the next second.
+#: MATLAB names the file 08-10-00 because segmentName.m rounds to milliseconds
+#: (the 'HH:mm:ss.SSS' format) before truncating to the second.
+MILLISECOND_ROLLOVER = 1668607799.99988
+
+
+def test_segment_name_rounds_to_milliseconds_before_truncating():
+    """Truncating the raw timestamp renames this one file, and only this one.
+
+    Across the 72 released segments: truncate = 71/72, round-to-seconds = 27/72,
+    round-to-milliseconds-then-truncate = 72/72.
+    """
+    assert segments.segment_name(MILLISECOND_ROLLOVER) == \
+        "I-24MOTION_2022-11-16_08-10-00.json"
+
+
+def test_segment_name_does_not_round_whole_seconds_up():
+    """Guard the other direction: .983 must stay at 59, not become the next second."""
+    assert segments.segment_name(1668772799.9833353) == \
+        "I-24MOTION_2022-11-18_05-59-59.json"
+
+
+def test_manifest_cache_is_rejected_when_the_naming_version_changes(tmp_path):
+    """The fingerprint covers only the raw listing, so a code change to the
+    name mapping must invalidate the cache through its version."""
+    data, results = build_day(tmp_path)
+    segments.manifest(data, results, 18)
+    cache = results / ".mvt" / "manifests" / "segments_2022-11-18.json"
+
+    stale = json.loads(cache.read_text(encoding="utf-8"))
+    stale["version"] = segments._CACHE_VERSION - 1
+    stale["segments"][0]["output_name"] = "I-24MOTION_1999-01-01_00-00-00.json"
+    cache.write_text(json.dumps(stale), encoding="utf-8")
+
+    rebuilt = segments.manifest(data, results, 18)
+    assert rebuilt[0].output_name == "I-24MOTION_2022-11-18_05-59-59.json"
