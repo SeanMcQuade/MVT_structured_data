@@ -244,7 +244,11 @@ def assemble_run(run: PreprocessedRun, status: dict, median_xd: float = 0.0) -> 
         "longitude": round_decimals(run.longitude, 6),
         "x_position": round_decimals(FT_TO_METER * run.x_position - median_xd, 6),
         "y_position": round_decimals(FT_TO_METER * run.y_position, 6),
-        "controller_engaged": run.control_active.astype(float),
+        # Stays boolean: MATLAB carries this as a logical, so jsonencode writes
+        # true/false. Casting to float here encoded 0/1 instead, which is the
+        # same information but not the same bytes - and at 3M samples it was
+        # 9.8 MB of spurious difference against the released file.
+        "controller_engaged": run.control_active.astype(bool),
         "speed": run.can_speed,
         "is_server_connected": connected,
         "first_timestamp": float(round_decimals(run.timestamp[0], 6)),

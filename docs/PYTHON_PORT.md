@@ -24,6 +24,7 @@ without a MATLAB license.
 | Macroscopic fields (`generate_macroscopic_fields`) | `mvtpy.fields` | Rho bit-exact; Q/F/U/Phi/Psi to ~1e-11, NaN layout identical | float-exact |
 | AV-effect binning (`plot_AV_analysis` core) | `mvtpy.avanalysis` | median and count bit-exact; effective/mean to ~1e-16 | float-exact |
 | Figures (field heatmaps, AV fuel curves) | `mvtpy.plotting` | matplotlib, same colors/colormap/layout, not pixel-exact | visual |
+| Microscopic trajectories (`plot_microscopic_trajectories`) | `mvtpy.microplot` | same trajectory count and ribbon geometry per segment; one artist per file | visual |
 
 `mvtpy.plotting` renders the two main figure families in matplotlib using
 MATLAB's `parula` colormap, the same per-field color-scale limits, the same
@@ -31,6 +32,12 @@ engaged-red / disengaged-white AV overlay, the same per-day blue/red/green, and
 a matching layout. It is deliberately visually close rather than pixel-for-pixel
 (matplotlib cannot reproduce MATLAB's renderer exactly). matplotlib is imported
 lazily, so the rest of `mvtpy` does not depend on it.
+
+`mvtpy.microplot` covers stage 5b, the trajectory time-space figures, and
+carries the same memory fix as the MATLAB version — one artist per segment file
+rather than one per trajectory. See
+[MEMORY_FIX_microscopic_trajectories.md](MEMORY_FIX_microscopic_trajectories.md#the-python-port)
+for how the two implementations correspond.
 | Distance to upstream/downstream AVs | `mvtpy.avdist` | all four distance fields and their vehicle ids, including empty/null handling | exact |
 | **Whole segment: assemble, round, encode, write** | `mvtpy.slim` | **full 409 MB released segment reproduced from raw data, md5 identical** | **byte-identical** |
 
@@ -177,6 +184,58 @@ with **bit-identical output** (all 795 runs unchanged); each vectorization was
 verified against the original scalar form first. The full-day check is opt-in
 (`MVT_RUN_SLOW=1`).
 
+## GPS parity: measured against the released 2022-11-18 file
+
+A full from-scratch Python run (`mvt build --day 18` into an empty tree) was
+compared with the released MATLAB outputs. Result: **6 of 25 files
+byte-identical** (`mvt verify`). The whole gap originates in stage 1; given the
+*released* GPS as input, the Python `slim` stage reproduces a segment
+byte-for-byte.
+
+Three distinct causes. Two are **fixed**; the structure of the file now matches
+exactly and only a last-digit residual remains.
+
+1. **`controller_engaged` was encoded as 0/1 instead of `true`/`false`.**
+   MATLAB carries it as a logical, so `jsonencode` writes booleans. At 3M
+   samples this alone was **9.8 MB** of difference. *Fixed* in
+   `gpsassemble.assemble_record`; pinned by
+   `tests/test_gpsassemble.py::test_controller_engaged_encodes_as_json_booleans`.
+
+2. **Every run was one 10 Hz sample short — a slicing off-by-one.** MATLAB's
+   `runEnd` is the first sample *outside* the testbed and `vehTable(1:runEnd,:)`
+   **keeps** it, resuming at `runEnd+1`. The port sliced `rows.iloc[:end]`,
+   dropping it, and resumed at `end`. That shortened **214 of 772** records
+   (211 by one sample, 3 by two) and caused the 466-sample shortfall in
+   `samples_for_distance_analysis_18`. *Fixed* in `gpsruns._split_runs`; pinned
+   by `test_run_keeps_the_first_sample_outside_the_testbed`.
+
+   The pre-existing run tests could not have caught this: they check run
+   *counts* (795/795), not sample counts.
+
+3. **A last-digit residual**, which is what remains. After 1 and 2, for
+   2022-11-18:
+
+   | field | values differing | max abs diff |
+   | --- | --- | --- |
+   | `controller_engaged`, `is_server_connected`, `control_car`, `control_last30` | **0** | 0 |
+   | `y_position` | 4 (0.0001%) | 1e-6 |
+   | `latitude` / `longitude` | 12 / 30 | 1e-6 |
+   | `timestamp` | 48 (0.0016%) | 1.19e-6 |
+   | `speed` | 48,547 (1.58%) | 1.38e-6 |
+   | `x_position` | 11,851 (0.39%) | 2.14e-2 |
+
+   Record count, per-record sample counts and total samples (3,076,225) now all
+   match exactly, and 15 records are identical in every field. The
+   `x_position` outlier is confined to **5 records**, each with what is
+   effectively a *constant* offset (≤21 mm) — the signature of `median_xd`, the
+   MOTION-matching bias, landing on a different median because the matched set
+   differs. Everything else sits at 1e-6, the granularity these fields are
+   written at, so a single flipped digit still breaks a checksum.
+
+Earlier notes in this file described 2 and 3 together as a "sub-ULP residual".
+That was too optimistic: a missing sample is a structural difference, not a
+rounding one.
+
 ## What is not ported yet
 
 Every stage of the JSON-producing pipeline is now ported. What remains is
@@ -184,7 +243,7 @@ optional polish, not new stages:
 
 | Piece | Notes |
 | --- | --- |
-| Byte-exact GPS output | Blocked only by MATLAB `readtable` CSV float parsing; fixed on the Python side with `float_precision='round_trip'` for lat/long, with a sub-ULP residual remaining on `y`/`speed`/`x`. |
+| Byte-exact GPS output | Three causes remain, measured below. Not "sub-ULP" as previously recorded — one is a whole missing sample per run. |
 | `gpsmatch` performance | Correct but slow; needs vectorization for routine use. |
 | `.mat` writers and figures (stages 3–6) | Not started; the analysis/plotting half of the pipeline. |
 | Samples, macroscopic fields, figures | stages 3-6 | Later; `.mat` writers and matplotlib equivalents. |

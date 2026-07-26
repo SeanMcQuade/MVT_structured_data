@@ -15,6 +15,7 @@
 #   make FORCE=1 fields-17   # rebuild even if outputs look fresh
 #   make -n all              # dry run: show the plan without running MATLAB
 #   make status              # ask MATLAB what is stale and why
+#   make watch               # live progress of a run, from a second terminal
 #   make clean-figures-17    # narrow, explicit cleanup
 #
 # (C) 2026 CIRCLES Consortium. BSD-3-Clause.
@@ -105,7 +106,7 @@ endef
 # Aggregate targets
 # ---------------------------------------------------------------------------
 .PHONY: all data figures gps slim full samples fields macro micro av \
-        status config test help migrate-cache accept
+        status config test help migrate-cache accept watch watch-once verify
 
 all: figures av
 
@@ -184,6 +185,47 @@ $(STAMPS)/av: $(SRC_av) $(foreach d,$(DAYS),$(STAMPS)/samples-$(d)) | $(STAMPS)
 # ---------------------------------------------------------------------------
 status:
 	@cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) "mvt.status()"
+
+# ---------------------------------------------------------------------------
+# Output verification
+#
+# Checks generated files against the expected md5s in python/expected/. The
+# manifest is derived from the MATLAB outputs, so a pass is evidence that a
+# pipeline reproduced them byte for byte - which is the claim worth making
+# about the Python port. PNGs are excluded: renderers do not agree pixel for
+# pixel, so a checksum there would fail for reasons unrelated to correctness.
+#
+#   make verify                       # every day in DAYS
+#   make verify RESULTS=/tmp/other    # verify a tree built somewhere else
+#   make verify-against RESULTS=/tmp/other   # explain how it differs
+#   make verify-update                # re-record expected checksums
+# ---------------------------------------------------------------------------
+PYTHON ?= python3
+.PHONY: verify verify-update verify-against
+verify:
+	@cd $(REPO_ROOT)/python && $(PYTHON) -m mvtpy verify \
+	  $(foreach d,$(DAYS),--day $(d)) --results-dir "$(RESULTS)"
+
+verify-against:
+	@cd $(REPO_ROOT)/python && $(PYTHON) -m mvtpy verify \
+	  $(foreach d,$(DAYS),--day $(d)) --results-dir "$(RESULTS)" \
+	  --reference "$(WORKSPACE)/results"
+
+verify-update:
+	@cd $(REPO_ROOT)/python && $(PYTHON) -m mvtpy verify \
+	  $(foreach d,$(DAYS),--day $(d)) --results-dir "$(RESULTS)" --update
+
+# Live progress of a run in flight. Start this in a second terminal while
+# `make -jN` works: it reads the outputs on disk, so it needs no cooperation
+# from the stages and adds no dependency that would make them stale.
+# `make watch-once` prints a single snapshot, which is what you want in a log.
+.PHONY: watch watch-once
+watch:
+	@cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) "mvt.watch()"
+
+watch-once:
+	@cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) \
+	  "mvt.watch('Once', true)"
 
 # Check the data are laid out where the pipeline expects them.
 .PHONY: check-data

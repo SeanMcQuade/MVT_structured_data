@@ -44,13 +44,28 @@ avanalysis
 plotting
     Matplotlib figures (field heatmaps, AV fuel curves) - same colors and
     layout as the MATLAB figures, not pixel-exact. Requires matplotlib.
+microplot
+    Microscopic trajectory time-space figures (plot_microscopic_trajectories),
+    with the per-file batching that keeps the artist count bounded.
+segments
+    Raw segment -> processed filename mapping, resolved before any decode
+    (the MATLAB build manifest).
+build
+    A make for the pipeline: dependency graph, staleness, and a -j scheduler
+    over per-day and per-segment work units.
+progress
+    Live progress display for a build, degrading to plain lines when piped.
+verify
+    Checks generated outputs against expected md5s, or against another
+    results tree.
 """
 
-from . import (avanalysis, avdist, fields, fuel, gpsassemble, gpsmatch, gpsruns,
-               kinematics, lanes, matjson, matround, plotting, rawio, samples,
-               slim)
+from . import (avanalysis, avdist, build, fields, fuel, gpsassemble, gpsmatch,
+               gpsruns, kinematics, lanes, matjson, matround, microplot,
+               plotting, progress, rawio, samples, segments, slim, verify)
 
-__all__ = ["avanalysis", "avdist", "fields", "fuel", "gpsassemble", "gpsmatch",
-           "gpsruns", "kinematics", "lanes", "matjson", "matround", "rawio",
-           "plotting", "samples", "slim"]
+__all__ = ["avanalysis", "avdist", "build", "fields", "fuel", "gpsassemble",
+           "gpsmatch", "gpsruns", "kinematics", "lanes", "matjson", "matround",
+           "microplot", "plotting", "progress", "rawio", "samples", "segments",
+           "slim", "verify"]
 __version__ = "0.1.0"

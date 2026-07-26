@@ -95,3 +95,47 @@ def test_run_numbers_increment_per_vehicle(parsed_runs):
         expected = seen.get(run.vin, 0) + 1
         assert run.run_num == expected
         seen[run.vin] = expected
+
+
+def _synthetic_vehicle_day(options: GpsRunOptions, exit_index: int = 800):
+    """One westbound sweep that leaves the testbed at `exit_index`.
+
+    Sized to clear the run filters (>60 s, >1.2 km). Sample `exit_index` is the
+    first one outside the testbed; MATLAB keeps it as the run's final sample.
+    """
+    import numpy as np
+    import pandas as pd
+
+    n = exit_index + 100
+    x = np.empty(n)
+    x[:exit_index] = np.linspace(20000.0, options.min_rcs_x + 1.0, exit_index)
+    x[exit_index:] = options.min_rcs_x - 100.0      # outside from here on
+    y = np.linspace(100.0, 50.0, n)                 # moving toward the centre
+    return pd.DataFrame({
+        "Systime": 1668772800.0 + np.arange(n) * 0.1,
+        "rcs_x": x, "rcs_y": y,
+        "Long": np.full(n, -86.6), "Lat": np.full(n, 36.0),
+        "state_x": x, "state_y": y,
+        "can_speed": np.full(n, 25.0),
+        "Status": ["A"] * n,
+        "control_active": pd.array(["True"] * n, dtype="string"),
+    })
+
+
+def test_run_keeps_the_first_sample_outside_the_testbed():
+    """MATLAB slices vehTable(1:runEnd,:) inclusively.
+
+    Slicing to `end` instead dropped one sample from the tail of every run,
+    which shortened 214 of the 772 released records for 2022-11-18.
+    """
+    from mvtpy.gpsruns import _split_runs
+
+    options = GpsRunOptions()
+    exit_index = 800
+    table = _synthetic_vehicle_day(options, exit_index)
+    runs = _split_runs(table, vehicle_id=1, options=options)
+
+    assert runs, "synthetic sweep should produce a run"
+    assert runs[0].timestamp.size == exit_index + 1
+    # The kept sample is the one outside the testbed.
+    assert runs[0].x_position[-1] < options.min_rcs_x

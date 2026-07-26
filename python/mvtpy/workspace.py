@@ -57,6 +57,19 @@ class Workspace:
     def figures_dir(self, day: int) -> Path:
         return self.results_dir / "figures" / f"2022-11-{day}"
 
+    def models_dir(self) -> Path:
+        """The MATLAB ``Models/`` folder, which holds the road-grade fit the
+        slim stage reads. Resolved from the code location, like `resolve`."""
+        return Path(__file__).resolve().parents[2] / "Models"
+
+    def cache_dir(self, day: int) -> Path:
+        """Derived plotting caches, matching MATLAB's ``mvt.dayDir('cache', ...)``.
+
+        Everything under ``results/.mvt`` is build state: derived, and safe to
+        delete.
+        """
+        return self.results_dir / ".mvt" / "cache" / f"2022-11-{day}"
+
 
 def _pick(explicit: Optional[str], env_var: str, default: Path) -> Path:
     if explicit:

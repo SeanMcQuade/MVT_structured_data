@@ -186,6 +186,41 @@ marks them stale and re-runs without needing `Force`. To rebuild regardless, pas
 matlab -batch "plot_microscopic_trajectories(18, 'Force', true)"
 ```
 
+## The Python port
+
+`python/mvtpy/microplot.py` implements the same stage, with the same fix applied
+in matplotlib terms. The correspondence:
+
+| MATLAB (fixed) | Python |
+| --- | --- |
+| one `patch` per file, NaN-padded `Faces` | one `TriMesh` per file (`tripcolor(..., shading="gouraud")`) |
+| `'FaceColor','interp'` | Gouraud shading — per-vertex speed, same meaning |
+| ~24 graphics objects per day | ~24 artists per day |
+| `int32` vertices to bound memory | not needed; geometry is float arrays, no per-object overhead |
+| zoom by `xlim`/`ylim`, no deletion pass | identical — same artists, tighter limits |
+| `*_reduced.mat` caches | `results/.mvt/cache/2022-11-DD/*_micro.npz` (triangulation, not raw fields) |
+
+Two differences are worth knowing:
+
+* The obvious translation of `patch` is a `PolyCollection`, and it is the wrong
+  one: `set_verts` materializes one `Path` object per polygon, which recreates
+  the object-count problem this fix exists to remove. `TriMesh` keeps the
+  geometry in three flat arrays.
+* The port never holds a decoded segment whole. Trajectories are converted to
+  geometry as they stream off disk and the decoded record is dropped
+  immediately, so it does not need the caches to avoid the multi-GB decode the
+  way MATLAB does — the caches only save time.
+
+The port also does not reproduce the colorbar defect of the `int32` path, where
+`caxis([0,35*toInt32Factor])` leaves a 0–3.5×10⁴ scale labelled `m/s`; its
+colorbar reads 0–35 m/s.
+
+```bash
+cd .../python
+python -m mvtpy micro --day 18        # writes fig_motion_trajectories_*_py_*.png
+python -m pytest tests/test_microplot.py -q
+```
+
 ## Rollback
 
 ```bash

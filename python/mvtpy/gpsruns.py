@@ -121,7 +121,11 @@ def _split_runs(table, vehicle_id: int, options: GpsRunOptions) -> List[GpsRun]:
     end = _find_run_end(rows, options)
 
     while len(rows) > 1:
-        segment = rows.iloc[:end]
+        # MATLAB slices `vehTable(1:runEnd,:)` with runEnd the 1-based index of
+        # the first sample outside the testbed, so that sample is KEPT. `end` is
+        # its 0-based index, hence end+1. Slicing to `end` dropped exactly one
+        # sample from the tail of every run - 214 of 772 released records.
+        segment = rows.iloc[:end + 1] if end < len(rows) else rows
         time = segment["Systime"].to_numpy(dtype=float)
         x = segment["rcs_x"].to_numpy(dtype=float)
         status = segment["Status"].astype(str).str[0].to_numpy()
@@ -153,7 +157,8 @@ def _split_runs(table, vehicle_id: int, options: GpsRunOptions) -> List[GpsRun]:
             ))
 
         if end < len(rows):
-            rows = rows.iloc[end:].reset_index(drop=True)
+            # ... and MATLAB resumes at `runEnd+1`, i.e. after the kept sample.
+            rows = rows.iloc[end + 1:].reset_index(drop=True)
             start = _find_run_start(rows, options)
             if start is None:
                 break

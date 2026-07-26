@@ -117,7 +117,20 @@ def test_controller_engaged_matches_released_exactly(gps_assembly_case):
     for case in gps_assembly_case:
         pre, record, window = case["pre"], case["record"], case["window"]
         assert _equal_with_nan(pre.control_active[window].astype(float),
-                               record["controller_engaged"])
+                               np.asarray(record["controller_engaged"], dtype=float))
+
+
+def test_controller_engaged_encodes_as_json_booleans():
+    """MATLAB carries this as a logical, so jsonencode writes true/false.
+
+    Encoding it as 0/1 is the same information but not the same bytes, and at
+    3M samples it was 9.8 MB of spurious difference against the released file -
+    enough to fail a checksum comparison on its own.
+    """
+    from mvtpy import matjson
+
+    record = {"controller_engaged": np.array([True, False, True]).tolist()}
+    assert matjson.dumps(record) == '{"controller_engaged":[true,false,true]}'
 
 
 def test_server_connected_logic_on_hand_built_inputs():
