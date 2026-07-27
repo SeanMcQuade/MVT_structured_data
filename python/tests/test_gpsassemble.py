@@ -250,3 +250,47 @@ def test_colon_matches_matlab_both_ends_construction():
     assert grid[-1] == pytest.approx(1668603250.5)
     assert grid[half] == 1668603246.5 + half * 0.1
     assert grid[half + 1] == 1668603250.5 - (n - half - 1) * 0.1
+
+
+def test_colon_sets_the_exact_midpoint_to_the_endpoint_average():
+    """MATLAB's a:d:b builds from both ends, and for an even number of steps
+    the middle element is (a+b)/2 - not either one-sided form.
+
+    Verified bit-for-bit against MATLAB over the 772 real 2022-11-18 grids
+    (0 of 3,739,194 points differ). Before this, 104 grid points per day were
+    wrong, which flipped 6th-decimal roundings downstream.
+    """
+    from mvtpy.gpsassemble import _colon
+
+    a, b = 1668776258.0, 1668776458.0        # 2000 steps of 0.1 => even
+    grid = _colon(a, 0.1, b)
+    assert grid.size == 2001
+    assert grid[1000] == (a + b) / 2
+    assert grid[0] == a and grid[-1] == b
+
+
+def test_colon_odd_step_count_splits_without_a_midpoint():
+    from mvtpy.gpsassemble import _colon
+
+    a, b = 1668776258.0, 1668776258.0 + 0.1 * 2001   # odd number of steps
+    grid = _colon(a, 0.1, b)
+    assert grid.size == 2002
+    assert grid[0] == a and grid[-1] == b
+
+
+def test_interp_is_exact_on_a_flat_segment():
+    """MATLAB's interp1 returns the value itself when both endpoints are equal.
+
+    The blend A*(1-w) + B*w rounds the two products independently and lands a
+    ULP off. Speed data is full of flat runs, so this was the last source of
+    1-ULP differences in the resampled fields: against interp1 on a real
+    9,449-point run the plain blend differed on 88 values, every one a flat
+    segment; with the guard, none.
+    """
+    xp = np.array([0.0, 1.0])
+    fp = np.array([68.736000000000004, 68.736000000000004])
+    out = ga._interp_extrap(xp, fp, np.array([0.44856179347689035]))
+    assert out[0] == fp[0]
+    # the unguarded blend does not manage this
+    w = 0.44856179347689035
+    assert fp[0] * (1 - w) + fp[1] * w != fp[0]

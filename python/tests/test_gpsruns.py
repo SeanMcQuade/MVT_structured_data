@@ -21,8 +21,9 @@ from mvtpy import avdist  # noqa: E402
 from mvtpy.gpsruns import GpsRunOptions, day_time_limits, parse_gps_data  # noqa: E402
 
 WORKSPACE = Path(__file__).resolve().parents[3]
+from conftest import RESULTS_DIR  # noqa: E402
 CARS_GPS = WORKSPACE / "data" / "cars" / "cars_gps"
-RELEASED_GPS = WORKSPACE / "results" / "gps" / "CIRCLES_GPS_10Hz_2022-11-16.json"
+RELEASED_GPS = RESULTS_DIR / "gps" / "CIRCLES_GPS_10Hz_2022-11-16.json"
 
 pytest.importorskip("pandas", reason="pandas is needed to read the vehicle CSVs")
 

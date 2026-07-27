@@ -19,7 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mvtpy import avanalysis  # noqa: E402
 
 WORKSPACE = Path(__file__).resolve().parents[3]
-SAMPLES_MAT = (WORKSPACE / "results" / "figures" / "2022-11-16"
+from conftest import RESULTS_DIR  # noqa: E402
+SAMPLES_MAT = (RESULTS_DIR / "figures" / "2022-11-16"
                / "samples_for_distance_analysis_16.mat")
 BIN_FIXTURE = (Path(__file__).resolve().parent / "fixtures"
                / "av_bin_stats_2022-11-16.npz")

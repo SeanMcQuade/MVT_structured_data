@@ -87,6 +87,13 @@ class PreprocessedRun:
     state_y: np.ndarray
     can_speed: np.ndarray
     control_active: np.ndarray  # bool
+    #: Bounds of the *raw* run, before resampling. MATLAB's ``preproc_gps``
+    #: overwrites ``timestamp`` with the 10 Hz grid but leaves
+    #: ``starting_time``/``ending_time`` at the raw values, and the matching
+    #: pass filters on those. The grid is floor/ceil'd outward by up to 0.1 s,
+    #: so using it instead admits runs MATLAB excludes.
+    starting_time: float = 0.0
+    ending_time: float = 0.0
 
 
 def preprocess_run(run: GpsRun, index: int, lane_map: Dict[int, int]) -> PreprocessedRun:
@@ -118,6 +125,8 @@ def preprocess_run(run: GpsRun, index: int, lane_map: Dict[int, int]) -> Preproc
         can_speed=resample_10hz(time, run.can_speed, grid),
         # MATLAB: logical(round(sample_10hz(single(control_active)))).
         control_active=np.round(control).astype(bool),
+        starting_time=float(run.starting_time),
+        ending_time=float(run.ending_time),
     )
 
 
@@ -323,18 +332,31 @@ def _colon(a: float, step: float, b: float) -> np.ndarray:
 
     MATLAB's colon operator does NOT compute ``a + k*step``; it builds the
     vector from both ends to stay accurate at each end - the first half from
-    ``a + k*step`` and the second half from ``b - (n-k)*step``. For a large base
-    like a POSIX timestamp the two forms disagree in the last bit on ~20% of
-    points, which shifts the interp1 query points and flips 6th-decimal
-    roundings in the resampled GPS fields. Verified against `lo:0.1:hi` on the
-    real grids (2207/2207 identical).
+    ``a + k*step``, the second from ``b - (n-k)*step``. For a large base like a
+    POSIX timestamp the two forms disagree in the last bit on ~20% of points,
+    which shifts the interp1 query points and flips 6th-decimal roundings in the
+    resampled GPS fields.
+
+    When the number of steps is **even** there is an exact middle element, and
+    MATLAB sets it to ``(a+b)/2`` rather than to either one-sided form. Missing
+    that was worth 104 wrong grid points per day: neither a forward nor a
+    backward split reproduces it, because the correct value is sometimes one and
+    sometimes the other, and always the average.
+
+    Verified bit-for-bit against `lo:0.1:hi` evaluated in MATLAB over the 772
+    real 2022-11-18 run grids: 0 of 3,739,194 points differ.
     """
     n = int(round((b - a) / step))
     k = np.arange(n + 1)
     half = n // 2
     grid = np.empty(n + 1)
-    grid[:half + 1] = a + k[:half + 1] * step
-    grid[half + 1:] = b - (n - k[half + 1:]) * step
+    if n % 2 == 0:
+        grid[:half] = a + k[:half] * step
+        grid[half] = (a + b) / 2
+        grid[half + 1:] = b - (n - k[half + 1:]) * step
+    else:
+        grid[:half + 1] = a + k[:half + 1] * step
+        grid[half + 1:] = b - (n - k[half + 1:]) * step
     return grid
 
 
@@ -345,15 +367,23 @@ def _interp_extrap(xp: np.ndarray, fp: np.ndarray, x: np.ndarray) -> np.ndarray:
     ``A(i)*(1-w) + A(i+1)*w`` with ``w = (x-B(i))/(B(i+1)-B(i))``, NOT the
     algebraically equivalent ``A(i) + slope*(x-B(i))``. The two disagree in the
     last bit (~1e-14), which is invisible at the 4-decimal rounding of the MOTION
-    data but flips 6th-decimal roundings in the GPS data. The blend form was
-    confirmed against interp1 on the real inputs (2207/2207 values identical).
+    data but flips 6th-decimal roundings in the GPS data.
+
+    On a **flat segment** (``A(i) == A(i+1)``) the blend is not exact: the two
+    products round independently and their sum lands a ULP off the common value,
+    whereas MATLAB returns the value itself. Speed data is full of flat runs, so
+    this was the single remaining source of 1-ULP differences in the resampled
+    fields. Verified against ``interp1(B,A,newT,'linear','extrap')`` on a real
+    9,449-point run: the plain blend differs on 88 values, all of them flat
+    segments; with this guard, 0 differ.
     """
     xp = np.asarray(xp, dtype=float)
     fp = np.asarray(fp, dtype=float)
     x = np.asarray(x, dtype=float)
     index = np.clip(np.searchsorted(xp, x, side="right") - 1, 0, len(xp) - 2)
+    left, right = fp[index], fp[index + 1]
     weight = (x - xp[index]) / (xp[index + 1] - xp[index])
-    return fp[index] * (1 - weight) + fp[index + 1] * weight
+    return np.where(left == right, left, left * (1 - weight) + right * weight)
 
 
 def _speed_from_position(x_position: np.ndarray, timestamp: np.ndarray) -> np.ndarray:

@@ -75,6 +75,12 @@ def interp1_linear_extrap(xp: np.ndarray, fp: np.ndarray, x: np.ndarray) -> np.n
     NumPy's ``interp`` clamps outside the sample range; MATLAB continues the
     nearest segment's line, which matters because trajectories reach beyond the
     x-range covered by the driving-line cells.
+
+    Uses the same evaluation MATLAB's interp1 does, checked against it on real
+    inputs: the weighted blend ``A*(1-w) + B*w``, except on a flat segment
+    (``A == B``) where MATLAB returns the value itself. The algebraically
+    equivalent slope form ``A + slope*(x-A)`` that this used before disagrees
+    with MATLAB on ~25% of points in the last bit.
     """
     xp = np.asarray(xp, dtype=float)
     fp = np.asarray(fp, dtype=float)
@@ -82,8 +88,9 @@ def interp1_linear_extrap(xp: np.ndarray, fp: np.ndarray, x: np.ndarray) -> np.n
 
     index = np.searchsorted(xp, x, side="right") - 1
     index = np.clip(index, 0, len(xp) - 2)
-    slope = (fp[index + 1] - fp[index]) / (xp[index + 1] - xp[index])
-    return fp[index] + slope * (x - xp[index])
+    left, right = fp[index], fp[index + 1]
+    weight = (x - xp[index]) / (xp[index + 1] - xp[index])
+    return np.where(left == right, left, left * (1 - weight) + right * weight)
 
 
 @dataclass(frozen=True)

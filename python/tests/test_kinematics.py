@@ -69,3 +69,42 @@ def test_trapezoid_integral_matches_matlab_dot_form():
     values = np.array([1.0, 2.0, 0.0, 4.0])
     expected = float(np.dot(np.diff(time), (values[:-1] + values[1:]) / 2))
     assert kin.trapezoid_integral(time, values) == expected
+
+
+def test_neumaier_dot_matches_matlab_bit_for_bit():
+    """Compensated summation is a fixed sequence of IEEE ops, so MATLAB's
+    mvt.neumaierDot and this loop agree exactly.
+
+    Verified on 60 real trajectories (60/60 bit-identical). The case below is a
+    regression guard: the naive product-then-sum disagrees with it, which is the
+    platform-dependence the flag exists to remove.
+    """
+    from mvtpy.kinematics import neumaier_dot
+
+    # Terms spanning many magnitudes, where accumulation order matters.
+    a = np.array([1e16, 1.0, -1e16, 1.0])
+    b = np.ones(4)
+    assert neumaier_dot(a, b) == 2.0          # exact
+    assert float(np.sum(a * b)) != 2.0        # naive summation loses both ones
+
+
+def test_quadrature_flag_selects_the_implementation():
+    from mvtpy import kinematics
+
+    t = np.arange(500) * 0.04
+    v = np.abs(np.sin(t)) * 2.0
+    deterministic = kinematics.trapezoid_integral(t, v, deterministic=True)
+    blas = kinematics.trapezoid_integral(t, v, deterministic=False)
+
+    assert deterministic == kinematics.neumaier_dot(t[1:] - t[:-1],
+                                                    (v[:-1] + v[1:]) / 2)
+    # Same value to within rounding; the point is that only one of them is
+    # reproducible across platforms.
+    assert deterministic == pytest.approx(blas, rel=1e-12)
+
+
+def test_default_flag_is_deterministic():
+    """Must stay in step with flag_deterministic_quadrature in the .m files."""
+    from mvtpy import kinematics
+
+    assert kinematics.DETERMINISTIC_QUADRATURE is True

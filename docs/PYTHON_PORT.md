@@ -112,8 +112,21 @@ change to the MATLAB pipeline or the released data was needed.
    builds the vector from both ends (`a + k·step` for the first half,
    `b − (n−k)·step` for the second) to stay accurate at each end. For a POSIX
    timestamp base the two forms differ in the last bit on ~20% of the 10 Hz
-   grid points, which shifts the interp1 queries. `mvtpy.gpsassemble._colon`
-   reproduces the both-ends construction (0 of 2207 grid points differ).
+   grid points, which shifts the interp1 queries.
+
+   There is a third case the both-ends description omits: when the number of
+   steps is **even** there is an exact middle element, and MATLAB sets it to
+   **`(a+b)/2`**, not to either one-sided form. This is not a tie-break that can
+   be inferred — the correct midpoint equals the forward form on some grids and
+   the backward form on others, and the average on all of them (206/206 of the
+   discriminating cases). An earlier note here claimed "0 of 2207 grid points
+   differ"; that sample happened to contain no discriminating even-step grid.
+   Measured over the 772 real 2022-11-18 run grids, the missing midpoint rule
+   was worth **104 wrong grid points per day**.
+
+   `mvtpy.gpsassemble._colon` now reproduces all three cases, verified
+   bit-for-bit against `lo:0.1:hi` evaluated in MATLAB: **0 of 3,739,194 points
+   differ.**
 
 3. **`interp1`.** MATLAB uses the weighted-blend form `A·(1−w) + B·w`, not
    `A + slope·(x−A)`; they differ at ~1e-14, invisible at 4 decimals but
@@ -184,16 +197,31 @@ with **bit-identical output** (all 795 runs unchanged); each vectorization was
 verified against the original scalar form first. The full-day check is opt-in
 (`MVT_RUN_SLOW=1`).
 
-## GPS parity: measured against the released 2022-11-18 file
+## GPS parity: byte-identical as of 2026-07-25
 
-A full from-scratch Python run (`mvt build --day 18` into an empty tree) was
-compared with the released MATLAB outputs. Result: **6 of 25 files
-byte-identical** (`mvt verify`). The whole gap originates in stage 1; given the
-*released* GPS as input, the Python `slim` stage reproduces a segment
-byte-for-byte.
+The Python GPS stage reproduces the released 2022-11-18 file **exactly** —
+269,121,567 bytes, md5 `04f301cc5009bebaabd4666c563d040f`. It started 9.3 MB
+short.
 
-Three distinct causes. Two are **fixed**; the structure of the file now matches
-exactly and only a last-digit residual remains.
+Five distinct causes, every one identified by dumping MATLAB ground truth and
+diffing bit-for-bit, not by reading code and reasoning:
+
+| # | Cause | Cost before the fix |
+| --- | --- | --- |
+| 1 | `controller_engaged` encoded 0/1, not `true`/`false` | 9.8 MB |
+| 2 | Run slicing dropped the first sample outside the testbed | 214 of 772 records short |
+| 3 | `a:d:b` midpoint for an even step count is `(a+b)/2` | 104 grid points/day |
+| 4 | `interp1` returns the endpoint exactly on a flat segment | 48,547 speed values |
+| 5 | `smoothdata` omits NaN; the port propagated it | `median_xd` on 5 runs |
+
+**The method matters more than any single fix.** Write the real inputs to a
+file, evaluate the MATLAB expression under `-batch`, dump raw doubles, compare
+in Python. Reasoning about what MATLAB "should" do produced two confident and
+wrong hypotheses for cause 5 alone — each was killed by a controlled experiment
+(re-run the matching, count how many of the 772 runs move) before any code
+changed. Both moved zero runs.
+
+Causes 1 and 2, in the order they were found:
 
 1. **`controller_engaged` was encoded as 0/1 instead of `true`/`false`.**
    MATLAB carries it as a logical, so `jsonencode` writes booleans. At 3M
@@ -212,29 +240,100 @@ exactly and only a last-digit residual remains.
    The pre-existing run tests could not have caught this: they check run
    *counts* (795/795), not sample counts.
 
-3. **A last-digit residual**, which is what remains. After 1 and 2, for
-   2022-11-18:
+3. **Two floating-point evaluation differences in the resample.**
 
-   | field | values differing | max abs diff |
-   | --- | --- | --- |
-   | `controller_engaged`, `is_server_connected`, `control_car`, `control_last30` | **0** | 0 |
-   | `y_position` | 4 (0.0001%) | 1e-6 |
-   | `latitude` / `longitude` | 12 / 30 | 1e-6 |
-   | `timestamp` | 48 (0.0016%) | 1.19e-6 |
-   | `speed` | 48,547 (1.58%) | 1.38e-6 |
-   | `x_position` | 11,851 (0.39%) | 2.14e-2 |
+   * **The colon operator's midpoint.** For an even number of steps MATLAB sets
+     the middle grid element to `(a+b)/2`, not to either one-sided form. This is
+     not inferable by tie-breaking: the correct midpoint equals the forward form
+     on 102 grids and the backward form on 104, and the average on all 206.
+     Verified over the 772 real 2022-11-18 run grids: 0 of 3,739,194 points
+     differ.
+   * **`interp1` on a flat segment.** Where the bracketing values are equal
+     (`A == B`), the blend `A*(1-w) + B*w` rounds its two products
+     independently and lands a ULP off; MATLAB returns the value itself. Against
+     `interp1` on a real 9,449-point run the plain blend differs on 88 values,
+     every one a flat segment; with the guard, 0. Three call sites had the bug,
+     and `lanes.interp1_linear_extrap` used the slope form `A + slope*(x-A)`
+     entirely, which disagrees with MATLAB on ~25% of points.
 
-   Record count, per-record sample counts and total samples (3,076,225) now all
-   match exactly, and 15 records are identical in every field. The
-   `x_position` outlier is confined to **5 records**, each with what is
-   effectively a *constant* offset (≤21 mm) — the signature of `median_xd`, the
-   MOTION-matching bias, landing on a different median because the matched set
-   differs. Everything else sits at 1e-6, the granularity these fields are
-   written at, so a single flipped digit still breaks a checksum.
+   Together these took the file from 484 KB off to **30 bytes**, with nine of
+   the ten array fields bit-identical and 767 of 772 records exact.
 
-Earlier notes in this file described 2 and 3 together as a "sub-ULP residual".
-That was too optimistic: a missing sample is a structural difference, not a
-rounding one.
+4. **`smoothdata` omits NaN.** In MATLAB a smoothed point is NaN only when its
+   *entire* window is NaN; the port propagated NaN from any window member.
+   `dist_to_av` is NaN wherever a MOTION trajectory runs past the AV's own time
+   range, so the port poisoned a half-window (1.5 s, ~37 samples at 25 Hz) ahead
+   of every NaN. That ended matched stretches early and shifted `median_xd` on 5
+   of 772 runs by 2.6-21 mm.
+
+   Two plausible causes were eliminated first, each by re-running the matching
+   and counting how many runs moved:
+
+   * *`smoothdata` precision.* MATLAB's `exp` genuinely differs from numpy's in
+     the last bit - delta probes recover MATLAB's weight matrix, and the kernel
+     *ratios* differ by 4.4e-16 while `np.exp` and `math.exp` agree exactly, so
+     no rearrangement can reproduce it. Re-running with a differently-rounded
+     equivalent kernel moved **0 of 772** runs. The difference is real and
+     irrelevant; no MATLAB-side change is needed.
+   * *Filter bounds.* MATLAB's `preproc_gps` overwrites `timestamp` with the
+     10 Hz grid but leaves `starting_time`/`ending_time` at the raw values, and
+     the matching filters on those. The port used grid bounds, which are
+     floor/ceil'd outward by up to 0.1 s. A genuine mismatch, now fixed - and it
+     also moved **0 of 772** runs.
+
+   The actual cause was found by instrumenting MATLAB: a copy of
+   `assemble_data_GPS.m` restricted to the single segment feeding the smallest
+   affected run, dumping its matched pool. Python's pool was a strict subset,
+   36 values short, and the per-segment breakdown showed one stretch at `n=90`
+   against MATLAB's `n=127` - a 37-sample gap, exactly the half-window.
+
+Ruled out along the way, each against MATLAB ground truth: `round(x,6,'decimals')`
+(0 of 18,000 differ, including exact `.5` ties), `median` (0 of 3,000, including
+even-length averaging), and FMA in the interpolation (every fused variant ~25x
+worse). `mean` does differ from MATLAB's at ~1e-15, but it only gates a
+`<= 200 m` test.
+
+## Slim parity: the remaining 0.01%
+
+With the GPS stage byte-identical, a three-day `gps`+`slim` rebuild verifies at
+**40 of 75 files byte-identical** (all 3 GPS files, 37 of 72 slim segments).
+
+The residual is one field and one cause. Measured on
+`I-24MOTION_2022-11-18_06-39-59.json`:
+
+```
+trajectories compared: 20,466
+with any difference:        2   (0.0098%)
+differing field:            total_fuel_consumed_grams   (both records)
+example:                    0.2455  vs  0.2456          (0.1 mg)
+```
+
+The fuel total is `integrate = @(t,v) dot(t(2:end)-t(1:end-1), (v(1:end-1)+v(2:end))/2)`.
+The port evaluates the identical expression, but MATLAB's `dot` is a BLAS call
+whose accumulation order differs from numpy's, by ~1e-16. That only matters when
+the integral lands within a ULP of a 4-decimal tie, where MATLAB's near-tie snap
+(see "The rule that decided it") rounds one way and the port the other.
+
+Reproducing MATLAB's accumulation was attempted and abandoned. Against `dot`
+evaluated in MATLAB on 60 real trajectories:
+
+| accumulation | exact |
+| --- | --- |
+| `np.dot` (OpenBLAS) | 23/60 |
+| `np.sum(a*b)` | 35/60 |
+| `math.fsum` / sequential Python loop | 41/60 |
+| 8 accumulators, FMA, tree combine | **45/60** (best) |
+
+Blocked (64/128/256), unrolled (2/4/8/16), FMA and non-FMA, sequential and tree
+combination were all scanned. Nothing reaches 60/60: MATLAB's BLAS is Accelerate,
+numpy's is OpenBLAS, and their `ddot` blocking differs. This is not reachable
+from pure Python.
+
+Closing it would require changing the MATLAB side — writing `integrate` as an
+explicitly ordered accumulation both languages can reproduce. That is a real
+option but not a free one: it changes `generate_data_mvt_slim.m`, so the released
+slim data (15 GB/day) would no longer match the code that produced it and would
+have to be regenerated along with the checksum manifests.
 
 ## What is not ported yet
 

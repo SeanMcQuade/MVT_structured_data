@@ -7,6 +7,8 @@ do. Each function names the lines it mirrors.
 
 from __future__ import annotations
 
+from typing import Optional
+
 import numpy as np
 
 __all__ = [
@@ -115,11 +117,55 @@ def road_grade(x_meters: np.ndarray, direction: float, points: np.ndarray,
     return theta if direction > 0 else -theta
 
 
-def trapezoid_integral(t: np.ndarray, values: np.ndarray) -> float:
+#: Match ``flag_deterministic_quadrature`` in generate_data_mvt_{slim,full}.m.
+#: True uses compensated summation, which is bit-identical on every platform and
+#: in both languages. False reproduces MATLAB's ``dot`` (a BLAS call) as closely
+#: as numpy can, for comparison against pre-2026-07 outputs - but note the two
+#: BLAS libraries do not agree with each other either, so "false" is not a
+#: well-defined target. See docs/REPRODUCIBLE_QUADRATURE.md.
+DETERMINISTIC_QUADRATURE = True
+
+
+def neumaier_dot(a: np.ndarray, b: np.ndarray) -> float:
+    """Sum of ``a*b`` by compensated (Kahan-Babuska-Neumaier) summation.
+
+    A fixed sequence of IEEE-754 double operations, so it returns identical bits
+    everywhere. Deliberately a scalar Python loop: the recurrence is sequential,
+    and any vectorized reassociation would reintroduce exactly the
+    order-dependence this exists to remove.
+
+    Verified against the same loop in MATLAB (``mvt.neumaierDot``) on 60 real
+    trajectories: 60 of 60 bit-identical, and equal to the exactly-rounded sum
+    on all 60.
+    """
+    total = 0.0
+    compensation = 0.0
+    for x, y in zip(np.asarray(a, dtype=float).tolist(),
+                    np.asarray(b, dtype=float).tolist()):
+        product = x * y
+        running = total + product
+        if abs(total) >= abs(product):
+            compensation += (total - running) + product
+        else:
+            compensation += (product - running) + total
+        total = running
+    return total + compensation
+
+
+def trapezoid_integral(t: np.ndarray, values: np.ndarray,
+                       deterministic: Optional[bool] = None) -> float:
     """Trapezoidal quadrature.
 
-    Mirrors ``integrate = @(t,v) dot(t(2:end)-t(1:end-1), (v(1:end-1)+v(2:end))/2)``.
+    Mirrors ``integrate = @(t,v) <dot>(t(2:end)-t(1:end-1), (v(1:end-1)+v(2:end))/2)``
+    where ``<dot>`` is ``mvt.neumaierDot`` or MATLAB's ``dot``, selected by
+    ``flag_deterministic_quadrature`` there and :data:`DETERMINISTIC_QUADRATURE`
+    here. The two flags must agree or the fuel totals will differ in the 4th
+    decimal on a small fraction of trajectories.
     """
     t = np.asarray(t, dtype=float)
     values = np.asarray(values, dtype=float)
-    return float(np.dot(t[1:] - t[:-1], (values[:-1] + values[1:]) / 2))
+    weights = t[1:] - t[:-1]
+    heights = (values[:-1] + values[1:]) / 2
+    if DETERMINISTIC_QUADRATURE if deterministic is None else deterministic:
+        return neumaier_dot(weights, heights)
+    return float(np.dot(weights, heights))

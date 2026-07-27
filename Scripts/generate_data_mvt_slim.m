@@ -83,6 +83,13 @@ originXPosition = 309804.0625; % [ft] location of the origin for the x-coordinat
 ft2meterFactor = 0.3048; % [m/ft] conversion factor from feet to meter
 meter2mileFactor = 6.213712e-04; % [mile/m] conversion factor from meter to mile
 g2gallonsFactor = 3.522294e-04; % [gallon/g] conversion factor from fuel gram to gallon
+% Use compensated summation for the fuel quadrature instead of MATLAB's `dot`.
+% `dot` calls the BLAS, whose accumulation order differs between platforms
+% (Accelerate on Mac, MKL on PC), which changes total_fuel_consumed_grams in the
+% 4th decimal on ~0.01% of trajectories and makes the released JSON
+% machine-dependent. Set false only to reproduce pre-2026-07 outputs.
+% See docs/REPRODUCIBLE_QUADRATURE.md.
+flag_deterministic_quadrature = true;
 mcDist = 0.225 ; %[mile] the distance between mill creek origin (MM58.675) and MM58.9
 % the estimated origin of the road grade map
 %========================================================================
@@ -252,7 +259,17 @@ for fileNr = mvt.shardIndices(numel(segments), opts.Shard)
         end
         data(trjInd).energy_model = vehType;
         % Calculate total fuel
-        integrate = @(t,v) dot( t(2:end)-t(1:end-1) , (v(1:end-1)+v(2:end))/2); % quadrature
+        % Quadrature. flag_deterministic_quadrature selects mvt.neumaierDot
+        % (compensated summation: identical bits on every platform) over
+        % MATLAB's `dot`, which dispatches to the BLAS and so accumulates
+        % differently on Accelerate (Mac) and MKL (PC). See
+        % docs/REPRODUCIBLE_QUADRATURE.md. Set the flag false to reproduce
+        % pre-2026-07 outputs bit-for-bit.
+        if flag_deterministic_quadrature
+            integrate = @(t,v) mvt.neumaierDot( t(2:end)-t(1:end-1) , (v(1:end-1)+v(2:end))/2);
+        else
+            integrate = @(t,v) dot( t(2:end)-t(1:end-1) , (v(1:end-1)+v(2:end))/2);
+        end
         % Fuel consumption rate of drive on road
         eval(sprintf(['[fS,~,infeasible] = fuel_model_'...
             vehType '_simplified(v,a,theta,true);']))

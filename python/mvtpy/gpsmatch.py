@@ -90,9 +90,20 @@ def smoothdata_gaussian(values: np.ndarray, sample_points: np.ndarray,
     cols = lo[:, None] + np.arange(max_band)[None, :]
     valid = cols < hi[:, None]
     cols_clipped = np.minimum(cols, n - 1)
+    windowed = values[cols_clipped]
+    # MATLAB's smoothdata omits NaN: a point is NaN only when its whole window
+    # is NaN, not when the window merely touches one. Propagating NaN instead
+    # poisoned a half-window (1.5 s ~ 37 samples at 25 Hz) ahead of every NaN,
+    # which ended matched stretches early and changed the median_xd bias -
+    # dist_to_av is NaN wherever a MOTION trajectory runs past the AV's own
+    # time range, so this happened at the end of most matched trajectories.
+    valid = valid & ~np.isnan(windowed)
     dt = t[cols_clipped] - t[:, None]
     weights = np.exp(-(dt * dt) / (2 * sigma ** 2)) * valid
-    return (weights * values[cols_clipped]).sum(axis=1) / weights.sum(axis=1)
+    total = weights.sum(axis=1)
+    numerator = (weights * np.where(valid, windowed, 0.0)).sum(axis=1)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.where(total > 0, numerator / total, np.nan)
 
 
 def assign_lanes_bidirectional(trajectories: Sequence[dict],
@@ -144,11 +155,17 @@ def assign_lanes_bidirectional(trajectories: Sequence[dict],
 def matching_bias(runs: Sequence[PreprocessedRun], raw_motion_dir,
                   day: int, options: MatchOptions = MatchOptions(),
                   segment_files: Optional[Sequence] = None,
-                  progress=None) -> Dict[int, float]:
+                  progress=None,
+                  collect: Optional[Dict[int, np.ndarray]] = None) -> Dict[int, float]:
     """Per-run median x offset between each GPS run and its MOTION trajectories.
 
     Returns ``{run.index: median_xd}`` in meters; runs with no match get 0.0,
     matching MATLAB. ``raw_motion_dir`` is ``data/i24motion/2022-11-DD``.
+
+    Pass a dict as ``collect`` to also receive the pooled matched distances per
+    run. The bias is a median over those, so when a run's bias disagrees with
+    MATLAB the question is always which values entered the pool - this makes
+    that inspectable without re-running the (multi-minute) matching pass.
     """
     from .gpsruns import GpsRunOptions  # noqa: F401  (kept for symmetry)
 
@@ -167,9 +184,11 @@ def matching_bias(runs: Sequence[PreprocessedRun], raw_motion_dir,
         last_ts = np.array([tr["last_timestamp"] for tr in trajectories])
         directions = np.array([tr["direction"] for tr in trajectories])
 
+        # MATLAB filters on the *raw* run bounds here, not the resampled grid
+        # (preproc_gps overwrites timestamp but leaves starting/ending_time).
         concurrent = [run for run in runs
-                      if run.timestamp[0] <= first_ts.max()
-                      and run.timestamp[-1] >= first_ts.min()]
+                      if run.starting_time <= first_ts.max()
+                      and run.ending_time >= first_ts.min()]
         if not concurrent:
             if progress:
                 progress(seg_index, len(segment_files), 0)
@@ -196,8 +215,12 @@ def matching_bias(runs: Sequence[PreprocessedRun], raw_motion_dir,
             values = np.concatenate(pooled)
             values = values[~np.isnan(values)]
             bias[run.index] = float(np.median(values)) if values.size else 0.0
+            if collect is not None:
+                collect[run.index] = values
         else:
             bias[run.index] = 0.0
+            if collect is not None:
+                collect[run.index] = np.empty(0)
     return bias
 
 
@@ -322,13 +345,21 @@ def _median_filter(values: np.ndarray, window: int) -> np.ndarray:
 
 
 def _interp1_nan(xp, fp, x):
-    """interp1(xp, fp, x) with the weighted-blend form; NaN outside range."""
+    """interp1(xp, fp, x) with the weighted-blend form; NaN outside range.
+
+    Carries the same flat-segment guard as
+    :func:`mvtpy.gpsassemble._interp_extrap`: where both endpoints are equal the
+    blend lands a ULP off and MATLAB returns the value itself. It matters here
+    because these distances decide which trajectory segments count as matched,
+    and so which values the median_xd bias is taken over.
+    """
     xp = np.asarray(xp, dtype=float)
     fp = np.asarray(fp, dtype=float)
     x = np.asarray(x, dtype=float)
     index = np.clip(np.searchsorted(xp, x, side="right") - 1, 0, len(xp) - 2)
+    left, right = fp[index], fp[index + 1]
     weight = (x - xp[index]) / (xp[index + 1] - xp[index])
-    out = fp[index] * (1 - weight) + fp[index + 1] * weight
+    out = np.where(left == right, left, left * (1 - weight) + right * weight)
     out[(x < xp[0]) | (x > xp[-1])] = np.nan
     return out
 
@@ -341,8 +372,9 @@ def _relevant_segments(runs, raw_motion_dir, day):
     zone = ZoneInfo("America/Chicago")
     day_start = datetime(2022, 11, day, 6, 0, 0, tzinfo=zone).timestamp()
 
-    starts = np.array([run.timestamp[0] for run in runs])
-    ends = np.array([run.timestamp[-1] for run in runs])
+    # Raw run bounds, as MATLAB uses at assemble_data_GPS.m:139-143.
+    starts = np.array([getattr(run, "starting_time", run.timestamp[0]) for run in runs])
+    ends = np.array([getattr(run, "ending_time", run.timestamp[-1]) for run in runs])
     min_av_start = starts[ends > day_start].min()
     max_av_end = ends[starts < day_start + 4 * 3600].max()
     min_file = max(1, int(np.floor((min_av_start - day_start) / 60 / 10)))

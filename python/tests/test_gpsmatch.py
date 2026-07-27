@@ -119,3 +119,39 @@ def test_matching_bias_against_recovered(matching_bias_case):
     assert checked > 0
     assert agree / checked > 0.9, \
         f"only {agree}/{checked} runs within 1e-3 m (worst {worst:.4f})"
+
+
+def test_smoothdata_omits_nan_like_matlab():
+    """MATLAB's smoothdata ignores NaN; a point is NaN only if its whole window is.
+
+    Propagating NaN instead poisoned a half-window (1.5 s, ~37 samples at
+    MOTION's 25 Hz) ahead of every NaN. dist_to_av is NaN wherever a trajectory
+    runs past the AV's own time range, so matched stretches ended early and the
+    median_xd bias shifted - this was the last discrepancy between the Python
+    and MATLAB GPS output, worth 2.6-21 mm on 5 of 772 runs.
+    """
+    from mvtpy.gpsmatch import smoothdata_gaussian
+
+    # The window is 3 s wide (+/- 1.5 s), so the NaN block must exceed that
+    # before any point sees an all-NaN window.
+    t = np.arange(80) * 0.1
+    v = np.ones(80)
+    v[20:] = np.nan
+
+    out = smoothdata_gaussian(v, t, 3.0)
+    # A window still containing a finite sample stays finite, and the NaNs in it
+    # are ignored rather than poisoning the result.
+    assert np.isfinite(out[:34]).all()
+    assert out[19] == pytest.approx(1.0)
+    assert out[33] == pytest.approx(1.0)
+    # Beyond a full half-window past the last finite sample, the window is
+    # entirely NaN and the result is NaN.
+    assert np.isnan(out[40:]).all()
+
+
+def test_smoothdata_all_nan_window_is_nan():
+    from mvtpy.gpsmatch import smoothdata_gaussian
+
+    t = np.arange(10) * 0.1
+    out = smoothdata_gaussian(np.full(10, np.nan), t, 3.0)
+    assert np.isnan(out).all()

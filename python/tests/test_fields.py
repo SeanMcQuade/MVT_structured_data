@@ -20,8 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mvtpy import fields  # noqa: E402
 
 WORKSPACE = Path(__file__).resolve().parents[3]
-SLIM_DIR = WORKSPACE / "results" / "slim" / "2022-11-16"
-REFERENCE = (WORKSPACE / "results" / "figures" / "2022-11-16"
+from conftest import RESULTS_DIR  # noqa: E402
+SLIM_DIR = RESULTS_DIR / "slim" / "2022-11-16"
+REFERENCE = (RESULTS_DIR / "figures" / "2022-11-16"
              / "fields_motion_2022-11-16.mat")
 
 

@@ -12,6 +12,7 @@ a sibling of ``data/`` and ``results/``, which are distributed separately).
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -25,9 +26,19 @@ from mvtpy.matround import round_decimals  # noqa: E402
 from tools.json_parity import extract_prefix_records  # noqa: E402
 
 WORKSPACE = Path(__file__).resolve().parents[3]
-RAW_SEGMENT = (WORKSPACE / "data" / "i24motion" / "2022-11-16"
+
+# Resolve data/ and results/ the same way mvtpy.workspace does, so the parity
+# tests still find the released data when the tree lives under another name.
+# They previously hardcoded WORKSPACE/"results"; when that directory was renamed
+# every parity test skipped and the suite still reported success, which is the
+# worst possible failure mode for tests whose whole job is comparing against
+# MATLAB.
+DATA_DIR = Path(os.environ.get("MVT_DATA_DIR") or (WORKSPACE / "data"))
+RESULTS_DIR = Path(os.environ.get("MVT_RESULTS_DIR") or (WORKSPACE / "results"))
+
+RAW_SEGMENT = (DATA_DIR / "i24motion" / "2022-11-16"
                / "64888dc1d2834b01ce52a162__wed_0_00.json")
-SLIM_SEGMENT = (WORKSPACE / "results" / "slim" / "2022-11-16"
+SLIM_SEGMENT = (RESULTS_DIR / "slim" / "2022-11-16"
                 / "I-24MOTION_2022-11-16_05-59-59.json")
 GRADE_FIT = Path(__file__).resolve().parents[2] / "Models" / "Eastbound_grade_fit.csv"
 
@@ -67,7 +78,7 @@ def driving_line(raw_segment_path):
     return lanes.estimate_driving_line(westbound)
 
 
-CARS_DIR = WORKSPACE / "data" / "cars"
+CARS_DIR = DATA_DIR / "cars"
 
 
 @pytest.fixture(scope="session")
@@ -82,7 +93,7 @@ def gps_assembly_case():
     cars_gps = CARS_DIR / "cars_gps"
     vins = CARS_DIR / "cars_vins.csv"
     pings = CARS_DIR / "veh_ping_20221116.csv"
-    released_file = WORKSPACE / "results" / "gps" / "CIRCLES_GPS_10Hz_2022-11-16.json"
+    released_file = RESULTS_DIR / "gps" / "CIRCLES_GPS_10Hz_2022-11-16.json"
     if not (cars_gps.is_dir() and vins.is_file() and pings.is_file()
             and released_file.is_file()):
         pytest.skip("raw vehicle GPS data or released GPS file not available")
@@ -130,7 +141,7 @@ def gps_assembly_case():
     return pairs
 
 
-MOTION_2022_11_16 = WORKSPACE / "data" / "i24motion" / "2022-11-16"
+MOTION_2022_11_16 = DATA_DIR / "i24motion" / "2022-11-16"
 LANE_FIXTURE = (Path(__file__).resolve().parent / "fixtures"
                 / "motion_lanes_2022-11-16_seg08.npz")
 
@@ -168,8 +179,8 @@ def matching_bias_case():
     exactly what the matching pass computes. Running the matching is slow
     (streams the day's MOTION segments), so this is opt-in via the data.
     """
-    cars = WORKSPACE / "data" / "cars"
-    reference = WORKSPACE / "results" / "gps" / "CIRCLES_GPS_10Hz_2022-11-16.json"
+    cars = DATA_DIR / "cars"
+    reference = RESULTS_DIR / "gps" / "CIRCLES_GPS_10Hz_2022-11-16.json"
     if not ((cars / "cars_gps").is_dir() and MOTION_2022_11_16.is_dir()
             and reference.is_file()):
         pytest.skip("raw data or GPS reference not available")
@@ -217,7 +228,7 @@ def av_runs():
     """Control-vehicle runs from the assembled GPS file for the same day."""
     from mvtpy import avdist
 
-    gps_file = (WORKSPACE / "results" / "gps" / "CIRCLES_GPS_10Hz_2022-11-16.json")
+    gps_file = (RESULTS_DIR / "gps" / "CIRCLES_GPS_10Hz_2022-11-16.json")
     if not gps_file.is_file():
         pytest.skip("assembled GPS results not available")
     return avdist.load_av_runs(gps_file)
