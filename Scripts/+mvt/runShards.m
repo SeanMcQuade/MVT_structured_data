@@ -87,11 +87,16 @@ for k = 1:nWorkers
         's = 0; catch err, disp(getReport(err)); s = 1; end; ' ...
         'fid = fopen(''%s'', ''w''); fprintf(fid, ''%%d'', s); fclose(fid); exit(s);'], ...
         p.scriptsDir, stage, day, k, nWorkers, markers{k});
-    cmd = sprintf('"%s" -batch "%s"', matlabExe, inner);
+    % -logfile rather than shell redirection: on Windows, wrapping this in
+    % `cmd /c "... > ""log"" 2>&1"` nests quotes three deep and is fragile.
+    % MATLAB writes the log itself, so the spawn line stays simple on both
+    % platforms. `inner` contains only single-quoted MATLAB strings, so the
+    % -batch argument needs no escaping.
+    cmd = sprintf('"%s" -batch "%s" -logfile "%s"', matlabExe, inner, logs{k});
     if ispc
-        spawn = sprintf('start "mvt %s" /B cmd /c "%s > ""%s"" 2>&1"', tag, cmd, logs{k});
+        spawn = sprintf('start "mvt %s" /B %s', tag, cmd);
     else
-        spawn = sprintf('%s > "%s" 2>&1 &', cmd, logs{k});
+        spawn = sprintf('%s &', cmd);
     end
     [status, msg] = system(spawn);
     if status ~= 0
