@@ -1,5 +1,7 @@
 # Making the fuel quadrature reproducible across machines
 
+*Data set version 2.1.1 — see [DATA_CHANGELOG.md](DATA_CHANGELOG.md) for the release note, and this document for the measurements.*
+
 ## Why this change
 
 The trajectory fuel totals were computed with `integrate = @(t,v) dot(t(2:end)-t(1:end-1), (v(1:end-1)+v(2:end))/2)`.

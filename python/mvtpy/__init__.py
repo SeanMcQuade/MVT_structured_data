@@ -75,6 +75,10 @@ __version__ = "0.1.0"
 #: observatory versions independently and which nothing here changes). Must
 #: match Scripts/+mvt/dataVersion.m; tests/test_kinematics.py asserts it.
 #:
-#:   2.1  the data set used for the Nature submission
-#:   2.2  deterministic fuel quadrature (see docs/REPRODUCIBLE_QUADRATURE.md)
-DATA_VERSION = "2.2"
+#: MAJOR.MINOR.PATCH: MAJOR changes meaning, MINOR changes fields or format,
+#: PATCH leaves both alone and only shifts the last decimal of a few values
+#: (so checksums differ but analyses do not need redoing).
+#:
+#:   2.1    the data set used for the Nature submission
+#:   2.1.1  deterministic fuel quadrature (docs/REPRODUCIBLE_QUADRATURE.md)
+DATA_VERSION = "2.1.1"
