@@ -1,9 +1,10 @@
 function [] = generate_data_mvt_slim(processingDay, varargin)
-% GENERATE_DATA_MVT_SLIM  Build the released (westbound) v2.1 MVT data set.
+% GENERATE_DATA_MVT_SLIM  Build the released (westbound) MVT data set (see mvt.dataVersion).
 %
 % Purpose
 %   Processes raw I-24 MOTION segments for one MegaVanderTest day into the
-%   "slim" version of CIRCLES v2.1 data used in the team's nature paper
+%   "slim" version of the CIRCLES data used in the team's nature paper
+%   (data set version: see mvt.dataVersion)
 %   submission: westbound trajectories only, with lanes assigned, lane changes
 %   clipped, distance to CIRCLES control vehicles computed, and per-vehicle
 %   fuel consumption estimated from the class-specific fuel models.
@@ -132,15 +133,19 @@ gradeDataSlope = gradeData(:,4);
 gradeDataIntercept = gradeData(:,5);
 % GPS Data is assumed to be processed. Run create_data_GPS.m to produce processed GPS files
 fprintf('\nLoading and decoding AVs GPS data file ...'); tic
-dataGPS = jsondecode(fileread(fullfile(dataRootDirectory,...
-    'results','gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])));
+dataGPS = jsondecode(fileread(fullfile(p.resultsDir,...
+    'gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])));
 fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Process each I24 MOTION file 
 %========================================================================
 addpath(fullfile(parentDirectory, 'Models'));
 % Segments owned by this shard: worker k of N takes k, k+N, k+2N, ...
-for fileNr = mvt.shardIndices(numel(segments), opts.Shard)
+shardSegments = mvt.shardIndices(numel(segments), opts.Shard);
+reportProgress = mvt.progress(numel(shardSegments), ...
+    sprintf('slim 2022-11-%d', processingDay), 'Opts', opts);
+segmentsDone = 0;
+for fileNr = shardSegments
     segment = segments(fileNr);
     filenameLoad = segment.rawPath;
     % The output name is known from the manifest, so freshness is decided
@@ -190,7 +195,7 @@ for fileNr = mvt.shardIndices(numel(segments), opts.Shard)
     fprintf('Calculating Distance to AVs ...'),tic
     distToAvsData = calculate_distance_to_avs(dataTemp,dataGPS);
     fprintf('Done (%0.0fsec).\n',toc)
-    fprintf('Generating v2.1 version of data ... '),tic
+    fprintf('Generating v%s version of data ... ', mvt.dataVersion()),tic
     n = length(dataTemp);
     data = init_data_struct(n);
     
@@ -339,7 +344,10 @@ for fileNr = mvt.shardIndices(numel(segments), opts.Shard)
     fprintf('Done (%0.0fsec).\n',toc)
     clear jsonStr
     toc
+    segmentsDone = segmentsDone + 1;
+    reportProgress(segmentsDone, segment.outputName);
 end
+reportProgress();
 rmpath(fullfile(parentDirectory, 'Models'));
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

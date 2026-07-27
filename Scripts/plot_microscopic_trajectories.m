@@ -127,7 +127,7 @@ if flag_reduce_data_files
     data_files = data_files(~is_dotfile);
 
     if length(data_files) < 24
-        reduce_data(inputPath, cachePath);
+        reduce_data(inputPath, cachePath, opts, processingDay);
         % now, the files should be there!
         data_files = dir(fullfile(cachePath, ...
             '*_reduced.mat'));
@@ -204,6 +204,8 @@ fprintf(' Done (%0.0fsec).\n',toc)
 %========================================================================
 % Go through files/trajectories and plot them
 %========================================================================
+reportProgress = mvt.progress(length(data_files), ...
+    sprintf('micro 2022-11-%d', processingDay), 'Opts', opts);
 for fileInd = 1:1:length(data_files) % loop over relevant files
     % Load data file
     fileName = data_files(fileInd).name;
@@ -280,7 +282,9 @@ for fileInd = 1:1:length(data_files) % loop over relevant files
     patch('Faces',F,'Vertices',V,'FaceVertexCData',C,...
         'FaceColor','interp','EdgeColor','none')
     fprintf(' Done (%0.0fsec).\n',toc)
+    reportProgress(fileInd, fileName);
 end
+reportProgress();
 clear data  veh_lengths
 % Finish drawing everything 
 fprintf('Drawing full plot ...'), tic
@@ -371,7 +375,7 @@ exportgraphics(fig, filename, 'Resolution', res);
 fprintf(' Done (%0.0fsec).\n',toc)
 end
 
-function [] = reduce_data(inputPath, cachePath)
+function [] = reduce_data(inputPath, cachePath, opts, processingDay)
 % Build the *_reduced.mat plotting caches: decode each released JSON segment,
 % drop the fields the trajectory plot does not use, and save the result under
 % cachePath (results/.mvt/cache/...), leaving the released data untouched.
@@ -409,6 +413,8 @@ data_files = dir(fullfile(inputPath,'*.json'));
 is_dotfile = startsWith({data_files.name},'.');
 data_files = data_files(~is_dotfile);
 
+reportCache = mvt.progress(length(data_files), ...
+    sprintf('micro cache 2022-11-%d', processingDay), 'Opts', opts);
 for fileInd = 1:length(data_files)
     filename = data_files(fileInd).name;
     filenameSave = [filename(1:end-5),'_reduced.mat'];
@@ -421,5 +427,7 @@ for fileInd = 1:length(data_files)
     % Save new data file into the cache folder
     save(fullfile(cachePath,filenameSave),'data')
     fprintf(' Done (%0.0fsec).\n',toc)
+    reportCache(fileInd, filenameSave);
 end
+reportCache();
 end

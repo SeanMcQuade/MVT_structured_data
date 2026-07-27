@@ -142,7 +142,7 @@ minFileNr = max(1,floor((minAVStart-dataTLimits(1))/60/10));
 maxAVStart = max([dataGPS0([dataGPS0.starting_time]<dataTLimits(2)).ending_time]);
 maxFileNr = min(24,floor((maxAVStart-dataTLimits(1))/60/10)+1);
 % Find I24 MOTION data files in the same folder outside the repository
-dataFolderPath = fullfile(dataRootDirectory,'data','i24motion', ...
+dataFolderPath = fullfile(p.dataDir,'i24motion', ...
     ['2022-11-' num2str(processingDay) ]) ;
 if ~isfolder(dataFolderPath)
     error('Folder %s does not exist.\n',dataFolderPath)
@@ -167,6 +167,8 @@ matchedSegments(10*length(dataGPS0),1).av_trj_i = [];
 matchedSegments(10*length(dataGPS0),1).x_diff =   [];
 matchedSegments(10*length(dataGPS0),1).timestamp = [];
 segmentsCounter = 1;
+reportMatch = mvt.progress(maxFileNr - minFileNr + 1, ...
+    sprintf('gps match 2022-11-%d', processingDay), 'Opts', opts);
 for fileNr = minFileNr:maxFileNr
     % Load MOTION data file
     filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
@@ -263,7 +265,9 @@ for fileNr = minFileNr:maxFileNr
         end
     end
     fprintf('Done (%0.0fsec).\n',toc)
+    reportMatch(fileNr - minFileNr + 1, dataFiles(fileNr).name);
 end
+reportMatch();
 matchedSegments(segmentsCounter:end) = [];
 % Calculate median offset between GPS runs and I24 matched signals
 xd_match = [];
@@ -283,9 +287,9 @@ end
 % Add controller status and clean data structure
 %========================================================================
 fprintf('Adding controller status and preparing output data... ');tic
-avPingsData = readtable(fullfile(dataRootDirectory,'data', 'cars', ['veh_ping_202211' ...
+avPingsData = readtable(fullfile(p.dataDir, 'cars', ['veh_ping_202211' ...
     num2str(processingDay) '.csv']));
-avVINs = readtable(fullfile(dataRootDirectory,'data', 'cars','cars_vins.csv'));
+avVINs = readtable(fullfile(p.dataDir, 'cars','cars_vins.csv'));
 avConnectionStatus  = get_connection_status(avPingsData,avVINs);
 nAVs = length(dataGPS0);
 clear dataGPS
@@ -306,6 +310,8 @@ dataGPS(nAVs,1).last_timestamp = [];
 dataGPS(nAVs,1).control_car = [];
 dataGPS(nAVs,1).control_last30 = [];
 % Loop over processed AV runs and append to output data structure 
+reportAssemble = mvt.progress(nAVs, ...
+    sprintf('gps assemble 2022-11-%d', processingDay), 'Opts', opts);
 for avInd =1:nAVs
     avVeh = dataGPS0(avInd);
     % Locate start of the run in the server data
@@ -347,7 +353,9 @@ for avInd =1:nAVs
     % Append modified control status signal to correct for controller
     % showing as inactive when the vehicle stops
     dataGPS(avInd) = get_control_car_status(dataGPS(avInd));
+    reportAssemble(avInd);
 end
+reportAssemble();
 % Clip trajectories at testbed limits and prepare data for writing
 XLIMS = [-400 2.54e4] *ft2meterFactor; % testbed limits
 gpsDataFields = string(fieldnames(dataGPS));

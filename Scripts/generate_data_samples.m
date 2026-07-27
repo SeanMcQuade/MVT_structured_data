@@ -106,6 +106,8 @@ samples_xpos = []; %x position for samples with downstream/upstream  av
 samples_lane = []; %lane number for samples with downstream/upstream  av
 samples_t = []; %timestamp for samples with downstream/upstream  av (seconds after 6am)
 %% data collection
+reportProgress = mvt.progress(nrFiles, ...
+    sprintf('samples 2022-11-%d', processingDay), 'Opts', opts);
 for file_nr =1:nrFiles % loop over data files and append samples
     fprintf('Loading original data file %d / %d ...', file_nr,nrFiles )
     tic
@@ -134,7 +136,9 @@ for file_nr =1:nrFiles % loop over data files and append samples
     samples_lane = [samples_lane;lane];
     samples_fcons = [samples_fcons;fcons];
     fprintf('Done (%0.0fsec).\n',toc)
+    reportProgress(file_nr, I24FilesInDir(file_nr).name);
 end
+reportProgress();
 % filenameSave comes from up above
 save(filenameSave,'samples_*','-v7.3')
 end

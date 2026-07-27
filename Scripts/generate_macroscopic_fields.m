@@ -158,6 +158,8 @@ end
 %========================================================================
 % Go through files/trajectories and successively increment fields
 %========================================================================
+reportProgress = mvt.progress(length(dataFiles), ...
+    sprintf('fields 2022-11-%d', processingDay), 'Opts', opts);
 for fileInd = 1:length(dataFiles) % loop over relevant files
     % Load data file
     indexFilename = dataFiles(fileInd).name;
@@ -224,7 +226,9 @@ for fileInd = 1:length(dataFiles) % loop over relevant files
         end
     end
     fprintf(' Done (%0.0fsec).\n',toc)
+    reportProgress(fileInd, dataFiles(fileInd).name);
 end
+reportProgress();
 % Normalize fields by kernal factors
 if isfield(field.value,'Rho'), field.value.Rho = field.value.Rho*fac; end
 if isfield(field.value,'Q'), field.value.Q = field.value.Q*fac; end

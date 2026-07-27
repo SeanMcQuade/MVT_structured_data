@@ -69,3 +69,12 @@ __all__ = ["avanalysis", "avdist", "build", "fields", "fuel", "gpsassemble",
            "microplot", "plotting", "progress", "rawio", "samples", "segments",
            "slim", "verify"]
 __version__ = "0.1.0"
+
+#: Version of the released MVT data set this code produces - the derived
+#: slim/full/gps products, not the upstream I-24 MOTION data (which the
+#: observatory versions independently and which nothing here changes). Must
+#: match Scripts/+mvt/dataVersion.m; tests/test_kinematics.py asserts it.
+#:
+#:   2.1  the data set used for the Nature submission
+#:   2.2  deterministic fuel quadrature (see docs/REPRODUCIBLE_QUADRATURE.md)
+DATA_VERSION = "2.2"

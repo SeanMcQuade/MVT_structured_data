@@ -108,3 +108,20 @@ def test_default_flag_is_deterministic():
     from mvtpy import kinematics
 
     assert kinematics.DETERMINISTIC_QUADRATURE is True
+
+
+def test_data_version_matches_matlab():
+    """The Python and MATLAB data versions must not drift apart.
+
+    Parsed straight out of Scripts/+mvt/dataVersion.m rather than duplicated, so
+    bumping one side without the other fails here.
+    """
+    import re
+
+    import mvtpy
+
+    source = (Path(__file__).resolve().parents[2] / "Scripts" / "+mvt"
+              / "dataVersion.m").read_text()
+    match = re.search(r"^version\s*=\s*'([^']+)'\s*;", source, re.MULTILINE)
+    assert match, "could not find the version literal in dataVersion.m"
+    assert mvtpy.DATA_VERSION == match.group(1)

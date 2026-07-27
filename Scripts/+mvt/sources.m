@@ -69,6 +69,10 @@ end
 closure = [closure, extraSources(stageName, p)];
 closure = keepInRepo(closure, p);
 closure = dropHelperPackage(closure, p);
+% Re-added *after* the package drop: mvt.neumaierDot is the one +mvt function
+% that changes results rather than build mechanics (it is the fuel quadrature),
+% so editing it must invalidate the fuel totals.
+closure = [closure, resultAffectingHelpers(stageName, p)];
 files = keepExisting(unique(closure, 'stable'));
 
 writeCache(cacheFile, stageName, stageStamp, files);
@@ -87,6 +91,21 @@ switch stageName
             extras{iFile} = fullfile(p.modelsDir, listing(iFile).name);
         end
         extras{end} = fullfile(p.modelsDir, 'Eastbound_grade_fit.csv');
+    otherwise
+        extras = {};
+end
+end
+
+% ---------------------------------------------------------------------------
+function extras = resultAffectingHelpers(stageName, p)
+% +mvt files that belong in the closure despite dropHelperPackage.
+%
+% The package is normally excluded so that editing build mechanics does not
+% invalidate computed outputs. mvt.neumaierDot is the exception: it performs the
+% fuel quadrature, so a change there changes total_fuel_consumed_grams.
+switch stageName
+    case {'generate_data_mvt_slim', 'generate_data_mvt_full'}
+        extras = {fullfile(p.scriptsDir, '+mvt', 'neumaierDot.m')};
     otherwise
         extras = {};
 end

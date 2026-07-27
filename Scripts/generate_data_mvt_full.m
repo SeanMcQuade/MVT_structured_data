@@ -1,5 +1,5 @@
 function [] = generate_data_mvt_full(processingDay, varargin)
-% GENERATE_DATA_MVT_FULL  Build the full (both directions) v2.1 MVT data set.
+% GENERATE_DATA_MVT_FULL  Build the full (both directions) MVT data set (see mvt.dataVersion).
 %
 % Purpose
 %   Same processing as GENERATE_DATA_MVT_SLIM, but retains material the paper
@@ -121,8 +121,8 @@ gradeDataSlope = gradeData(:,4);
 gradeDataIntercept = gradeData(:,5);
 % GPS Data is assumed to be processed. Run create_data_GPS.m to produce processed GPS files
 fprintf('\nLoading and decoding AVs GPS data file ...'); tic
-dataGPS = jsondecode(fileread(fullfile(dataRootDirectory,...
-    'results','gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])));
+dataGPS = jsondecode(fileread(fullfile(p.resultsDir,...
+    'gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])));
 fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Process each I24 MOTION file 
@@ -177,7 +177,7 @@ for fileNr = mvt.shardIndices(numel(segments), opts.Shard)
     fprintf('Calculating Distance to AVs ...'),tic
     distToAvsData = calculate_distance_to_avs(dataTemp,dataGPS);
     fprintf('Done (%0.0fsec).\n',toc)
-    fprintf('Generating v2.1 version of data ... '),tic
+    fprintf('Generating v%s version of data ... ', mvt.dataVersion()),tic
     n = length(dataTemp);
     data = init_data_struct(n);
     

@@ -23,6 +23,11 @@
 SHELL := /bin/bash
 .DELETE_ON_ERROR:
 
+# V=1 echoes the raw MATLAB command lines; by default recipes print a short
+# labelled header instead, so `make -j` output stays readable.
+V ?= 0
+Q := $(if $(filter 1,$(V)),,@)
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -81,7 +86,8 @@ car_files = $(wildcard $(DATA)/cars/cars_gps/circles_v2_1_car*.csv) \
 
 # $(call run_stage,STAGE,DAY) - one MATLAB process for a stage
 define run_stage
-cd $(SCRIPTS) && $(MATLAB) $(MATLAB_FLAGS) "mvt.build('$(1)', $(2))"
+$(Q)printf '[make] %-8s 2022-11-%s  ->  %s\n' "$(1)" "$(2)" "$(RESULTS)"
+$(Q)cd $(SCRIPTS) && $(MATLAB) $(MATLAB_FLAGS) "mvt.build('$(1)', $(2))"
 endef
 
 # $(call run_sharded,STAGE,DAY) - SHARDS MATLAB processes over the 24 segments
@@ -89,7 +95,7 @@ define run_sharded
 @if [ "$(SHARDS)" -le 1 ]; then \
   cd $(SCRIPTS) && $(MATLAB) $(MATLAB_FLAGS) "mvt.build('$(1)', $(2))"; \
 else \
-  echo "[make] $(1) 2022-11-$(2): $(SHARDS) shards"; \
+  printf '[make] %-8s 2022-11-%s  ->  %s  (%s shards)\n' "$(1)" "$(2)" "$(RESULTS)" "$(SHARDS)"; \
   pids=""; \
   for k in $$(seq 1 $(SHARDS)); do \
     ( cd $(SCRIPTS) && MVT_SHARD=$$k/$(SHARDS) \

@@ -54,3 +54,6 @@ results_groundtruth/
 
 # Test manifests are committed fixtures, not generated data
 !tests/manifests/*.json
+
+# Local diagnostic captures (machine-specific, not part of the pipeline)
+crashlog-*.txt

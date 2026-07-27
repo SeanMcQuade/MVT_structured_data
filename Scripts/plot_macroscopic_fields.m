@@ -95,11 +95,20 @@ fprintf('Loading %s ...',filename), tic
 load(filename)
 fprintf(' Done (%0.0fsec).\n',toc)
 if flagPlotAvTrajectories
-    dataFiles = dir(fullfile(dataRootDirectory, 'results','gps',['CIRCLES_GPS_10Hz_2022-11-'...
+    % p.resultsDir, not <dataRoot>/results: the results tree is relocatable
+    % via MVT_RESULTS_DIR (make RESULTS=...), and hardcoding it here made this
+    % stage fail with "Index exceeds array bounds" on any non-default tree.
+    gpsDir = fullfile(p.resultsDir, 'gps');
+    dataFiles = dir(fullfile(gpsDir, ['CIRCLES_GPS_10Hz_2022-11-'...
          num2str(processingDay)  '.json']));
+    if isempty(dataFiles)
+        error('mvt:plot_macroscopic_fields:missingGPS', ...
+            'No assembled GPS file for 2022-11-%d in %s. Run the gps stage first.', ...
+            processingDay, gpsDir);
+    end
     filename = dataFiles(1).name; % if multiple files, use first one
     fprintf('Loading %s ...',filename), tic
-    fid = fopen(fullfile(dataRootDirectory, 'results','gps',filename));
+    fid = fopen(fullfile(gpsDir, filename));
     data = fread(fid,inf);
     fclose(fid);
     fprintf(' Done (%0.0fsec).\n',toc)
@@ -116,6 +125,8 @@ end
 figRes = [2500 800]; figResZoom = [1250 800];
 n_xticks = 16; % number of time ticks
 close all
+reportProgress = mvt.progress(length(plotFields), ...
+    sprintf('macro 2022-11-%d', processingDay), 'Opts', opts);
 for i = 1:length(plotFields)
     fieldPlot = plotFields{i};
     if direction<0
@@ -208,5 +219,7 @@ for i = 1:length(plotFields)
         print(filename,'-dpng','-r384');
         fprintf(' Done (%0.0fsec).\n',toc)
     end
+    reportProgress(i, plotFields{i});
 end
+reportProgress();
 end
