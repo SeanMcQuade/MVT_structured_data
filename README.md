@@ -119,6 +119,61 @@ Options (see `Scripts/+mvt/options.m`): `Force`, `Clean`, `DryRun`, `Verbose`,
 `Shard`, `Days`, `SettleSeconds`. They may be given as name/value pairs or as an
 options struct.
 
+### On Windows, entirely from MATLAB
+
+No `make` is required. Set the two locations (or let them default to `data/` and
+`results/` beside this repository), then run the stages in order:
+
+```matlab
+setenv('MVT_DATA_DIR',    'D:\mvt-nature\data')
+setenv('MVT_RESULTS_DIR', 'D:\mvt-nature\results-pc')
+cd('C:\path\to\MVT_structured_data\Scripts')
+
+mvt.build('gps',     16)      % ~12 min/day
+mvt.build('slim',    16)      % ~40 min/day sequentially - see below
+mvt.build('samples', 16)
+mvt.build('fields',  16)
+mvt.build('macro',   16)
+mvt.build('micro',   16)
+mvt.status('Days', 16)        % what is stale, and why
+```
+
+**Concurrency: `mvt.build` on its own is sequential.** Nothing in this pipeline
+uses `parfor`; `opts.UseParfor` is declared but never read by any stage, and the
+Parallel Computing Toolbox is not required anywhere. All the parallelism in the
+Makefile comes from launching *separate MATLAB processes*. `mvt.runShards` does
+the same thing from inside MATLAB, so the `make -j8` approach works on Windows:
+
+```matlab
+mvt.runShards('slim', 16, 8)   % 8 concurrent MATLAB processes over the 24 segments
+mvt.runShards('full', 16, 8)
+```
+
+Each worker takes segments `k, k+N, k+2N, …`, logs to
+`<results>/.mvt/logs/<stage>-<day>-shard<k>of<N>.log`, and reports its exit
+status; the caller blocks until all workers finish and raises if any failed.
+
+Only `slim` and `full` shard by segment, so those are the only stages that gain
+from this — `runShards` refuses more than one worker for the others rather than
+silently doing the same work N times. **Size the worker count by memory, not
+cores**: each process holds a decoded segment and peaks at several GB.
+
+For a whole day, the sequential stages plus a sharded `slim` is the useful
+shape:
+
+```matlab
+for day = [16 17 18]
+    mvt.build('gps', day)
+    mvt.runShards('slim', day, 8)
+    for stage = ["samples" "fields" "macro" "micro"]
+        mvt.build(char(stage), day)
+    end
+end
+```
+
+Note that `gps` must finish before `slim` for the same day (slim reads the
+assembled GPS), and `slim` before the rest.
+
 ### With make (parallel)
 
 `make` encodes the same dependency graph and runs independent work
