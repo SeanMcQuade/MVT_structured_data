@@ -23,6 +23,18 @@ A PATCH bump still changes checksums. Two copies of the data with different
 PATCH versions are *not* expected to be byte-identical, but any analysis built
 on one holds for the other.
 
+## Telling which version a folder holds
+
+Every product folder carries a `dataset_info.json` sidecar naming the data-set
+version, the product, the copyright and licence, and how the folder was
+produced — MATLAB release or Python version, platform, host, user, and the code
+commit. `mvt.build` writes it after each stage; `mvtpy.datasetinfo.write` is the
+Python equivalent.
+
+It is deliberately **excluded from the checksum manifests**: it mixes
+reproducible facts with run provenance, so it is machine-specific by design and
+would fail a byte comparison for reasons unrelated to the data.
+
 ## 2.1.1
 
 **Deterministic fuel quadrature.** `mvt.neumaierDot` (compensated summation)

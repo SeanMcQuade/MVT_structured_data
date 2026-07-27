@@ -22,6 +22,9 @@ than a green tick:
 * ``.npz`` vs MATLAB ``.mat`` (samples, fields) - array comparison with a
   tolerance, because the two container formats cannot be byte-compared at all.
   A checksum of the ``.npz`` still pins Python-to-Python reproducibility.
+* ``dataset_info.json`` - **not** checksummed and never listed. It records the
+  data-set version alongside run provenance (host, user, interpreter), so it is
+  machine-specific by design; see :mod:`mvtpy.datasetinfo`.
 * ``.png`` (figures) - **not** checksummed. Matplotlib and MATLAB renderers do
   not agree pixel for pixel, and PNG bytes carry encoder metadata, so a
   checksum here would fail for reasons that say nothing about correctness. They

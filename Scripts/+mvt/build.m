@@ -55,6 +55,9 @@ switch stage
             'samples, fields, macro, micro, av.'], stage);
 end
 
+% Record what this folder now holds, next to the data itself.
+mvt.writeDatasetInfo(stage, day, opts);
+
 footer(opts, stage, dayTag(stage, day), toc(runTimer));
 end
 

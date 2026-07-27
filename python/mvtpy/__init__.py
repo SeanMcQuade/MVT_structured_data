@@ -63,11 +63,12 @@ verify
 from . import (avanalysis, avdist, build, fields, fuel, gpsassemble, gpsmatch,
                gpsruns, kinematics, lanes, matjson, matround, microplot,
                plotting, progress, rawio, samples, segments, slim, verify)
+from . import datasetinfo  # noqa: E402  (imports DATA_VERSION from this module)
 
 __all__ = ["avanalysis", "avdist", "build", "fields", "fuel", "gpsassemble",
            "gpsmatch", "gpsruns", "kinematics", "lanes", "matjson", "matround",
            "microplot", "plotting", "progress", "rawio", "samples", "segments",
-           "slim", "verify"]
+           "slim", "verify", "datasetinfo"]
 __version__ = "0.1.0"
 
 #: Version of the released MVT data set this code produces - the derived
