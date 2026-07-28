@@ -123,6 +123,36 @@ make all DryRun true          % plan the whole run, write nothing
 make slim Force true          % rebuild regardless of timestamps
 ```
 
+### If a run stops early
+
+`make` prints the days it is building and any `MVT_*` variables in effect
+before it starts:
+
+```
+[make] environment: MVT_DAYS = 16
+[make] target 'all': gps slim samples fields macro micro av
+[make] days 16, 3 worker(s) for sharded stages
+```
+
+`setenv` persists for the whole MATLAB session, so an `MVT_DAYS` left over from
+an earlier experiment quietly narrows every later build. `make config` shows
+what was resolved:
+
+```matlab
+make config          % days, paths, workers, data version
+setenv('MVT_DAYS','')   % clear an unwanted override
+```
+
+By default a failing stage stops the run, so one bad day abandons the rest. To
+attempt everything and see all the failures together:
+
+```matlab
+make all Workers 3 KeepGoing true
+```
+
+Each failure is reported as it happens and listed again at the end, and the run
+still errors afterwards so it cannot be mistaken for success.
+
 ### How many workers
 
 `Workers` is the only setting that turns anything concurrent. Nothing in this

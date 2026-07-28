@@ -25,6 +25,8 @@ function make(varargin)
 %            ('gps', 'slim', 'full', 'samples', 'fields', 'macro', 'micro',
 %            'av') | 'status' | 'config'
 %   Name/value:
+%     'KeepGoing' attempt every stage and report failures at the end,
+%                instead of stopping at the first one (default false)
 %     'Workers'  MATLAB processes for the stages that shard (default 1).
 %                Only 'slim' and 'full' shard; everything else ignores it.
 %                Size by memory, not cores: each worker peaks at several GB.
@@ -44,7 +46,7 @@ function make(varargin)
 %
 % (C) 2026 CIRCLES Consortium. BSD-3-Clause.
 
-[target, workers, opts] = parseArguments(varargin);
+[target, workers, keepGoing, opts] = parseArguments(varargin);
 
 switch target
     case 'status'
@@ -60,43 +62,91 @@ days = opts.Days;
 crossDay = ismember('av', stages);
 perDay = stages(~strcmp(stages, 'av'));
 
+announceEnvironment();
 fprintf('[make] target ''%s'': %s\n', target, strjoin(stages, ' '));
 fprintf('[make] days %s, %d worker(s) for sharded stages\n', ...
     mat2str(days), workers);
 started = tic;
 
+failures = {};
 for day = days
     for iStage = 1:numel(perDay)
         stage = perDay{iStage};
         if workers > 1 && ismember(stage, {'slim', 'full'})
-            runStage(@() mvt.runShards(stage, day, workers, opts), stage, day, opts);
+            thunk = @() mvt.runShards(stage, day, workers, opts);
         else
-            runStage(@() mvt.build(stage, day, opts), stage, day, opts);
+            thunk = @() mvt.build(stage, day, opts);
         end
+        failures = runStage(thunk, stage, day, opts, keepGoing, failures);
     end
 end
 
 if crossDay
-    runStage(@() mvt.build('av', [], opts), 'av', [], opts);
+    failures = runStage(@() mvt.build('av', [], opts), 'av', [], opts, ...
+        keepGoing, failures);
 end
 
-fprintf('[make] target ''%s'' finished in %s\n', target, humanTime(toc(started)));
+fprintf('[make] target ''%s'': days %s finished in %s\n', ...
+    target, mat2str(days), humanTime(toc(started)));
+if isempty(failures)
+    fprintf('[make] all stages completed\n');
+else
+    fprintf(2, '[make] %d stage(s) FAILED:\n', numel(failures));
+    for k = 1:numel(failures)
+        fprintf(2, '         %s\n', failures{k});
+    end
+    if ~opts.DryRun
+        error('mvt:make:stageFailed', ...
+            '%d stage(s) failed; see the list above.', numel(failures));
+    end
+end
 end
 
 % ---------------------------------------------------------------------------
-function runStage(thunk, stage, day, opts)
-% Run one stage. Under DryRun a later stage usually cannot even look at its
-% inputs, because the earlier stage that would have produced them wrote
-% nothing - so a plan must report that and carry on rather than abort. A real
-% run still fails loudly.
+function announceEnvironment()
+% MVT_* variables silently change what a build does - most sharply MVT_DAYS,
+% which narrows the run to a subset without any other outward sign. setenv
+% persists for the whole MATLAB session, so one left over from an earlier
+% experiment quietly shrinks every later build. Say so up front.
+names = {'MVT_DAYS', 'MVT_DATA_DIR', 'MVT_RESULTS_DIR', 'MVT_FORCE', ...
+    'MVT_CLEAN', 'MVT_DRYRUN', 'MVT_VERBOSE', 'MVT_SHARD', 'MVT_SETTLE_SECONDS'};
+for k = 1:numel(names)
+    value = strtrim(getenv(names{k}));
+    if ~isempty(value)
+        fprintf('[make] environment: %s = %s\n', names{k}, value);
+    end
+end
+end
+
+% ---------------------------------------------------------------------------
+function failures = runStage(thunk, stage, day, opts, keepGoing, failures)
+% Run one stage, recording rather than raising when asked to carry on.
+%
+% Under DryRun a later stage usually cannot even look at its inputs, because
+% the earlier stage that would have produced them wrote nothing, so a plan
+% always continues. A real run stops at the first failure unless KeepGoing is
+% set, in which case every stage is attempted and the failures are reported
+% together at the end - one bad day should not throw away the other two.
 try
     thunk();
 catch err
-    if ~opts.DryRun
+    reason = err.identifier;
+    if isempty(reason)          % MATLAB errors need not carry an identifier
+        reason = 'error';
+    end
+    label = sprintf('%s%s (%s)', stage, dayLabel(day), reason);
+    if opts.DryRun
+        fprintf('[make] (dry-run) %s%s: cannot plan yet (%s)\n', stage, ...
+            dayLabel(day), reason);
+        return
+    end
+    if ~keepGoing
+        fprintf(2, '[make] %s FAILED. Re-run with KeepGoing true to attempt the rest.\n', label);
         rethrow(err);
     end
-    fprintf('[make] (dry-run) %s%s: cannot plan yet (%s)\n', stage, ...
-        dayLabel(day), err.identifier);
+    fprintf(2, '[make] %s FAILED, continuing (KeepGoing)\n', label);
+    fprintf(2, '       %s\n', err.message);
+    failures{end+1} = label; %#ok<AGROW>
 end
 end
 
@@ -129,7 +179,7 @@ end
 end
 
 % ---------------------------------------------------------------------------
-function [target, workers, opts] = parseArguments(args)
+function [target, workers, keepGoing, opts] = parseArguments(args)
 target = 'all';
 if ~isempty(args) && (ischar(args{1}) || isstring(args{1})) ...
         && ~isOptionName(args{1})
@@ -152,11 +202,16 @@ for k = 2:2:numel(args)
 end
 
 workers = 1;
+keepGoing = false;
 keep = true(1, numel(args));
 for k = 1:2:numel(args) - 1
-    if strcmpi(char(args{k}), 'Workers')
-        workers = args{k + 1};
-        keep(k:k + 1) = false;
+    switch lower(char(args{k}))
+        case 'workers'
+            workers = args{k + 1};
+            keep(k:k + 1) = false;
+        case 'keepgoing'
+            keepGoing = logical(args{k + 1});
+            keep(k:k + 1) = false;
     end
 end
 opts = mvt.options(args{keep});
@@ -169,7 +224,7 @@ end
 % ---------------------------------------------------------------------------
 function tf = isOptionName(value)
 tf = any(strcmpi(char(value), {'Force', 'Clean', 'DryRun', 'Verbose', ...
-    'Shard', 'Days', 'SettleSeconds', 'Workers', 'UseParfor'}));
+    'Shard', 'Days', 'SettleSeconds', 'Workers', 'KeepGoing', 'UseParfor'}));
 end
 
 % ---------------------------------------------------------------------------
