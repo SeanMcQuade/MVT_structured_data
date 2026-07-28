@@ -55,8 +55,14 @@ switch stage
             'samples, fields, macro, micro, av.'], stage);
 end
 
-% Record what this folder now holds, next to the data itself.
-mvt.writeDatasetInfo(stage, day, opts);
+% Record what this folder now holds. Never let bookkeeping fail a stage that
+% has already done its work and written its outputs: an 'av' build once died
+% here because the cross-day stage has no day to describe.
+try
+    mvt.writeDatasetInfo(stage, day, opts);
+catch err
+    mvt.log(opts, 'could not write dataset_info for %s (%s)', stage, err.identifier);
+end
 
 footer(opts, stage, dayTag(stage, day), toc(runTimer));
 end

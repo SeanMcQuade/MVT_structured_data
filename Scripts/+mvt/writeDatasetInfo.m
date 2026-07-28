@@ -157,13 +157,25 @@ switch lower(char(stage))
         dataDir = infoDir;
         product = 'gps (control-vehicle 10 Hz GPS)';
     case {'slim', 'full'}
+        if isempty(day)
+            return
+        end
         name = lower(char(stage));
         infoDir = fullfile(p.resultsDir, name);
         dataDir = mvt.dayDir(name, day);
         product = sprintf('%s (I-24 MOTION trajectories)', name);
-    case {'samples', 'fields', 'macro', 'micro', 'av'}
+    case {'samples', 'fields', 'macro', 'micro'}
+        if isempty(day)
+            return          % per-day product with no day: nothing to describe
+        end
         infoDir = fullfile(p.resultsDir, 'figures');
         dataDir = mvt.dayDir('figures', day);
         product = 'figures and analysis products';
+    case 'av'
+        % Cross-day: plot_AV_analysis writes into results/figures itself, with
+        % no day folder, so `day` is empty here by design.
+        infoDir = fullfile(p.resultsDir, 'figures');
+        dataDir = infoDir;
+        product = 'figures and analysis products (cross-day)';
 end
 end
