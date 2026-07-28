@@ -126,15 +126,21 @@ def write_manifest(ws: Workspace, day: int, directory: Optional[Path] = None,
         for path in paths:
             if not (path.is_file() and _checkable(path)):
                 continue
-            entries[_key(ws, path)] = {"md5": checksum(path),
+            # `path` duplicates the key on purpose: MATLAB's jsondecode turns
+            # object keys into struct field names, mangling '/', '-' and '.'
+            # into '_' irreversibly, so mvt.verify reads the path from here.
+            entries[_key(ws, path)] = {"path": _key(ws, path),
+                                       "md5": checksum(path),
                                        "bytes": path.stat().st_size,
                                        "stage": stage}
             log(f"    {entries[_key(ws, path)]['md5']}  {_key(ws, path)}")
 
     target = manifest_path(day, directory)
     target.parent.mkdir(parents=True, exist_ok=True)
+    from . import DATA_VERSION
     target.write_text(json.dumps(
-        {"day": day, "files": dict(sorted(entries.items()))}, indent=1) + "\n",
+        {"day": day, "data_version": DATA_VERSION,
+         "files": dict(sorted(entries.items()))}, indent=1) + "\n",
         encoding="utf-8")
     return target
 
@@ -147,7 +153,17 @@ def verify_against_manifest(ws: Workspace, day: int,
         raise FileNotFoundError(
             f"no checksum manifest for 2022-11-{day} at {source}; "
             f"create one with `mvt verify --day {day} --update`")
-    expected = json.loads(source.read_text(encoding="utf-8"))["files"]
+    stored = json.loads(source.read_text(encoding="utf-8"))
+    expected = stored["files"]
+
+    # A manifest with no version predates the stamping or came from an older
+    # code base; either way it cannot be matched against this one.
+    from . import DATA_VERSION
+    recorded = stored.get("data_version")
+    if recorded != DATA_VERSION:
+        print(f"[mvtpy] WARNING: manifest describes data version "
+              f"{recorded or '(unrecorded)'}, this code produces {DATA_VERSION}. "
+              f"Differences are expected, not defects; see docs/DATA_CHANGELOG.md")
 
     results: List[Result] = []
     for stage, paths in outputs_for(ws, day).items():

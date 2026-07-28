@@ -146,6 +146,28 @@ Progress is reported as workers finish, and each logs to
 [mvt] slim 2022-11-18: 6/6 shards ok in 245 s
 ```
 
+### Checking the outputs
+
+After a build, confirm the bytes match the reference:
+
+```matlab
+make all Workers 6
+mvt.verify                    % all three days, against python/expected/
+mvt.verify Days 18            % one day
+mvt.verify Verbose true       % list every file, not just failures
+```
+
+It reads the same manifests the Python tool uses, so both implementations check
+against one set of expected values, and it needs no Python. Only the JSON
+products (`gps`, `slim`) are byte-comparable and therefore checked; figures and
+`.mat` files are skipped, and so is `dataset_info.json`, which records host and
+user by design.
+
+Each manifest records the data set version it was built from. If that differs
+from `mvt.dataVersion()` the check warns first, because the differences are then
+expected rather than a defect — comparing a 2.1.1 build against a 2.1 manifest
+reports the fuel totals that the deterministic quadrature moved.
+
 ### Results somewhere else
 
 Only needed for a non-standard layout — a different disk, or keeping runs side
