@@ -143,6 +143,18 @@ make config          % days, paths, workers, data version
 setenv('MVT_DAYS','')   % clear an unwanted override
 ```
 
+Every build writes a timestamped log:
+
+```
+[make] logging to <results>/.mvt/logs/make-all-20260728_091706.log
+```
+
+It captures the environment, the stages as they run, and — importantly — the
+full error report when something fails, which in `-batch` goes to stderr and
+would otherwise be missing from the log that exists to explain it. Sharded
+stages additionally leave one log per worker in the same folder. `make all Log
+false` turns it off.
+
 By default a failing stage stops the run, so one bad day abandons the rest. To
 attempt everything and see all the failures together:
 

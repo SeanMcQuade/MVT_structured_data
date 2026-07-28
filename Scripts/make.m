@@ -25,6 +25,8 @@ function make(varargin)
 %            ('gps', 'slim', 'full', 'samples', 'fields', 'macro', 'micro',
 %            'av') | 'status' | 'config'
 %   Name/value:
+%     'Log'      write a timestamped log under <results>/.mvt/logs
+%                (default true; Log false disables it)
 %     'KeepGoing' attempt every stage and report failures at the end,
 %                instead of stopping at the first one (default false)
 %     'Workers'  MATLAB processes for the stages that shard (default 1).
@@ -46,22 +48,23 @@ function make(varargin)
 %
 % (C) 2026 CIRCLES Consortium. BSD-3-Clause.
 
-[target, workers, keepGoing, opts] = parseArguments(varargin);
+[target, workers, keepGoing, doLog, opts, configArgs] = parseArguments(varargin);
 
 switch target
     case 'status'
         mvt.status(opts);
         return
     case 'config'
-        showConfig(opts, workers);
+        configure(configArgs, opts, workers);
         return
 end
 
 stages = expandTarget(target);
-days = opts.Days;
+days = opts.Days;   % already resolved in parseArguments: explicit > config > all
 crossDay = ismember('av', stages);
 perDay = stages(~strcmp(stages, 'av'));
 
+logCleanup = startLog(target, doLog); %#ok<NASGU> closes the diary on any exit
 announceEnvironment();
 fprintf('[make] target ''%s'': %s\n', target, strjoin(stages, ' '));
 fprintf('[make] days %s, %d worker(s) for sharded stages\n', ...
@@ -103,6 +106,53 @@ end
 end
 
 % ---------------------------------------------------------------------------
+function cleanup = startLog(target, doLog)
+% Tee the whole run to a timestamped file under <results>/.mvt/logs.
+%
+% A build takes hours and prints thousands of lines; when something goes wrong
+% the command window has usually scrolled past it, or the session has been
+% closed. The diary keeps the whole thing, including the stage output and the
+% error report, next to the data it was building.
+%
+% Returns an onCleanup object: the diary closes when make returns, whether it
+% finished, errored or was interrupted.
+cleanup = [];
+if ~doLog
+    return
+end
+try
+    p = mvt.paths();
+    logDir = fullfile(p.stateDir, 'logs');
+    mvt.ensureDir(logDir);
+    stamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
+    logFile = fullfile(logDir, sprintf('make-%s-%s.log', target, stamp));
+
+    % Preserve a diary the caller already had running.
+    priorState = get(0, 'Diary');
+    priorFile = get(0, 'DiaryFile');
+    diary(logFile);
+    cleanup = onCleanup(@() closeLog(logFile, priorState, priorFile));
+
+    fprintf('[make] logging to %s\n', logFile);
+    fprintf('[make] %s | MATLAB %s | %s | data version %s\n', ...
+        char(datetime('now')), version('-release'), computer(), mvt.dataVersion());
+catch err
+    fprintf(2, '[make] could not open a log file (%s); continuing without one\n', ...
+        err.identifier);
+    cleanup = [];
+end
+end
+
+% ---------------------------------------------------------------------------
+function closeLog(logFile, priorState, priorFile)
+fprintf('[make] log written to %s\n', logFile);
+diary off
+if strcmpi(priorState, 'on')
+    diary(priorFile);
+end
+end
+
+% ---------------------------------------------------------------------------
 function announceEnvironment()
 % MVT_* variables silently change what a build does - most sharply MVT_DAYS,
 % which narrows the run to a subset without any other outward sign. setenv
@@ -112,7 +162,13 @@ names = {'MVT_DAYS', 'MVT_DATA_DIR', 'MVT_RESULTS_DIR', 'MVT_FORCE', ...
     'MVT_CLEAN', 'MVT_DRYRUN', 'MVT_VERBOSE', 'MVT_SHARD', 'MVT_SETTLE_SECONDS'};
 for k = 1:numel(names)
     value = strtrim(getenv(names{k}));
-    if ~isempty(value)
+    if isempty(value)
+        continue
+    end
+    if strcmp(names{k}, 'MVT_DAYS')
+        fprintf('[make] environment: %s = %s (IGNORED; make builds every day)\n', ...
+            names{k}, value);
+    else
         fprintf('[make] environment: %s = %s\n', names{k}, value);
     end
 end
@@ -142,10 +198,13 @@ catch err
     end
     if ~keepGoing
         fprintf(2, '[make] %s FAILED. Re-run with KeepGoing true to attempt the rest.\n', label);
+        % Into the diary as well: in -batch the error text goes to stderr and
+        % would otherwise be missing from the log that exists to explain it.
+        disp(getReport(err, 'extended', 'hyperlinks', 'off'));
         rethrow(err);
     end
     fprintf(2, '[make] %s FAILED, continuing (KeepGoing)\n', label);
-    fprintf(2, '       %s\n', err.message);
+    disp(getReport(err, 'extended', 'hyperlinks', 'off'));
     failures{end+1} = label; %#ok<AGROW>
 end
 end
@@ -179,7 +238,7 @@ end
 end
 
 % ---------------------------------------------------------------------------
-function [target, workers, keepGoing, opts] = parseArguments(args)
+function [target, workers, keepGoing, doLog, opts, configArgs] = parseArguments(args)
 target = 'all';
 if ~isempty(args) && (ischar(args{1}) || isstring(args{1})) ...
         && ~isOptionName(args{1})
@@ -203,6 +262,7 @@ end
 
 workers = 1;
 keepGoing = false;
+doLog = true;
 keep = true(1, numel(args));
 for k = 1:2:numel(args) - 1
     switch lower(char(args{k}))
@@ -212,9 +272,34 @@ for k = 1:2:numel(args) - 1
         case 'keepgoing'
             keepGoing = logical(args{k + 1});
             keep(k:k + 1) = false;
+        case 'log'
+            doLog = logical(args{k + 1});
+            keep(k:k + 1) = false;
     end
 end
-opts = mvt.options(args{keep});
+configArgs = args(keep);
+% `make config reset` is a bare word, not a name/value pair; mvt.options would
+% reject it, so keep it out of the options struct.
+optionArgs = configArgs;
+if numel(optionArgs) == 1 && (ischar(optionArgs{1}) || isstring(optionArgs{1})) ...
+        && any(strcmpi(char(optionArgs{1}), {'reset', 'clear'}))
+    optionArgs = {};
+end
+opts = mvt.options(optionArgs{:});
+
+% `make all` builds every day. mvt.options honors MVT_DAYS - which the Unix
+% Makefile needs, and which is why it stays there - but an ambient variable
+% must not silently decide what a build covers. Precedence here is explicit
+% argument, then a value set with `make config`, then all three days.
+gaveDays = false;
+for k = 1:2:numel(optionArgs) - 1
+    if strcmpi(char(optionArgs{k}), 'Days')
+        gaveDays = true;
+    end
+end
+if ~gaveDays
+    opts.Days = sessionDays();
+end
 
 if ~isscalar(workers) || workers < 1 || workers ~= fix(workers)
     error('mvt:make:badWorkers', 'Workers must be a positive integer.');
@@ -222,22 +307,64 @@ end
 end
 
 % ---------------------------------------------------------------------------
-function tf = isOptionName(value)
-tf = any(strcmpi(char(value), {'Force', 'Clean', 'DryRun', 'Verbose', ...
-    'Shard', 'Days', 'SettleSeconds', 'Workers', 'KeepGoing', 'UseParfor'}));
+function days = sessionDays(newDays)
+% Days for a build with no explicit Days argument: whatever `make config Days`
+% last set in this MATLAB session, otherwise all three. Deliberately session
+% scoped and in memory - a setting that outlived the session would recreate the
+% invisible state that MVT_DAYS caused.
+persistent configured
+if nargin > 0
+    configured = newDays;
+end
+if isempty(configured)
+    days = [16 17 18];
+else
+    days = configured;
+end
 end
 
 % ---------------------------------------------------------------------------
-function showConfig(opts, workers)
+function tf = isOptionName(value)
+tf = any(strcmpi(char(value), {'Force', 'Clean', 'DryRun', 'Verbose', ...
+    'Shard', 'Days', 'SettleSeconds', 'Workers', 'KeepGoing', 'Log', 'UseParfor'}));
+end
+
+% ---------------------------------------------------------------------------
+function configure(configArgs, opts, workers)
+% `make config` prints the resolved settings; `make config Days 18` sets the
+% days used by later builds in this session, and `make config reset` clears it.
+if ~isempty(configArgs)
+    if numel(configArgs) == 1 && any(strcmpi(char(configArgs{1}), {'reset', 'clear'}))
+        sessionDays([]);
+        fprintf('  config reset: builds cover all three days again\n');
+    else
+        for k = 1:2:numel(configArgs) - 1
+            if strcmpi(char(configArgs{k}), 'Days')
+                sessionDays(configArgs{k + 1});
+                fprintf('  config set: days = %s (this MATLAB session)\n', ...
+                    mat2str(configArgs{k + 1}));
+            else
+                fprintf(2, '  config: %s is not a persistent setting; pass it to the build\n', ...
+                    char(configArgs{k}));
+            end
+        end
+    end
+    opts.Days = sessionDays();
+end
 p = mvt.paths();
 fprintf('  repo      = %s\n', p.repoRoot);
 fprintf('  data      = %s\n', p.dataDir);
 fprintf('  results   = %s\n', p.resultsDir);
-fprintf('  days      = %s\n', mat2str(opts.Days));
+fprintf('  days      = %s\n', mat2str(sessionDays()));
 fprintf('  workers   = %d\n', workers);
 fprintf('  force     = %d\n', opts.Force);
 fprintf('  dry run   = %d\n', opts.DryRun);
 fprintf('  data ver. = %s\n', mvt.dataVersion());
+stray = strtrim(getenv('MVT_DAYS'));
+if ~isempty(stray)
+    fprintf(2, ['  note: MVT_DAYS = %s is set but IGNORED by make; builds cover\n' ...
+        '        the days above. Use `make all Days ...` or `make config Days ...`.\n'], stray);
+end
 end
 
 % ---------------------------------------------------------------------------
