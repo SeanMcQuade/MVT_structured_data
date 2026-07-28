@@ -103,7 +103,20 @@ meant a code change silently produced nothing until you deleted files by hand.
 
 ### From MATLAB
 
-Run from the `Scripts` folder as before:
+One command builds everything, from the `Scripts` folder:
+
+```matlab
+make                    % every stage, all three days, skipping fresh work
+make all Workers 6      % the same, with slim split across 6 MATLAB processes
+make status             % what is stale, and why; builds nothing
+```
+
+`make` is `Scripts/make.m` — it needs no Unix `make`, no toolbox, and no
+environment variables on the standard layout. It works on every platform; see
+[Building on Windows](#on-windows-entirely-from-matlab) for the
+concurrency details, which matter most where the Makefile cannot run.
+
+The original entry points are unchanged:
 
 ```matlab
 run_all_scripts                        % all three days, skipping fresh work
@@ -121,36 +134,53 @@ options struct.
 
 ### On Windows, entirely from MATLAB
 
-No `make` and no Parallel Computing Toolbox. Everything below is typed at the
-MATLAB prompt.
-
-**1. Point MATLAB at the data, and at where results should go.** Do this once
-per session, before anything else:
+Two lines. No `make`, no toolbox, no environment variables:
 
 ```matlab
-cd('C:\path\to\MVT_structured_data\Scripts')
+cd C:\path\to\MVT_structured_data\Scripts
+make all Workers 6
+```
+
+That builds every stage, for all three days, in the right order, with `slim`
+split across 6 MATLAB processes. Stages that are already up to date are skipped,
+so re-running after an interruption picks up where it left off.
+
+`make` here is `Scripts/make.m`, not the Unix tool. The `cd` is only so MATLAB
+can find it; paths are resolved from the location of the code itself, so with
+the standard layout — this repository sitting beside `data/` and `results/` —
+the defaults are already right.
+
+Check before committing to a long run:
+
+```matlab
+make config          % the paths it resolved, and the data set version
+make status          % what is stale, and why; builds nothing
+make all DryRun true % plan the whole run, write nothing
+```
+
+Other useful forms:
+
+```matlab
+make all Days 18 Workers 6    % one day
+make slim Days 18 Workers 6   % one stage
+make figures                  % just macro and micro
+make slim Force true          % rebuild regardless of timestamps
+```
+
+#### Results somewhere else
+
+Only needed for a non-standard layout — a different disk, or keeping runs side
+by side:
+
+```matlab
 setenv('MVT_DATA_DIR',    'D:\mvt-nature\data')
 setenv('MVT_RESULTS_DIR', 'D:\mvt-nature\results-pc')
-mvt.status                     % what is stale, and why - reads nothing else
+make all Workers 6
 ```
 
-**2. Build it.** `make` runs the stages in the right order and shards the ones
-that can be sharded:
+#### Driving the stages yourself
 
-```matlab
-make                          % everything out of date, all three days
-make all Days 18 Workers 6    % one day, slim across 6 MATLAB processes
-make slim Days 18 Workers 6   % one stage
-make status                   % what is stale, and why; builds nothing
-make config                   % show the resolved paths and settings
-make all DryRun true          % plan only, write nothing
-```
-
-`make` here is `Scripts/make.m`, not the Unix tool — nothing outside MATLAB is
-involved. `Workers` is the only setting that turns on concurrency, and it
-applies to `slim` and `full`; every other stage ignores it.
-
-If you would rather drive the stages yourself, this is what `make all` does:
+`make all` is equivalent to:
 
 ```matlab
 for day = [16 17 18]
@@ -162,9 +192,6 @@ for day = [16 17 18]
 end
 mvt.build('av', [])
 ```
-
-That is the whole recipe. `mvt.runShards` is the only line that runs work
-concurrently.
 
 #### Why `runShards`, and how many workers
 
