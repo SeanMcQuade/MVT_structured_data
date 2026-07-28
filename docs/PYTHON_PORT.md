@@ -197,11 +197,29 @@ with **bit-identical output** (all 795 runs unchanged); each vectorization was
 verified against the original scalar form first. The full-day check is opt-in
 (`MVT_RUN_SLOW=1`).
 
-## GPS parity: byte-identical as of 2026-07-25
+## Parity: complete, and verified across implementations and platforms
 
-The Python GPS stage reproduces the released 2022-11-18 file **exactly** —
-269,121,567 bytes, md5 `04f301cc5009bebaabd4666c563d040f`. It started 9.3 MB
-short.
+As of 2026-07-28 the Python port reproduces the MATLAB output byte for byte
+across the whole released data set, and the MATLAB pipeline reproduces itself
+across operating systems. All three checks are `mvt verify` against one set of
+manifests derived from a MATLAB build:
+
+| built by | on | result |
+| --- | --- | --- |
+| MATLAB | macOS | **75 / 75** |
+| MATLAB | Windows | **75 / 75** |
+| **Python (mvtpy)** | macOS | **75 / 75** |
+
+75 files is every byte-comparable product: 3 assembled GPS files and 72 slim
+segments. Figures and `.mat` files are excluded for reasons given in
+`mvtpy.verify`. For context, before the deterministic quadrature landed, four
+builds of the *same MATLAB code* agreed with one another on only 55 to 69 of
+72 slim files.
+
+### GPS parity: the five causes
+
+Getting the GPS stage byte-identical took five fixes, every one found by
+dumping MATLAB ground truth and diffing against it rather than by reading code:
 
 Five distinct causes, every one identified by dumping MATLAB ground truth and
 diffing bit-for-bit, not by reading code and reasoning:

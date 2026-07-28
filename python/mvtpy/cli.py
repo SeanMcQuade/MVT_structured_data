@@ -192,6 +192,8 @@ def _run_gps(ws: Workspace, day: int) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(matjson.dumps([_arrays_to_lists(r) for r in records]), encoding="utf-8")
     print(f"    wrote {out}")
+    _write_dataset_info(ws.gps_dir(), "gps (control-vehicle 10 Hz GPS)", day,
+                        info_dir=ws.gps_dir())
 
 
 def _run_slim(ws: Workspace, day: int, segments=None, shard: str = None) -> None:
@@ -226,6 +228,7 @@ def _run_slim(ws: Workspace, day: int, segments=None, shard: str = None) -> None
             records = slim.build_segment(segment.raw_path, gps_file, grade_csv)
             written = slim.write_segment(records, segment.output_path(out_dir))
         print(f"    wrote {written} ({len(records)} records)")
+    _write_dataset_info(out_dir, "slim (I-24 MOTION trajectories)", day)
 
 
 def _run_samples(ws: Workspace, day: int) -> None:
@@ -350,6 +353,20 @@ def _run_all(ws: Workspace, day: int) -> None:
 
 
 # ---------------------------------------------------------------------------
+
+
+def _write_dataset_info(data_dir, product: str, day: int, info_dir=None) -> None:
+    """Record what this product folder holds. Never fatal: a stage that has
+    already written its outputs must not fail in the bookkeeping, which is
+    exactly how the MATLAB `av` stage once died."""
+    from . import datasetinfo
+
+    try:
+        written = datasetinfo.write(data_dir, product, day, info_dir=info_dir)
+        if written:
+            print(f"    wrote {written}")
+    except Exception as error:                            # noqa: BLE001
+        print(f"    could not write dataset_info.json ({error})")
 
 
 def _save_npz(path: Path, data: dict) -> None:

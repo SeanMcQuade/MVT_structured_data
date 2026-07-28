@@ -13,7 +13,12 @@ from mvtpy import cli  # noqa: E402
 from mvtpy.workspace import Workspace  # noqa: E402
 
 
-def test_workspace_defaults_to_sibling_layout():
+def test_workspace_defaults_to_sibling_layout(monkeypatch):
+    # Clear the overrides first: this asserts the *default* layout, and would
+    # otherwise fail for anyone whose shell has MVT_RESULTS_DIR set - which is
+    # normal when driving a build.
+    monkeypatch.delenv("MVT_DATA_DIR", raising=False)
+    monkeypatch.delenv("MVT_RESULTS_DIR", raising=False)
     ws = Workspace.resolve()
     repo = Path(__file__).resolve().parents[2]
     assert ws.data_dir == (repo.parent / "data").resolve()
