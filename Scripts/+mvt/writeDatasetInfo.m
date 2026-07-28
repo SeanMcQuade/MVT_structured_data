@@ -39,18 +39,23 @@ if isfield(opts, 'DryRun') && opts.DryRun
     return
 end
 
-[productDir, product] = productFolder(stage, day);
-if isempty(productDir) || ~isfolder(productDir)
+[infoDir, dataDir, product] = productFolder(stage, day);
+if isempty(infoDir) || ~isfolder(dataDir)
     return
 end
 
-listing = dir(fullfile(productDir, '*'));
+% Count and date the data files, which live in dataDir - one level below
+% infoDir for the per-day products. The sidecar deliberately does not sit
+% beside the data: a stray .json in a folder of trajectory JSON is swallowed by
+% any consumer globbing '*.json', which is exactly how the micro stage broke.
+listing = dir(fullfile(dataDir, '*'));
 listing = listing(~[listing.isdir] & ~startsWith({listing.name}, '.'));
 listing = listing(~strcmp({listing.name}, 'dataset_info.json'));
 if isempty(listing)
     return          % nothing produced here yet; do not claim otherwise
 end
 newest = max([listing.datenum]);
+productDir = infoDir;
 
 info = struct( ...
     'dataset', 'CIRCLES MegaVanderTest (MVT) derived data', ...
@@ -74,6 +79,18 @@ info.generated_utc = char(datetime(newest, 'ConvertFrom', 'datenum', ...
     'TimeZone', 'UTC'));
 
 info.generated_by = runProvenance();
+
+% Trees built before the sidecar moved up a level still carry one beside the
+% data, where a '*.json' glob will swallow it. Remove it, since this run is
+% writing the replacement one level up.
+legacy = fullfile(dataDir, 'dataset_info.json');
+if ~strcmp(dataDir, productDir) && isfile(legacy)
+    try
+        delete(legacy);
+        mvt.log(opts, 'removed the superseded sidecar %s', legacy);
+    catch
+    end
+end
 
 target = fullfile(productDir, 'dataset_info.json');
 try
@@ -122,20 +139,31 @@ end
 end
 
 % ---------------------------------------------------------------------------
-function [folder, product] = productFolder(stage, day)
-% Where a stage's released output lives, and what to call that product.
-folder = '';
+function [infoDir, dataDir, product] = productFolder(stage, day)
+% Where the sidecar goes (infoDir) and where the data it describes lives.
+%
+% For the per-day products the sidecar sits at the product root, one level
+% above the day folders, so those folders hold nothing but data. gps has no day
+% folders, and its sidecar sits beside the three GPS files - safe because every
+% consumer of them, in both implementations, opens the exact filename rather
+% than globbing.
+infoDir = '';
+dataDir = '';
 product = stage;
+p = mvt.paths();
 switch lower(char(stage))
     case 'gps'
-        p = mvt.paths();
-        folder = fullfile(p.resultsDir, 'gps');
+        infoDir = fullfile(p.resultsDir, 'gps');
+        dataDir = infoDir;
         product = 'gps (control-vehicle 10 Hz GPS)';
     case {'slim', 'full'}
-        folder = mvt.dayDir(lower(char(stage)), day);
-        product = sprintf('%s (I-24 MOTION trajectories)', lower(char(stage)));
+        name = lower(char(stage));
+        infoDir = fullfile(p.resultsDir, name);
+        dataDir = mvt.dayDir(name, day);
+        product = sprintf('%s (I-24 MOTION trajectories)', name);
     case {'samples', 'fields', 'macro', 'micro', 'av'}
-        folder = mvt.dayDir('figures', day);
+        infoDir = fullfile(p.resultsDir, 'figures');
+        dataDir = mvt.dayDir('figures', day);
         product = 'figures and analysis products';
 end
 end

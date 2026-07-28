@@ -25,11 +25,22 @@ on one holds for the other.
 
 ## Telling which version a folder holds
 
-Every product folder carries a `dataset_info.json` sidecar naming the data-set
-version, the product, the copyright and licence, and how the folder was
-produced — MATLAB release or Python version, platform, host, user, and the code
-commit. `mvt.build` writes it after each stage; `mvtpy.datasetinfo.write` is the
-Python equivalent.
+Each product carries a `dataset_info.json` sidecar naming the data-set version,
+the product, the copyright and licence, and how it was produced — MATLAB release
+or Python version, platform, host, user, and the code commit. `mvt.build` writes
+it after each stage; `mvtpy.datasetinfo.write` is the Python equivalent.
+
+It sits at the **product root**, not beside the data:
+
+```
+results/slim/dataset_info.json
+results/slim/2022-11-18/I-24MOTION_*.json    <- data only
+```
+
+A stray `.json` among trajectory JSON is swallowed by any consumer globbing
+`*.json`, which is how the `micro` stage broke once. `gps` is the exception —
+its three files have no day folder — and that is safe because every consumer
+opens them by exact filename.
 
 It is deliberately **excluded from the checksum manifests**: it mixes
 reproducible facts with run provenance, so it is machine-specific by design and

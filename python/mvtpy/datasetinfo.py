@@ -33,14 +33,14 @@ _SCHEME = ("MAJOR.MINOR.PATCH; PATCH keeps every field, meaning and format "
            "values. See docs/DATA_CHANGELOG.md.")
 
 
-def build_info(product_dir: Path, product: str, day: Optional[int] = None) -> dict:
-    """Assemble the sidecar contents for a product folder."""
+def build_info(data_dir: Path, product: str, day: Optional[int] = None) -> dict:
+    """Assemble the sidecar contents, describing the data in ``data_dir``."""
     # Imported here, not at module scope: __init__ defines DATA_VERSION after
     # it imports this module, so a top-level import would be circular.
     from . import DATA_VERSION
 
-    product_dir = Path(product_dir)
-    files = [p for p in product_dir.iterdir()
+    data_dir = Path(data_dir)
+    files = [p for p in data_dir.iterdir()
              if p.is_file() and not p.name.startswith(".") and p.name != FILENAME]
     newest = max((p.stat().st_mtime for p in files), default=None)
 
@@ -67,19 +67,28 @@ def build_info(product_dir: Path, product: str, day: Optional[int] = None) -> di
     return info
 
 
-def write(product_dir, product: str, day: Optional[int] = None) -> Optional[Path]:
-    """Write the sidecar into ``product_dir``. Returns the path, or None.
+def write(data_dir, product: str, day: Optional[int] = None,
+          info_dir=None) -> Optional[Path]:
+    """Describe the data in ``data_dir``, writing the sidecar into ``info_dir``.
+
+    ``info_dir`` defaults to the parent of ``data_dir``: the sidecar must not
+    sit beside the data, because any consumer globbing ``*.json`` in a folder of
+    trajectory JSON will swallow it - which is exactly how the MATLAB micro
+    stage broke. Pass ``info_dir=data_dir`` for a product whose data is not in a
+    per-day subfolder.
 
     Writes nothing for a folder with no outputs, rather than claiming one was
     produced. Failure to write is never fatal to a pipeline run.
     """
-    product_dir = Path(product_dir)
-    if not product_dir.is_dir():
+    data_dir = Path(data_dir)
+    if not data_dir.is_dir():
         return None
-    info = build_info(product_dir, product, day)
+    info_dir = Path(info_dir) if info_dir is not None else data_dir.parent
+    info = build_info(data_dir, product, day)
     if not info.get("files"):
         return None
-    target = product_dir / FILENAME
+    info_dir.mkdir(parents=True, exist_ok=True)
+    target = info_dir / FILENAME
     try:
         target.write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
     except OSError:
