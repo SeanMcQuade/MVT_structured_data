@@ -7,9 +7,9 @@ installed raspberri pi and several flags to indicate the state of the vehicle) a
 - [Quick start](#quick-start)
 - [Running the pipeline](#running-the-pipeline)
 - [Documentation](#documentation)
-- [Generate integrated data.](#tag1)
-- [Plot data and results.](#tag2)
-- [Websites](#tag3)
+- [Scripts to generate the integrated data set](#scripts-to-generate-the-integrated-data-set)
+- [Scripts to plot figures from the article](#scripts-to-plot-figures-from-the-article)
+- [Websites](#websites)
 
 ## Quick start
 
@@ -42,13 +42,14 @@ MVT_DATA_DIR=/abs/data MVT_RESULTS_DIR=/abs/results ./check_data.sh
 
 ### 2. Run — pick one
 
-**A. From within MATLAB** (interactive; the reference implementation)
+**A. From within MATLAB** (interactive; the reference implementation; works on
+every platform, including Windows, with no `make` and no toolbox)
 
 ```matlab
 cd MVT_structured_data/Scripts
-run_all_scripts                 % all three days, skipping work already done
-run_all_scripts('Days', 17)     % one day
-mvt.status                      % what is stale and why (nothing runs)
+make all Workers 6              % everything, slim across 6 MATLAB processes
+make status                     % what is stale and why (nothing runs)
+run_all_scripts                 % the original driver, still supported
 ```
 
 **B. MATLAB from the command line** (headless, incremental, parallel)
@@ -72,7 +73,8 @@ cd MVT_structured_data/python
 source .venv/bin/activate
 mvt fields  --day 16            # macroscopic fields  -> .npz
 mvt figures --day 16            # field heatmaps + AV fuel curves -> .png
-mvt all     --day 16            # gps, samples, fields, figures
+mvt all     --day 16            # gps, slim, samples, fields, figures, micro
+mvt verify  --day 16            # check the outputs against expected checksums
 ```
 
 The Python port also runs in Docker against a mounted data directory — see
@@ -85,8 +87,17 @@ The Python port also runs in Docker against a mounted data directory — see
 | [`docs/ALGORITHMS.md`](docs/ALGORITHMS.md) | The data-flow graph and what each stage computes, with the mapping to the paper's figures. Start here. |
 | [`docs/DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md) | Every field of every output: units, dtype, rounding, null/empty semantics, and which stage writes it. |
 | [`docs/MATLAB_JSON_FORMAT.md`](docs/MATLAB_JSON_FORMAT.md) | How MATLAB's `jsonencode` formats numbers, needed for byte-identical output. |
+| [`docs/DATA_CHANGELOG.md`](docs/DATA_CHANGELOG.md) | Versions of the released data set, what changed in each, and how to tell which version a folder holds. |
+| [`docs/REPRODUCIBLE_QUADRATURE.md`](docs/REPRODUCIBLE_QUADRATURE.md) | Why the fuel quadrature was made platform-independent, and the size of the difference. |
 | [`docs/PYTHON_PORT.md`](docs/PYTHON_PORT.md) | Status of the Python implementation and how its parity is verified. |
 | [`python/README.md`](python/README.md) | The Python port: install (venv), run (CLI), Docker, and test. |
+
+This code produces data set version **2.1.1** (`mvt.dataVersion`). Each product
+folder carries a `dataset_info.json` sidecar recording that version alongside
+the copyright, the licence, and how the folder was produced — MATLAB release or
+Python version, platform, host, user and code commit — so a folder can be
+identified on its own. See
+[`docs/DATA_CHANGELOG.md`](docs/DATA_CHANGELOG.md).
 
 The pipeline runs two ways: the **MATLAB** scripts under `Scripts/` (the
 reference implementation, driven by `make` or `run_all_scripts`), and the
