@@ -55,5 +55,10 @@ results_groundtruth/
 # Test manifests are committed fixtures, not generated data
 !tests/manifests/*.json
 
+# Expected-checksum manifests are the reference the pipeline is verified
+# against, not generated data. They are small (about 4 KB per day) and must
+# travel with the repository, or mvt.verify has nothing to check.
+!python/expected/*.json
+
 # Local diagnostic captures (machine-specific, not part of the pipeline)
 crashlog-*.txt

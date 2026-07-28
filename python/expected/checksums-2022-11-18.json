@@ -1,0 +1,156 @@
+{
+ "day": 18,
+ "data_version": "2.1.1",
+ "files": {
+  "gps/CIRCLES_GPS_10Hz_2022-11-18.json": {
+   "path": "gps/CIRCLES_GPS_10Hz_2022-11-18.json",
+   "md5": "04f301cc5009bebaabd4666c563d040f",
+   "bytes": 269121567,
+   "stage": "gps"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_05-59-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_05-59-59.json",
+   "md5": "911ad1a0f79fcc0c03a4cd69b60363fb",
+   "bytes": 358935432,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_06-10-00.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_06-10-00.json",
+   "md5": "d070df981f376331ad07a919ac4c2055",
+   "bytes": 423076356,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_06-19-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_06-19-59.json",
+   "md5": "0f693b083cadcdcc47d02a76c6e0a2ad",
+   "bytes": 497115218,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_06-29-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_06-29-59.json",
+   "md5": "9e0180e43f4f8e0550892035d52bee76",
+   "bytes": 581981311,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_06-39-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_06-39-59.json",
+   "md5": "48ccdf8635f288e815ad5179b51581b0",
+   "bytes": 655707323,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_06-49-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_06-49-59.json",
+   "md5": "0b8b017e5673faa9f7a121815ffdc0f2",
+   "bytes": 845022490,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_06-59-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_06-59-59.json",
+   "md5": "71c5545f4c1a6e594abb3efcf031667d",
+   "bytes": 922711450,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_07-10-00.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_07-10-00.json",
+   "md5": "718d831e842a24a2f8cd38d94d5f89a8",
+   "bytes": 772437903,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_07-19-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_07-19-59.json",
+   "md5": "0254552c48526165d47e2d7c6079319f",
+   "bytes": 775492627,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_07-30-00.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_07-30-00.json",
+   "md5": "88aed0ee18b30603a9b1e56cb91b8d22",
+   "bytes": 791996961,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_07-39-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_07-39-59.json",
+   "md5": "49d0a3bbdadaa0b93352ed85eb5715c4",
+   "bytes": 1000206350,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_07-50-00.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_07-50-00.json",
+   "md5": "3aab997846a3a662c2cf2135ade66b03",
+   "bytes": 1125152283,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_07-59-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_07-59-59.json",
+   "md5": "225fda35e174ebc1c621af982f60ac89",
+   "bytes": 1014206046,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_08-09-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_08-09-59.json",
+   "md5": "2c5644553c2f95f476fbd2adfa3bc6f7",
+   "bytes": 843039241,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_08-19-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_08-19-59.json",
+   "md5": "077b28666d5883b247e915a86b6d5a26",
+   "bytes": 966651591,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_08-30-00.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_08-30-00.json",
+   "md5": "45081fc3d75107ad99e3b2ef66d06808",
+   "bytes": 917333876,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_08-39-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_08-39-59.json",
+   "md5": "9fb3216b11c7863fafd8a3278a8892fb",
+   "bytes": 819629479,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_08-50-00.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_08-50-00.json",
+   "md5": "63fda5c559fc5fe84cb3324706c76092",
+   "bytes": 620007883,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_08-59-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_08-59-59.json",
+   "md5": "f96012f7744a7a355a8caf6c52b749e7",
+   "bytes": 516375328,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_09-10-00.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_09-10-00.json",
+   "md5": "77c2fd72488a38430352956f91e5c212",
+   "bytes": 340510751,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_09-20-00.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_09-20-00.json",
+   "md5": "f43d63ea805f486a8cdbcb96218fedee",
+   "bytes": 286097555,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_09-29-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_09-29-59.json",
+   "md5": "d1094a803c4242e60ba68e57e191820f",
+   "bytes": 274904737,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_09-39-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_09-39-59.json",
+   "md5": "439a2c80192f8846bd90b0fb1aa066a8",
+   "bytes": 258921990,
+   "stage": "slim"
+  },
+  "slim/2022-11-18/I-24MOTION_2022-11-18_09-49-59.json": {
+   "path": "slim/2022-11-18/I-24MOTION_2022-11-18_09-49-59.json",
+   "md5": "13471ffde7ac63ce83218f45f7e77c31",
+   "bytes": 240739521,
+   "stage": "slim"
+  }
+ }
+}
