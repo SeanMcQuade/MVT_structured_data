@@ -48,6 +48,16 @@ DATA      ?= $(WORKSPACE)/data
 # Override to write a second copy of the outputs for comparison, e.g.
 #   make RESULTS=$(WORKSPACE)/results_verify slim-16
 RESULTS   ?= $(WORKSPACE)/results
+
+# Resolve DATA/RESULTS to absolute paths against the directory make was invoked
+# from. Recipes cd into Scripts/ or python/ before running, and MATLAB and the
+# Python CLI resolve relative paths against different bases again, so a relative
+# override otherwise lands somewhere the caller did not choose.
+# `override` is required: a variable set on the command line normally wins over
+# every assignment in the makefile, so a plain := here would be ignored for
+# exactly the case that needs it.
+override DATA    := $(abspath $(DATA))
+override RESULTS := $(abspath $(RESULTS))
 STATE     := $(RESULTS)/.mvt
 STAMPS    := $(STATE)/stamps
 

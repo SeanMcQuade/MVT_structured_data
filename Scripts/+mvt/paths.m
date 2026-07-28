@@ -77,7 +77,14 @@ folder = strtrim(getenv(variableName));
 if isempty(folder)
     folder = fullfile(root, defaultName);
 elseif ~startsWith(folder, filesep) && ~contains(folder, ':')
-    % Relative overrides are resolved against the workspace root.
-    folder = fullfile(root, folder);
+    % Relative overrides follow the caller's working directory, as every other
+    % command-line tool does. They used to be resolved against the workspace
+    % root, so '../../out' typed in the repository landed one level higher than
+    % intended - and the Python CLI resolved the same string against its own
+    % working directory, giving a third answer. The Makefile passes absolute
+    % paths, so this only governs interactive use.
+    folder = fullfile(pwd, folder);
 end
+% Collapse any '..' so the value read back is the one actually used.
+folder = char(java.io.File(folder).getCanonicalPath());
 end
