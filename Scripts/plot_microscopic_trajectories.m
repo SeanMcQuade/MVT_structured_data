@@ -407,7 +407,12 @@ removed_fields = {
     'downstream_engaged_av_id',...
     'distance_to_downstream_engaged_av_meters'};
 
-data_files = dir(fullfile(inputPath,'*.json'));
+% Match the released segments specifically, as the plotting loop above does.
+% A bare '*.json' also picked up the dataset_info.json sidecar that every
+% product folder now carries, and decoding that as trajectory data failed with
+% "Unrecognized field lane_number".
+data_files = dir(fullfile(inputPath, ...
+    ['I-24*' char(num2str(processingDay)) '*.json']));
 
 % avoid processing files that start with .
 is_dotfile = startsWith({data_files.name},'.');
