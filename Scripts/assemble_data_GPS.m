@@ -167,8 +167,13 @@ matchedSegments(10*length(dataGPS0),1).av_trj_i = [];
 matchedSegments(10*length(dataGPS0),1).x_diff =   [];
 matchedSegments(10*length(dataGPS0),1).timestamp = [];
 segmentsCounter = 1;
+% The count is the AV activity window, not all 24 segments: a MOTION segment
+% recorded before the first control vehicle entered, or after the last left,
+% has nothing to match against and is not decoded. The label says so, because
+% "3/22" against 24 raw files otherwise reads as a bug.
 reportMatch = mvt.progress(maxFileNr - minFileNr + 1, ...
-    sprintf('gps match 2022-11-%d', processingDay), 'Opts', opts);
+    sprintf('gps match 2022-11-%d (segments %d-%d of %d, the AV activity window)', ...
+    processingDay, minFileNr, maxFileNr, numel(dataFiles)), 'Opts', opts);
 for fileNr = minFileNr:maxFileNr
     % Load MOTION data file
     filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
