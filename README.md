@@ -40,45 +40,33 @@ folders are elsewhere, point it at them:
 MVT_DATA_DIR=/abs/data MVT_RESULTS_DIR=/abs/results ./check_data.sh
 ```
 
-### 2. Run — pick one
+### 2. Run it
 
-**A. From within MATLAB** (interactive; the reference implementation; works on
-every platform, including Windows, with no `make` and no toolbox)
+From MATLAB:
 
 ```matlab
 cd MVT_structured_data/Scripts
-make all Workers 6              % everything, slim across 6 MATLAB processes
-make status                     % what is stale and why (nothing runs)
-run_all_scripts                 % the original driver, still supported
+make all Workers 6
 ```
 
-**B. MATLAB from the command line** (headless, incremental, parallel)
+That is the whole thing. It builds every stage, for all three days, in the right
+order, with the heavy stage spread across 6 MATLAB processes. Work that is
+already up to date is skipped, so an interrupted run picks up where it left off.
 
-```bash
-cd MVT_structured_data
-make check-data                 # same layout check as above
-make status                     # what would run
-make -j3 all                    # everything, three days in parallel
-make figures                    # just the plots (needs processed data)
-make SHARDS=4 slim-17           # one stage, one day, 4 processes
+`make` here is `Scripts/make.m`, not the Unix tool — no `make`, no toolbox and
+no environment variables are needed, on any platform including Windows. The `cd`
+is only so MATLAB can find it.
+
+Two commands worth running first:
+
+```matlab
+make config     % the paths it resolved, and the data set version
+make status     % what is stale, and why; builds nothing
 ```
 
-Set `MATLAB=/path/to/matlab` if MATLAB is not at the default macOS location.
-
-**C. Python from the command line** (no MATLAB needed; see `python/README.md`)
-
-```bash
-cd MVT_structured_data/python
-./setup_venv.sh --full          # create .venv and install (numpy, pandas, matplotlib, ...)
-source .venv/bin/activate
-mvt fields  --day 16            # macroscopic fields  -> .npz
-mvt figures --day 16            # field heatmaps + AV fuel curves -> .png
-mvt all     --day 16            # gps, slim, samples, fields, figures, micro
-mvt verify  --day 16            # check the outputs against expected checksums
-```
-
-The Python port also runs in Docker against a mounted data directory — see
-[`python/README.md`](python/README.md).
+Everything else — choosing the worker count, building one day or one stage,
+writing results elsewhere, the Unix `make`, and the Python port — is under
+[Running the pipeline](#running-the-pipeline).
 
 ## Documentation
 
@@ -112,76 +100,56 @@ and does nothing otherwise. Editing a script therefore causes exactly the
 affected outputs to rebuild — the older behavior ("output file exists, skip")
 meant a code change silently produced nothing until you deleted files by hand.
 
-### From MATLAB
-
-One command builds everything, from the `Scripts` folder:
+### Targets
 
 ```matlab
-make                    % every stage, all three days, skipping fresh work
-make all Workers 6      % the same, with slim split across 6 MATLAB processes
-make status             % what is stale, and why; builds nothing
+make                          % everything out of date, all three days
+make all Workers 6            % the same, with slim across 6 processes
+make data                     % gps, slim, samples, fields
+make figures                  % macro, micro
+make slim                     % one stage
+make slim Days 18             % one stage, one day
+make status                   % what is stale, and why; builds nothing
+make config                   % resolved paths, days, workers, data version
 ```
 
-`make` is `Scripts/make.m` — it needs no Unix `make`, no toolbox, and no
-environment variables on the standard layout. It works on every platform; see
-[Building on Windows](#on-windows-entirely-from-matlab) for the
-concurrency details, which matter most where the Makefile cannot run.
-
-The original entry points are unchanged:
+Options may follow any target: `Workers`, `Days`, `Force`, `Clean`, `DryRun`,
+`Verbose`, `SettleSeconds` (see `Scripts/+mvt/options.m`). Command syntax is
+fine — `make slim Days 18 Force true` — as is function syntax,
+`make('slim', 'Days', 18)`.
 
 ```matlab
-run_all_scripts                        % all three days, skipping fresh work
-run_all_scripts('Days', 17)            % one day
-run_all_scripts('Force', true)         % rebuild everything
-run_all_scripts('DryRun', true)        % show what would run, change nothing
-generate_data_mvt_slim(17)             % single stage, unchanged call style
-generate_data_mvt_slim(17, 'Force', true)
-mvt.status('Days', 17)                 % what is stale, and why
-```
-
-Options (see `Scripts/+mvt/options.m`): `Force`, `Clean`, `DryRun`, `Verbose`,
-`Shard`, `Days`, `SettleSeconds`. They may be given as name/value pairs or as an
-options struct.
-
-### On Windows, entirely from MATLAB
-
-Two lines. No `make`, no toolbox, no environment variables:
-
-```matlab
-cd C:\path\to\MVT_structured_data\Scripts
-make all Workers 6
-```
-
-That builds every stage, for all three days, in the right order, with `slim`
-split across 6 MATLAB processes. Stages that are already up to date are skipped,
-so re-running after an interruption picks up where it left off.
-
-`make` here is `Scripts/make.m`, not the Unix tool. The `cd` is only so MATLAB
-can find it; paths are resolved from the location of the code itself, so with
-the standard layout — this repository sitting beside `data/` and `results/` —
-the defaults are already right.
-
-Check before committing to a long run:
-
-```matlab
-make config          % the paths it resolved, and the data set version
-make status          % what is stale, and why; builds nothing
-make all DryRun true % plan the whole run, write nothing
-```
-
-Other useful forms:
-
-```matlab
-make all Days 18 Workers 6    % one day
-make slim Days 18 Workers 6   % one stage
-make figures                  % just macro and micro
+make all DryRun true          % plan the whole run, write nothing
 make slim Force true          % rebuild regardless of timestamps
 ```
 
-#### Results somewhere else
+### How many workers
+
+`Workers` is the only setting that turns anything concurrent. Nothing in this
+pipeline uses `parfor`, `opts.UseParfor` is declared but never read by any
+stage, and no toolbox is required: parallelism comes from running several
+MATLAB processes over disjoint shards of a day, which is what
+`mvt.runShards` does and what the Makefile does.
+
+**Size it by memory, not cores.** Each worker holds a decoded 10-minute segment
+and peaks at several GB, so 6 workers want roughly 30 GB. On a 32 GB machine use
+4–6; 12 workers on a 128 GB machine cut a day of `slim` from about 40 minutes to
+4. Only `slim` and `full` shard by segment — the other stages ignore `Workers`
+rather than doing the same job N times.
+
+Progress is reported as workers finish, and each logs to
+`<results>/.mvt/logs/<stage>-<day>-shard<k>of<N>.log`:
+
+```
+[mvt] slim 2022-11-18: launching 6 MATLAB workers
+[mvt] slim 2022-11-18 workers | [##########..........] 3/6 | 3m15s | ~3m15s left
+[mvt] slim 2022-11-18: 6/6 shards ok in 245 s
+```
+
+### Results somewhere else
 
 Only needed for a non-standard layout — a different disk, or keeping runs side
-by side:
+by side. Paths otherwise resolve from the location of the code:
 
 ```matlab
 setenv('MVT_DATA_DIR',    'D:\mvt-nature\data')
@@ -189,7 +157,17 @@ setenv('MVT_RESULTS_DIR', 'D:\mvt-nature\results-pc')
 make all Workers 6
 ```
 
-#### Driving the stages yourself
+### Other ways to run
+
+**The original MATLAB drivers**, unchanged:
+
+```matlab
+run_all_scripts                        % all three days
+run_all_scripts('Days', 17)            % one day
+generate_data_mvt_slim(17)             % a single stage, unchanged call style
+mvt.build('slim', 17)                  % the uniform stage entry point
+mvt.runShards('slim', 17, 6)           % that stage, across 6 processes
+```
 
 `make all` is equivalent to:
 
@@ -204,38 +182,29 @@ end
 mvt.build('av', [])
 ```
 
-#### Why `runShards`, and how many workers
+**The Unix Makefile** (macOS/Linux; drives MATLAB headlessly):
 
-`mvt.build` is **sequential**. Nothing in this pipeline uses `parfor`,
-`opts.UseParfor` is declared but never read by any stage, and no toolbox is
-required. All parallelism — in the Makefile and here — comes from running
-several MATLAB processes over disjoint shards of the same day.
-`mvt.runShards(stage, day, N)` launches N background MATLAB processes, each
-taking segments `k, k+N, k+2N, …`, then waits for them all and raises if any
-failed. Progress is reported as workers finish:
-
-```
-[mvt] slim 2022-11-18: launching 6 MATLAB workers
-[mvt] slim 2022-11-18 workers | [##########..........] 3/6 | 3m15s elapsed | ~3m15s left
-[mvt] slim 2022-11-18: 6/6 shards ok in 245 s
+```bash
+cd MVT_structured_data
+make status                     # what would run
+make -j3 all                    # everything, three days in parallel
+make SHARDS=4 slim-17           # one stage, one day, 4 processes
+make watch                      # live progress, from a second terminal
+make verify                     # check outputs against expected checksums
 ```
 
-Each worker logs to `<results>/.mvt/logs/<stage>-<day>-shard<k>of<N>.log`.
+Set `MATLAB=/path/to/matlab` if MATLAB is not at the default macOS location.
 
-**Choose N by memory, not by cores.** Each worker holds a decoded 10-minute
-segment and peaks at several GB, so 6 workers wants roughly 30 GB. On a 32 GB
-machine use 4–6; 12 workers on a 128 GB machine cut a day of `slim` from about
-40 minutes to 4.
+**The Python port**, which needs no MATLAB — see
+[`python/README.md`](python/README.md):
 
-Only `slim` and `full` split by segment. `runShards` refuses more than one
-worker for the other stages rather than silently doing the same job N times:
-
-```matlab
-mvt.runShards('fields', 16, 4)   % errors: mvt:runShards:notSharded
+```bash
+cd MVT_structured_data/python
+./setup_venv.sh --full
+source .venv/bin/activate
+mvt build -j 8                  # everything stale, all three days
+mvt verify                      # check against the expected checksums
 ```
-
-Verified on 2022-11-18: 12 workers, 24 segments, 12/12 succeeded, and all 24
-outputs byte-identical to the same day built sequentially.
 
 ## Scripts to generate the integrated data set.
 
