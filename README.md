@@ -11,9 +11,9 @@ installed raspberri pi and several flags to indicate the state of the vehicle) a
 - [Scripts to plot figures from the article](#scripts-to-plot-figures-from-the-article)
 - [Websites](#websites)
 
-## Quick start
+# Quick start
 
-### 1. Put the data in place
+## 1. Put the data in place
 
 The pipeline expects this repository to sit **next to** the `data/` and
 `results/` folders:
@@ -40,29 +40,39 @@ folders are elsewhere, point it at them:
 MVT_DATA_DIR=/abs/data MVT_RESULTS_DIR=/abs/results ./check_data.sh
 ```
 
-### 2. Run it
+## 2. Run it
+These examples use 3 concurrent processes. If your machine has a lot of ram, you can bump this up to 8 or 10.
 
-From MATLAB:
+### MATLAB:
+```matlab
+cd MVT_structured_data/Scripts
+make all Workers 3
+```
+
+### MATLAB (headless) from command prompt:
+```bash
+cd MVT_structured_data
+make -j3 all
+```
+
+### Python from command prompt:
+```bash
+cd MVT_structured_data/python
+./setup_venv.sh --full
+source .venv/bin/activate
+mvt build -j 3
+```
+
+#### MATLAB: more details
 
 ```matlab
 cd MVT_structured_data/Scripts
-make all Workers 6
+make all Workers 3
 ```
 
 That is the whole thing. It builds every stage, for all three days, in the right
-order, with the heavy stage spread across 6 MATLAB processes. Work that is
+order, with the heavy stage spread across 3 processes. Work that is
 already up to date is skipped, so an interrupted run picks up where it left off.
-
-`make` here is `Scripts/make.m`, not the Unix tool — no `make`, no toolbox and
-no environment variables are needed, on any platform including Windows. The `cd`
-is only so MATLAB can find it.
-
-Two commands worth running first:
-
-```matlab
-make config     % the paths it resolved, and the data set version
-make status     % what is stale, and why; builds nothing
-```
 
 Everything else — choosing the worker count, building one day or one stage,
 writing results elsewhere, the Unix `make`, and the Python port — is under
@@ -245,6 +255,19 @@ for day = [16 17 18]
 end
 mvt.build('av', [])
 ```
+**Using the make.m file in MATLAB**
+
+`make` here is `Scripts/make.m`, not the Unix tool — no `make`, no toolbox and
+no environment variables are needed, on any platform including Windows. The `cd`
+is only so MATLAB can find it.
+
+Two commands worth running first:
+
+```matlab
+make config     % the paths it resolved, and the data set version
+make status     % what is stale, and why; builds nothing
+```
+
 
 **The Unix Makefile** (macOS/Linux; drives MATLAB headlessly):
 
@@ -252,8 +275,17 @@ mvt.build('av', [])
 cd MVT_structured_data
 make status                     # what would run
 make -j3 all                    # everything, three days in parallel
+```
+If you want to run only one stage (slim) or on one day (slim-17):
+```bash
 make SHARDS=4 slim-17           # one stage, one day, 4 processes
+```
+To watch what is happening in another tab:
+```bash
 make watch                      # live progress, from a second terminal
+```
+To verify the output files match expected checksums:
+```bash
 make verify                     # check outputs against expected checksums
 ```
 
