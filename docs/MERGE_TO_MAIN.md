@@ -133,9 +133,10 @@ own terms before the PR opens.
 
 ## Open decisions to settle before merging
 
-* **`dataset_info.json` records `host` and `user`.** Useful for provenance,
-  but it puts a machine name and a username into a public release. Decide
-  whether to keep, hash, or drop them.
+* ~~**`dataset_info.json` records `host` and `user`.**~~ **Settled: they stay,
+  and are published.** For a dataset whose central claim is that two machines
+  produce identical bytes, recording which machine produced a given copy is
+  provenance rather than incidental metadata.
 * **Do the `mvt_v21_*.m` scripts stay?** They are superseded but harmless.
 * **Does the Python port live in this repository or its own?** It roughly
   doubles the repository's file count and has a different review audience.

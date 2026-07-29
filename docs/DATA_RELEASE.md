@@ -32,6 +32,40 @@ Each gets its own DOI. Dataset 2's landing page states, in one line, that it is
 derived from Dataset 1 by the code at a specific commit and is reproducible
 from it.
 
+### The derived data is being released first
+
+The raw inputs are not out yet; the DOI being minted now is for the derived
+output. That reverses the natural order and creates one problem worth handling
+deliberately rather than discovering later.
+
+**Reserve the raw dataset's DOI now, before publishing the derived one.** Every
+major repository (Zenodo, Dryad, Figshare, anything on DataCite) will issue a
+draft or reserved DOI that resolves only once the record is published. Reserve
+it, put it in Dataset 2's metadata as its source, and publish Dataset 1 against
+that same identifier whenever it is ready. This costs one step now and avoids
+the alternative, which is either a derived dataset that permanently cites
+nothing, or a metadata amendment after the fact.
+
+If a reserved DOI is genuinely unavailable, the fallback is to cite the raw
+data by name, extent and checksum manifest in Dataset 2's documentation, state
+plainly that it is not yet public and will be released separately, and plan to
+add the DOI in a metadata update once it exists.
+
+**Say what is verifiable today, and do not overclaim.** Until the raw inputs
+are public, an outside reader cannot regenerate `slim` — they have no inputs to
+run the pipeline on. What they *can* do is confirm their download is intact
+against the published checksums, and read exactly how it was produced. Anyone
+who already has the raw data — the consortium, reviewers under embargo, the
+I-24 MOTION observatory — can do the full rerun and get a byte-identical tree.
+That is a strong claim and it is true; "fully reproducible by anyone" is not,
+yet. Word the landing page for the first and let the second become true when
+Dataset 1 publishes.
+
+Note also that the I-24 MOTION segments are the observatory's data, versioned
+by them and unmodified by this pipeline (the sidecar records this). Whether the
+consortium or the observatory publishes them, and under what terms, is worth
+confirming before promising a raw release date.
+
 ## Why not fold `slim` into `data/`
 
 The instinct — "the analysis reads it, so it is input data" — conflates two
@@ -84,8 +118,10 @@ lost in the release process.
   version is how a recipient tells them apart.
 * **A sidecar per product.** `dataset_info.json` at each product root records
   the version, the file count, the generating code commit, and the run
-  environment. (Settle the `host`/`user` fields before publishing — see
-  `MERGE_TO_MAIN.md`.)
+  environment — including the `host` and `user` that produced it. Those two
+  fields are published intentionally: for a dataset whose selling point is that
+  two machines produce identical bytes, knowing which machine produced *this*
+  copy is provenance, not incidental metadata.
 * **Checksums, published with the data.** `python/expected/checksums-*.json`
   lets anyone confirm their download, and lets anyone who reruns the pipeline
   confirm they got the same answer. This is the difference between claiming
@@ -106,15 +142,19 @@ manifests, to fix a problem a sentence of description solves.
 
 ## Suggested release checklist
 
+Ordered for the derived-data-first release actually planned.
+
 1. Tag the code at the commit that builds the release.
 2. Build `slim` + `gps` from a clean tree; run `verify` to confirm 75/75.
 3. Confirm each `dataset_info.json` shows `2.1.1` and the tagged commit.
-4. Decide the `host`/`user` question; rebuild the sidecars if the answer is to
-   drop them.
-5. Publish Dataset 1 (raw) and mint its DOI.
-6. Publish Dataset 2 (derived) citing Dataset 1's DOI and the code tag; include
-   the checksum manifests alongside the data.
-7. Have the paper cite both DOIs and the code tag.
+4. **Reserve** the DOI for Dataset 1 (raw), without publishing it.
+5. Publish Dataset 2 (derived) with the checksum manifests alongside the data,
+   citing the code tag and the reserved raw DOI as its source. State that the
+   raw inputs are to be released separately.
+6. Have the paper cite the derived DOI and the code tag.
+7. When the raw inputs are ready, publish Dataset 1 against the reserved DOI.
+   The citation in Dataset 2 begins resolving with no edit required.
 
-Doing 5 before 6 matters: the derived dataset's metadata has to point at a DOI
-that already exists.
+Step 4 is the one that is easy to skip and expensive to skip. Once Dataset 2 is
+published with no source identifier, adding one later means amending a record
+that has already been cited.
