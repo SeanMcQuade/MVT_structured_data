@@ -293,7 +293,7 @@ for i = 1:length(lanesToAnalyze)
         hold off;
         ylabel('Merges / Min'); title(sprintf('Lane %d', currentLane), 'Color', 'k'); xlim([-500 500]); grid on;
         set(gca, 'Color', 'w', 'XColor', 'k', 'YColor', 'k');
-        if i == 1, legend('Change = +1', 'Change = -1', 'Location', 'best'); end
+        if i == 1, legend('Change to the right', 'Change to the left', 'Location', 'best'); end
         if i == length(lanesToAnalyze), xlabel(tOut(caseIdx), xLabels{caseIdx}, 'FontSize', 12, 'Color', 'k'); end
         
         % -------------------------------------------------------------------
@@ -317,7 +317,7 @@ for i = 1:length(lanesToAnalyze)
         hold off;
         ylabel('Merges / Min'); title(sprintf('Lane %d', currentLane), 'Color', 'k'); xlim([-500 500]); grid on;
         set(gca, 'Color', 'w', 'XColor', 'k', 'YColor', 'k');
-        if i == 1, legend('Change = +1', 'Change = -1', 'Location', 'best'); end
+        if i == 1, legend('Change from the left', 'Change from the right', 'Location', 'best'); end
         if i == length(lanesToAnalyze), xlabel(tIn(caseIdx), xLabels{caseIdx}, 'FontSize', 12, 'Color', 'k'); end
         
         % -------------------------------------------------------------------
