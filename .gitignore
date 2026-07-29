@@ -35,6 +35,7 @@ codegen/
 *.png
 *.xlsx
 *.zip
+*.csv
 
 # Octave session info
 octave-workspace
