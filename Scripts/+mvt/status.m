@@ -11,8 +11,11 @@ function report = status(varargin)
 %        which days to report on (default [16 17 18])
 %
 % Outputs
-%   report  struct array with fields stage, day, stale, reason. Printed as a
-%           table when called without an output argument.
+%   report  struct array with fields stage, day, stale, optional, reason.
+%           Printed as a table when called without an output argument.
+%           `optional` marks a stage that no default target builds - only
+%           `full`, and only while it has never been built - so a caller can
+%           tell "nothing will build this" from "this is pending".
 %
 % Example
 %   mvt.status('Days', 17)
@@ -34,21 +37,32 @@ stages = { ...
     'macro',   'plot_macroscopic_fields'; ...
     'micro',   'plot_microscopic_trajectories'};
 
-report = struct('stage', {}, 'day', {}, 'stale', {}, 'reason', {});
+report = struct('stage', {}, 'day', {}, 'stale', {}, 'optional', {}, 'reason', {});
 for day = opts.Days
     for iStage = 1:size(stages, 1)
         stage = stages{iStage, 1};
         fcn = stages{iStage, 2};
+        optional = false;
         try
             outputs = mvt.expectedOutputs(stage, day, opts);
             [stale, reason] = mvt.isStale(outputs, stageInputs(stage, day, p), ...
                 mvt.sources(fcn, opts), opts);
+            % `full` is not part of `all` in either make implementation, so a
+            % missing `full` tree is the normal state, not work that is pending.
+            % Reporting it as BUILD alongside stages that `all` really does
+            % build invents 24 missing files a day that nothing will ever
+            % create. Once someone has built it, staleness matters again and is
+            % reported as usual.
+            if strcmp(stage, 'full') && ~any(cellfun(@isfile, outputs))
+                optional = true;
+                reason = 'not built by ''all''; opt in with `make full`';
+            end
         catch err
             stale = true;
             reason = sprintf('cannot evaluate (%s)', err.message);
         end
         report(end+1) = struct('stage', stage, 'day', day, ...
-            'stale', stale, 'reason', reason); %#ok<AGROW>
+            'stale', stale, 'optional', optional, 'reason', reason); %#ok<AGROW>
     end
 end
 
@@ -63,7 +77,8 @@ catch err
     stale = true;
     reason = sprintf('cannot evaluate (%s)', err.message);
 end
-report(end+1) = struct('stage', 'av', 'day', NaN, 'stale', stale, 'reason', reason);
+report(end+1) = struct('stage', 'av', 'day', NaN, 'stale', stale, ...
+    'optional', false, 'reason', reason);
 
 if nargout == 0
     fprintf('%-8s %-6s %-7s %s\n', 'STAGE', 'DAY', 'STATE', 'REASON');
@@ -73,7 +88,9 @@ if nargout == 0
         else
             dayStr = num2str(report(iRow).day);
         end
-        if report(iRow).stale
+        if report(iRow).optional
+            state = 'opt-in';
+        elseif report(iRow).stale
             state = 'BUILD';
         else
             state = 'fresh';

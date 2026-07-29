@@ -319,22 +319,40 @@ If you want to confirm what it should look like from the 'parent' directory:
 ```
 
 
-### Step 1: run some scripts to generate the data
+### Step 1: run the stages
 
-You have a couple options here.
+`make all` runs everything below in order, for all three days. The individual
+scripts are listed so they can be run one at a time; each takes a day
+(`16`, `17`, or `18`) and writes under `results/`.
 
----
-Run "Scripts\generate_data_mvt_full" or "Scripts\generate_data_mvt_slim.":This load files from `../data/cars/gps` and saves assembled GPS.json into Data_2022-11-??__I24_Base for each day. 
+| | Script | Produces |
+|---|---|---|
+| 1 | `assemble_data_GPS(day)` | `results/gps/CIRCLES_GPS_10Hz_2022-11-DD.json` |
+| 2 | `generate_data_mvt_slim(day)` | `results/slim/2022-11-DD/` — 24 segment files |
+| 3 | `generate_data_samples(day)` | `samples_for_distance_analysis_DD.mat` |
+| 4 | `generate_macroscopic_fields(day)` | `fields_motion_2022-11-DD.mat` |
+| 5 | `plot_macroscopic_fields(day)` | figure 3 and SM5 |
+| 5b | `plot_microscopic_trajectories(day)` | trajectory time-space figures |
+| 6 | `plot_AV_analysis()` | figures 2, SM2, SM3 (reads all three days) |
 
-Step 2: Once the slimmed or full data is generated, run "Scripts\generate_data_samples.m." It produces mat-files in the Folder called 'Data_Analysis,' one for each day.
+#### `slim` and `full`
 
-Step 3: Run 'Scripts\generate_macroscopic_fields.m.' This will save macoscopic fields data to the "Data\Data_for_Figures" folder as a matlab file ".mat."
+`generate_data_mvt_full` produces a second, larger variant that additionally
+carries eastbound and reference trajectories plus flat-fuel and direction
+fields. **It is not built by `all`, in either the MATLAB or the Python
+implementation, and nothing downstream reads it.** Stages 3–6 all read `slim`,
+which is the released data set.
 
+Build it only if you need eastbound plots — `direction = 1` in
+`plot_microscopic_trajectories.m` switches to it:
 
-## Scripts to plot figures from the article.
-Step 4: Run "Scripts\plot_AV_stats.m' to generate the results from the article (figure 2, figure SM2, and Figure SM3).
+```
+make full            # or: make full Days 17
+```
 
-Step 5: Run "Scripts\plot_macroscopic_stats.m' to generate the macroscopic fields figures from the article (figure 3, and SM 5, as well as additional fields).
+`make status` reports `full` as `opt-in` rather than `BUILD` while it has never
+been built, so a missing `full` tree does not read as pending work. Once you
+have built it, it is reported like any other stage.
 
 ## Websites
 [Visit the CIRCLES consortium website](https://circles-consortium.github.io/)
