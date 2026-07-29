@@ -355,15 +355,14 @@ have to be regenerated along with the checksum manifests.
 
 ## What is not ported yet
 
-Every stage of the JSON-producing pipeline is now ported. What remains is
-optional polish, not new stages:
+Every stage is ported, and the byte-comparable products are byte-identical to
+MATLAB's (see the parity section above). What remains is not parity work:
 
 | Piece | Notes |
 | --- | --- |
-| Byte-exact GPS output | Three causes remain, measured below. Not "sub-ULP" as previously recorded — one is a whole missing sample per run. |
-| `gpsmatch` performance | Correct but slow; needs vectorization for routine use. |
-| `.mat` writers and figures (stages 3–6) | Not started; the analysis/plotting half of the pipeline. |
-| Samples, macroscopic fields, figures | stages 3-6 | Later; `.mat` writers and matplotlib equivalents. |
+| `.mat` writers | The analysis stages write `.npz` rather than MATLAB `.mat`. The arrays match (`samples` exactly, `fields` to ~1e-11), but a MATLAB user cannot `load()` the Python output directly. |
+| Figures | Rendered with matplotlib: same colormap, limits, overlays and layout, deliberately not pixel-for-pixel. A checksum comparison is meaningless here and `mvt verify` skips them. |
+| `full` (both-directions data set) | Only `slim` is verified byte-for-byte; `full` shares the same code path but has no checksum manifest. |
 
 ## Running the checks
 

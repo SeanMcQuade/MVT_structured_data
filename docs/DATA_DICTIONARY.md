@@ -58,7 +58,7 @@ per timestamp sample.
 | 18 | `energy_model` | name | string | Fuel model used: `midBase`, `midSUV`, `Pickup`, `Class8Tractor` (by class). |
 | 19 | `fuel_rate_grams_per_second` | g/s | array | Instantaneous fuel rate from the class fuel model (road grade applied). |
 | 20 | `percent_infeasibility` | % | scalar | Fraction of samples the fuel model flagged as dynamically infeasible. |
-| 21 | `total_fuel_consumed_grams` | g | scalar | Trapezoidal integral of the fuel rate over time. |
+| 21 | `total_fuel_consumed_grams` | g | scalar | Trapezoidal integral of the fuel rate over time, by compensated summation so the value does not depend on the platform's BLAS (see [DATA_CHANGELOG.md](DATA_CHANGELOG.md), data version 2.1.1). |
 | 22 | `total_fuel_consumed_gallons` | gal | scalar | `3.522294e-4 · grams`. |
 | 23 | `total_fuel_economy_mpg` | mi/gal | scalar | `(distance·6.213712e-4) / gallons`; `null` when gallons is 0. |
 

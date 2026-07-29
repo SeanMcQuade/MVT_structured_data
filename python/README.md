@@ -85,13 +85,13 @@ than a green tick:
 | `samples`, `fields` (`.npz`) | array comparison vs the MATLAB `.mat` | the container formats cannot be byte-compared at all; the `.npz` md5 still pins Python-to-Python reproducibility |
 | figures (`.png`) | **skipped**, and reported as skipped | matplotlib and MATLAB renderers do not agree pixel for pixel, and PNG bytes carry encoder metadata — a checksum would fail for reasons unrelated to correctness |
 
-Current status for 2022-11-18: the GPS record count, per-record sample counts
-and total sample count now match MATLAB exactly, and four fields
-(`controller_engaged`, `is_server_connected`, `control_car`, `control_last30`)
-are identical. What remains is a last-digit residual — see "GPS parity" in
-[../docs/PYTHON_PORT.md](../docs/PYTHON_PORT.md) for the per-field numbers.
-Given the *released* GPS as input, the Python `slim` stage already reproduces a
-segment byte-for-byte.
+Current status: **75 of 75 byte-comparable files match** — the 3 assembled GPS
+files and 72 slim segments, for all three days, verified against manifests
+derived from a MATLAB build. The same manifests are matched by MATLAB on macOS
+and on Windows, so two independent implementations on two operating systems
+produce identical bytes. See
+[../docs/PYTHON_PORT.md](../docs/PYTHON_PORT.md) for how that was reached and
+[../docs/DATA_CHANGELOG.md](../docs/DATA_CHANGELOG.md) for the data set version.
 
 ### `mvt build` — the make
 

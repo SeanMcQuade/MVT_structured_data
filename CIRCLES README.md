@@ -1,3 +1,8 @@
+> **Superseded.** This file describes the pre-reorganisation layout
+> (`Data/Data_2022-11-DD__I24_{Base,Slim,Full}`) and the older script names. It
+> is kept for historical reference only. For how the pipeline is laid out and
+> run now, see [README.md](README.md); trust the scripts over this file.
+
 These scripts and data are from the CIRCLES consortium MegaVanderTest experiment that was conducted in Nashville on highway I-24 during the week of November 14th 2022. 
 This repository contains data recorded from the partially automated vehicles, called the GPS data (this includes GPS location data recoreded by the 
 installed raspberri pi and several flags to indicate the state of the vehicle) and data recorded by the I-24 MOTION observatory.

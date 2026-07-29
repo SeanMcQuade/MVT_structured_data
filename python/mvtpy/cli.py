@@ -31,9 +31,9 @@ Notes
 * ``figures`` renders the field heatmaps and the AV fuel curves (needs
   matplotlib).
 * ``micro`` renders the microscopic trajectory time-space figures (stage 5b).
-  It is deliberately *not* part of ``all``: on a cold cache it reads the whole
-  slim tree for the day (~15 GB), so it is opt-in rather than a surprise inside
-  a full run. Later runs reuse ``results/.mvt/cache/*_micro.npz``.
+  It is the last step of ``all``, and the slowest on a cold cache: it reads the
+  whole slim tree for the day (~15 GB). Later runs reuse
+  ``results/.mvt/cache/*_micro.npz``. Both ``all`` and ``build`` include it.
 * ``slim`` produces the released segments from raw MOTION (stage 2). It needs
   the assembled GPS first, takes ~97 s and ~5 GB per segment, and writes
   ~15 GB/day. Split it with ``--segment`` / ``--shard k/N``, or let ``build``
