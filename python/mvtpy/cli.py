@@ -5,6 +5,7 @@ tree, so the whole analysis can run from a shell or inside a container:
 
     python -m mvtpy gps      --day 16
     python -m mvtpy slim     --day 16
+    python -m mvtpy full     --day 16   # optional; not part of `all`
     python -m mvtpy samples  --day 16
     python -m mvtpy fields   --day 16
     python -m mvtpy figures  --day 16
@@ -34,6 +35,11 @@ Notes
   It is the last step of ``all``, and the slowest on a cold cache: it reads the
   whole slim tree for the day (~15 GB). Later runs reuse
   ``results/.mvt/cache/*_micro.npz``. Both ``all`` and ``build`` include it.
+* ``full`` is the optional counterpart to ``slim``: it keeps eastbound as well
+  as westbound trajectories and adds reference and flat-road fuel. Nothing
+  downstream reads it and it is ~1.7x the size, so it is opt-in - absent from
+  ``all`` and from ``build``'s defaults, and built only via ``mvt full`` or
+  ``build --target full``.
 * ``slim`` produces the released segments from raw MOTION (stage 2). It needs
   the assembled GPS first, takes ~97 s and ~5 GB per segment, and writes
   ~15 GB/day. Split it with ``--segment`` / ``--shard k/N``, or let ``build``
@@ -80,6 +86,7 @@ def main(argv=None) -> int:
     for name, help_text in (
         ("gps", "assemble the control-vehicle GPS JSON"),
         ("slim", "build the released slim segments from raw MOTION"),
+        ("full", "build the optional full segments (eastbound + reference)"),
         ("samples", "collect distance-to-AV samples (.npz)"),
         ("fields", "accumulate macroscopic fields (.npz)"),
         ("figures", "render field heatmaps and AV fuel curves"),
@@ -97,6 +104,13 @@ def main(argv=None) -> int:
         "--segment", type=int, action="append", metavar="N",
         help="segment index 0..23 to build; repeatable (default: all 24)")
     stages["slim"].add_argument(
+        "--shard", metavar="K/N",
+        help="build every Nth segment starting at K (1-based), as MATLAB's Shard [k N]")
+
+    stages["full"].add_argument(
+        "--segment", type=int, action="append", metavar="N",
+        help="segment index 0..23 to build; repeatable (default: all 24)")
+    stages["full"].add_argument(
         "--shard", metavar="K/N",
         help="build every Nth segment starting at K (1-based), as MATLAB's Shard [k N]")
 
@@ -169,6 +183,8 @@ def main(argv=None) -> int:
             _run_micro(workspace, day, skip_t=args.skip_t, use_cache=not args.no_cache)
         elif args.stage == "slim":
             _run_slim(workspace, day, segments=args.segment, shard=args.shard)
+        elif args.stage == "full":
+            _run_full(workspace, day, segments=args.segment, shard=args.shard)
         else:
             runners[args.stage](workspace, day)
     return 0
@@ -229,6 +245,41 @@ def _run_slim(ws: Workspace, day: int, segments=None, shard: str = None) -> None
             written = slim.write_segment(records, segment.output_path(out_dir))
         print(f"    wrote {written} ({len(records)} records)")
     _write_dataset_info(out_dir, "slim (I-24 MOTION trajectories)", day)
+
+
+def _run_full(ws: Workspace, day: int, segments=None, shard: str = None) -> None:
+    """Build the full segments for one day (the optional counterpart to slim).
+
+    Same selection and sharding as :func:`_run_slim`. `full` carries eastbound
+    and reference trajectories and four fuel evaluations per trajectory, so its
+    output is roughly 1.7x the size of `slim`'s and nothing downstream reads it
+    - it is opt-in here exactly as it is in the MATLAB make.
+    """
+    from . import segments as segment_map, full
+
+    _require(ws.motion_dir(day), "raw MOTION segments")
+    gps_file = ws.gps_dir() / f"CIRCLES_GPS_10Hz_2022-11-{day}.json"
+    _require(gps_file, "assembled GPS JSON (run the gps stage first)")
+    grade_csv = _require(ws.models_dir() / "Eastbound_grade_fit.csv", "road-grade fit")
+
+    chosen = segment_map.manifest(ws.data_dir, ws.results_dir, day)
+    if segments:
+        chosen = [segment for segment in chosen if segment.seq in set(segments)]
+    if shard:
+        index, count = (int(part) for part in shard.split("/"))
+        chosen = [segment for segment in chosen if segment.seq % count == (index - 1) % count]
+    if not chosen:
+        print("    no segments selected")
+        return
+
+    out_dir = ws.full_dir(day)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for segment in chosen:
+        with _timer(f"full 2022-11-{day} #{segment.seq:02d} -> {segment.output_name}"):
+            records = full.build_segment(segment.raw_path, gps_file, grade_csv)
+            written = full.write_segment(records, segment.output_path(out_dir))
+        print(f"    wrote {written} ({len(records)} records)")
+    _write_dataset_info(out_dir, "full (I-24 MOTION trajectories)", day)
 
 
 def _run_samples(ws: Workspace, day: int) -> None:

@@ -49,7 +49,9 @@ __all__ = ["Unit", "STAGES", "plan", "execute", "is_stale", "DEFAULT_TARGETS"]
 #: sub-second resolution).
 TOLERANCE = 1.0
 
-#: Stage order, and which stages a default `build` runs.
+#: Stage order, and which stages a default `build` runs. `full` is deliberately
+#: absent: it is an optional product that nothing downstream reads, so it is
+#: built only when named with `--target full`, exactly as in the MATLAB make.
 DEFAULT_TARGETS = ("gps", "slim", "samples", "fields", "figures", "micro")
 
 #: Code each stage depends on, relative to the mvtpy package. Editing one of
@@ -60,6 +62,9 @@ STAGE_SOURCES = {
             "matround.py", "rawio.py", "workspace.py"),
     "slim": ("slim.py", "lanes.py", "kinematics.py", "fuel.py", "avdist.py",
              "matjson.py", "matround.py", "rawio.py", "segments.py", "workspace.py"),
+    "full": ("full.py", "slim.py", "lanes.py", "kinematics.py", "fuel.py",
+             "avdist.py", "matjson.py", "matround.py", "rawio.py", "segments.py",
+             "workspace.py"),
     "samples": ("samples.py", "rawio.py", "workspace.py"),
     "fields": ("fields.py", "rawio.py", "workspace.py"),
     "figures": ("plotting.py", "avanalysis.py", "fields.py", "rawio.py",
@@ -139,7 +144,11 @@ def plan(ws: Workspace, days: Sequence[int], targets: Sequence[str] = DEFAULT_TA
     Units are returned in dependency order.
     """
     log = log or (lambda *_: None)
-    targets = [stage for stage in DEFAULT_TARGETS if stage in set(targets)]
+    # Order the requested targets by pipeline order. This filters through STAGES
+    # rather than DEFAULT_TARGETS: an explicitly requested non-default stage
+    # (`--target full`) must survive, and filtering through the defaults dropped
+    # it silently, which looks exactly like "full refuses to build".
+    targets = [stage for stage in STAGES if stage in set(targets)]
     units: List[Unit] = []
     base = _base_argv(ws)
 
@@ -172,6 +181,20 @@ def plan(ws: Workspace, days: Sequence[int], targets: Sequence[str] = DEFAULT_TA
                                  "--segment", str(segment.seq)],
                     deps=[gps_key] if "gps" in targets else [],
                     label=f"slim 2022-11-{day} #{segment.seq:02d}"))
+
+        if "full" in targets:
+            from . import segments as segment_map
+
+            full_dir = ws.full_dir(day)
+            for segment in segment_map.manifest(ws.data_dir, ws.results_dir, day, log=log):
+                units.append(Unit(
+                    stage="full", day=day, key=f"full/{day}/{segment.seq:02d}",
+                    outputs=[segment.output_path(full_dir)],
+                    inputs=[segment.raw_path, gps_file],
+                    argv=base + ["full", "--day", str(day),
+                                 "--segment", str(segment.seq)],
+                    deps=[gps_key] if "gps" in targets else [],
+                    label=f"full 2022-11-{day} #{segment.seq:02d}"))
 
         # Stages that consume the whole day's slim tree. Their data inputs are
         # resolved at plan time; on a cold tree that list is empty, which is

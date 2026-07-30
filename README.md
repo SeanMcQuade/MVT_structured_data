@@ -347,8 +347,11 @@ Build it only if you need eastbound plots — `direction = 1` in
 `plot_microscopic_trajectories.m` switches to it:
 
 ```
-make full            # or: make full Days 17
+make full                      # MATLAB; or: make full Days 17
+mvt full --day 17              # Python; or: mvt build --target full -j 6
 ```
+
+Both implementations produce it, and their output is byte-identical.
 
 `make status` reports `full` as `opt-in` rather than `BUILD` while it has never
 been built, so a missing `full` tree does not read as pending work. Once you
