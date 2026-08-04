@@ -73,6 +73,7 @@ writing results elsewhere, the Unix `make`, and the Python port — is under
 | Document | What it covers |
 | --- | --- |
 | [`docs/ALGORITHMS.md`](docs/ALGORITHMS.md) | The data-flow graph and what each stage computes, with the mapping to the paper's figures. Start here. |
+| [`docs/DATA_FILES.md`](docs/DATA_FILES.md) | What is in which file: an inventory of every input and output, the columns of each, and the shared vocabularies (vehicle class, direction, lane, coordinate frames). |
 | [`docs/DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md) | Every field of every output: units, dtype, rounding, null/empty semantics, and which stage writes it. |
 | [`docs/MATLAB_JSON_FORMAT.md`](docs/MATLAB_JSON_FORMAT.md) | How MATLAB's `jsonencode` formats numbers, needed for byte-identical output. |
 | [`docs/DATA_CHANGELOG.md`](docs/DATA_CHANGELOG.md) | Versions of the released data set, what changed in each, and how to tell which version a folder holds. |

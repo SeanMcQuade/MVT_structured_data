@@ -4,6 +4,10 @@ Every field of the data sets the pipeline produces: units, dtype, rounding, and
 which stage writes it. This doubles as the specification for the Python port,
 which must reproduce these files byte-for-byte.
 
+For the inputs (raw MOTION, the vehicle CSVs, the grade fit) and a
+file-by-file inventory, see [DATA_FILES.md](DATA_FILES.md). This document
+covers the processed products in full detail.
+
 Conventions used below:
 
 - **Rounding.** Unless noted, every numeric field in the processed MOTION data
