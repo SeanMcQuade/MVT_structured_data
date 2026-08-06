@@ -11,8 +11,10 @@ dataGPS = jsondecode(fileread(fullfile(dataRootDirectory,...
     'results','gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])));
 dataGPS = dataGPS([dataGPS.direction]<0);
 
-%%%% for day 16 to eliminate afternoon runs in the file (TO BE FIXED)
-dataGPS = dataGPS([dataGPS.first_timestamp] < 1.66862e9);
+
+max_T = posixtime(datetime(['2022-11-' char(num2str(processingDay)) ' 11:00:00'],...
+    'InputFormat', 'yyyy-MM-dd HH:mm:ss', 'TimeZone', 'America/Chicago'));
+dataGPS = dataGPS([dataGPS.first_timestamp] < max_T);
 
 lanesToAnalyze = [2, 3, 4];
 binEdges = -500:10:500;
@@ -151,11 +153,16 @@ dt_minutes = dt_seconds / 60;
 % -----------------------------------------------------------------------
 % 1. INITIALIZE ALL FIGURES UPFRONT
 % -----------------------------------------------------------------------
+figExp = gobjects(2,1); tExp = gobjects(2,1);
 figOut = gobjects(2,1); tOut = gobjects(2,1);
 figIn  = gobjects(2,1); tIn  = gobjects(2,1);
 figComp= gobjects(2,1); tComp= gobjects(2,1);
 
 for caseIdx = 1:2
+    figExp(caseIdx) = figure('Color', 'w', 'Name', ['Exposure: ', titleSuffix{caseIdx}]);
+    tExp(caseIdx) = tiledlayout(length(lanesToAnalyze), 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+    title(tExp(caseIdx), ['Total Exposure Time: ', titleSuffix{caseIdx}], 'FontSize', 14, 'Color', 'k');
+
     figOut(caseIdx) = figure('Color', 'w', 'Name', ['Rate Merge Out: ', titleSuffix{caseIdx}]);
     tOut(caseIdx) = tiledlayout(length(lanesToAnalyze), 1, 'TileSpacing', 'compact', 'Padding', 'compact');
     title(tOut(caseIdx), ['Rate: Merge Out Relative to ', titleSuffix{caseIdx}], 'FontSize', 14, 'Color', 'k');
@@ -262,7 +269,8 @@ for i = 1:length(lanesToAnalyze)
     
     exposure_min_all(exposure_min_all == 0) = NaN;
     exposure_min_eng(exposure_min_eng == 0) = NaN;
-    
+
+
     % --- 3. PLOT FOR BOTH CASES ---
     for caseIdx = 1:2
         % Select the correctly matched exposure array for the loop iteration
@@ -271,7 +279,17 @@ for i = 1:length(lanesToAnalyze)
         else
             exposure_minutes = exposure_min_all;
         end
-        
+        % Plot Exposure time 
+        set(0, 'CurrentFigure', figExp);
+        nexttile(tExp(caseIdx)); hold on;
+        plot(binCenters, exposure_minutes, 'LineWidth', 2, 'Color', [0 0.4470 0.7410]);
+        fill([binCenters, fliplr(binCenters)], [exposure_minutes', zeros(1, length(binCenters))], ...
+            [0.8500 0.3250 0.0980], 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+        hold off;
+        ylabel('Exposure (Min)'); title(sprintf('Lane %d', currentLane), 'Color', 'k'); grid on; xlim([-500 500]);
+        set(gca, 'Color', 'w', 'XColor', 'k', 'YColor', 'k');
+        if i == length(lanesToAnalyze), xlabel(tExp(caseIdx), xLabels{caseIdx}, 'FontSize', 12, 'Color', 'k'); end
+
         % -------------------------------------------------------------------
         % APPLY TO PART 4 (MERGE OUT)
         % -------------------------------------------------------------------
