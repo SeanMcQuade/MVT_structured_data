@@ -2,7 +2,7 @@
 % (C) 2026/05/26 by Benjamin Seibold, added to by Sean McQuade
 tic
 %choose parameter: 16, 17, or 18 (16 = Wed, 17 = Thurs, or 18 = Fri). 
-day = 16; 
+day = 18; 
 %choose initial and terminal file, there are 24 files per day.
 j_start = 1; j_end = 24;
 
@@ -17,7 +17,7 @@ datafolder = sprintf(formatSpec, day);
 
 for j=j_start:j_end
     %if 1 % activate upon first time, then deactivate
-        data_files = dir(strcat(datafolder,'I-24MOTION_????-??-??_??-??-??.json'));
+        data_files = dir(strcat(datafolder,'I-24MOTION_*.json'));
         % Load data file
         filename = data_files(j).name;
         fprintf('Loading %s ...',filename), tic
