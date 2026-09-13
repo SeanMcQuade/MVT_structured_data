@@ -33,7 +33,7 @@ for j=j_start:j_end
 edges = -30:0.5:30;
 
 % Process data
-av_dist_all_secments = [];
+av_dist_all_segments = [];
 rel_speed_all_segments = [];
 for i = 1:length(data) % loop over all segments
     times = data(i).timestamp;
@@ -65,7 +65,7 @@ for i = 1:length(data) % loop over all segments
     end
 
     % save rel_speed and av_dist for all segments
-    av_dist_all_secments = [av_dist_all_secments; av_dist];
+    av_dist_all_segments = [av_dist_all_segments; av_dist];
     rel_speed_all_segments = [rel_speed_all_segments; rel_speed];
 end
 
@@ -73,10 +73,10 @@ end
 clear filtered_ind filtered_dist filtered_speed;
 lower_Bnd = 7; %Sul suggests lowering this from 35 to 7. 
 upper_Bnd = 350;
-filtered_ind_low = find(lower_Bnd < av_dist_all_secments);
-filtered_ind_up = find(av_dist_all_secments < upper_Bnd);
+filtered_ind_low = find(lower_Bnd < av_dist_all_segments);
+filtered_ind_up = find(av_dist_all_segments < upper_Bnd);
 filtered_ind = intersect(filtered_ind_low,filtered_ind_up);
-filtered_dist = av_dist_all_secments(filtered_ind);
+filtered_dist = av_dist_all_segments(filtered_ind);
 filtered_speed = rel_speed_all_segments(filtered_ind);
 
 number_of_data = length(filtered_dist);
