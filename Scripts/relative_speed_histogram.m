@@ -2,7 +2,7 @@
 % (C) 2026/05/26 by Benjamin Seibold, added to by Sean McQuade
 tic
 %choose parameter: 16, 17, or 18 (16 = Wed, 17 = Thurs, or 18 = Fri). 
-day = 18; 
+day = 16; 
 %choose initial and terminal file, there are 24 files per day.
 j_start = 1; j_end = 24;
 
@@ -17,7 +17,7 @@ datafolder = sprintf(formatSpec, day);
 
 for j=j_start:j_end
     %if 1 % activate upon first time, then deactivate
-        data_files = dir(strcat(datafolder,'I-24MOTION_*.json'));
+        data_files = dir(strcat(datafolder,'I-24MOTION_????-??-??_??-??-??.json'));
         % Load data file
         filename = data_files(j).name;
         fprintf('Loading %s ...',filename), tic
@@ -71,7 +71,7 @@ end
 
 %only keep
 clear filtered_ind filtered_dist filtered_speed;
-lower_Bnd = 35;
+lower_Bnd = 7; %Sul suggests lowering this from 35 to 7. 
 upper_Bnd = 350;
 filtered_ind_low = find(lower_Bnd < av_dist_all_secments);
 filtered_ind_up = find(av_dist_all_secments < upper_Bnd);
@@ -91,43 +91,43 @@ interquartile = [first_quartile(j), third_quartile(j)];
 filtered_dist_all_files = [filtered_dist_all_files; filtered_dist];
 filtered_speed_all_files = [filtered_speed_all_files; filtered_speed];
 
-%plot relative speed histogram for jth file
-figure;
-hold on
-H = histogram(filtered_speed,edges);
-plot(mean_rel_speed(j)*ones(2,1), [0,max(H.Values)],"LineWidth",2)
-plot(median_rel_speed(j)*ones(2,1),[0,0.5*max(H.Values)],"LineWidth",2)
-std_dev = [mean_rel_speed(j)-stddev_rel_speed(j),...
-    mean_rel_speed(j) + stddev_rel_speed(j)];
-plot(std_dev, [0.5,0.5],"LineWidth",3)
-plot(interquartile, [0.5,0.5],"LineWidth",4)
-fontsize = 24;
-legend("Histogram", "Mean speed", "Median Speed", ...
-                  "Standard Dev", "Interquartile","FontSize",fontsize)
-xlabel("Relative Speed m/s","FontSize",fontsize);
-ylabel_formatSpec = "Frequency of speeds between %d and %d m/s";
-ylabel_string = sprintf(ylabel_formatSpec, lower_Bnd, upper_Bnd);
-ylabel(ylabel_string,"FontSize",fontsize);
-
-
-if day == 16 %Write the day in the title
-    formatSpec = "Relative speed histogram Wed," + ...
-        "for file %d, total data points = %d";
-    title_string = sprintf(formatSpec,j,number_of_data);
-elseif day == 17
-    formatSpec = "Relative speed histogram Thurs, " + ...
-        "for file %d, total data points = %d";
-    title_string = sprintf(formatSpec,j,number_of_data);
-elseif day == 18
-    formatSpec = "Relative speed histogram Fri," + ...
-        "for file %d, total data points = %d";
-    title_string = sprintf(formatSpec,j,number_of_data);
-end
-
-title(title_string,"FontSize",fontsize);
-formatSpecSave= "../../results/figures/Relative speed histogram, day %d for file j = %d.png";
-savename = sprintf(formatSpecSave,day, j);
-saveas(gcf,savename)
+% %plot relative speed histogram for jth file
+% figure;
+% hold on
+% H = histogram(filtered_speed,edges);
+% plot(mean_rel_speed(j)*ones(2,1), [0,max(H.Values)],"LineWidth",2)
+% plot(median_rel_speed(j)*ones(2,1),[0,0.5*max(H.Values)],"LineWidth",2)
+% std_dev = [mean_rel_speed(j)-stddev_rel_speed(j),...
+%     mean_rel_speed(j) + stddev_rel_speed(j)];
+% plot(std_dev, [0.5,0.5],"LineWidth",3)
+% plot(interquartile, [0.5,0.5],"LineWidth",4)
+% fontsz = 24;
+% legend("Histogram", "Mean speed", "Median Speed", ...
+%                   "Standard Dev", "Interquartile","FontSize",fontsz)
+% xlabel("Relative Speed m/s","FontSize",fontsz);
+% ylabel_formatSpec = "Frequency of speeds between %d and %d m/s";
+% ylabel_string = sprintf(ylabel_formatSpec, lower_Bnd, upper_Bnd);
+% ylabel(ylabel_string,"FontSize",fontsz);
+% 
+% 
+% if day == 16 %Write the day in the title
+%     formatSpec = "Relative speed histogram Wed," + ...
+%         "for file %d, total data points = %d";
+%     title_string = sprintf(formatSpec,j,number_of_data);
+% elseif day == 17
+%     formatSpec = "Relative speed histogram Thurs, " + ...
+%         "for file %d, total data points = %d";
+%     title_string = sprintf(formatSpec,j,number_of_data);
+% elseif day == 18
+%     formatSpec = "Relative speed histogram Fri," + ...
+%         "for file %d, total data points = %d";
+%     title_string = sprintf(formatSpec,j,number_of_data);
+% end
+% 
+% title(title_string,"FontSize",fontsz);
+% formatSpecSave= "../../results/figures/Relative speed histogram, day %d for file j = %d.png";
+% savename = sprintf(formatSpecSave,day, j);
+% saveas(gcf,savename)
 end
 
 number_of_data_all_files = length(filtered_speed_all_files);
@@ -148,39 +148,40 @@ std_dev = [mean_all_fil_rel_speed-stddev_fil_all_rel_speed,...
 interquartile_all = [first_quartile_fil_all, third_quartile_fil_all];
 plot(std_dev, [10,10],"LineWidth",3)
 plot(interquartile_all, [0.5,0.5],"LineWidth",4)
-fontsize = 24;
+fontsz = 24;
 legendformatSpec_mean = "mean speed = %3.3f";
 mean_legend = sprintf(legendformatSpec_mean,mean_all_fil_rel_speed);
 legendformatSpec_med = "median speed = %3.3f";
 med_legend = sprintf(legendformatSpec_med,median_fil_all_files);
-legend("histogram", mean_legend,med_legend,"Standard Dev", "Interquartile", ...
-                                                       "FontSize",fontsize)
+legend("histogram", mean_legend, med_legend, "Standard Dev", "Interquartile", ...
+                                                       "FontSize",fontsz)
 
 if day == 16 %Write the day in the title
-    formatSpec = "Relative speed histogram Wed," + ...
+    formatSpec = "Relative speed histogram Wed, " + ...
         "for files %d to %d, total data points = %d";
     title_string = sprintf(formatSpec,j_start,j_end,number_of_data_all_files);
 elseif day == 17
-    formatSpec = "Relative speed histogram Thurs," + ...
+    formatSpec = "Relative speed histogram Thurs, " + ...
         "for files %d to %d, total data points = %d";
     title_string = sprintf(formatSpec,j_start,j_end,number_of_data_all_files);
 elseif day == 18
-    formatSpec = "Relative speed histogram Fri," + ...
+    formatSpec = "Relative speed histogram Fri, " + ...
         "for file %d to %d, total data points = %d";
     title_string = sprintf(formatSpec, j_start, j_end,number_of_data_all_files);
 end
 
-title(title_string,"FontSize",fontsize);
-xlabel("Relative Speed m/s","FontSize",fontsize);
+title(title_string,"FontSize",fontsz);
+xlabel("Relative Speed m/s","FontSize",fontsz);
 ylabel_formatSpec = "Frequency of speeds between %d and %d m/s";
 ylabel_string = sprintf(ylabel_formatSpec, lower_Bnd, upper_Bnd);
-ylabel(ylabel_string,"FontSize",fontsize);
+ylabel(ylabel_string,"FontSize",fontsz);
 formatSpecSave= "../../results/figures/Relative speed histogram, day %d for files j = %d to %d.png";
+fontsize(gcf, 24, "points")
 savename = sprintf(formatSpecSave,day, j_start, j_end);
 saveas(gcf,savename)
 
-%run the script to show average speed in standard distance bins from AV
-binned_relative_speed
+% %run the script to show average speed in standard distance bins from AV
+% binned_relative_speed
 
 % Returns h = 1 if the data is NOT Gaussian, h = 0 if it IS Gaussian
 [h,p] = adtest(filtered_speed_all_files)
