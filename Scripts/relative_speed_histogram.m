@@ -172,7 +172,7 @@ end
 
 title(title_string,"FontSize",fontsz);
 xlabel("Relative Speed m/s","FontSize",fontsz);
-ylabel_formatSpec = "Frequency of speeds between %d and %d m/s";
+ylabel_formatSpec = "Frequency of speeds";
 ylabel_string = sprintf(ylabel_formatSpec, lower_Bnd, upper_Bnd);
 ylabel(ylabel_string,"FontSize",fontsz);
 formatSpecSave= "../../results/figures/Relative speed histogram, day %d for files j = %d to %d.png";
