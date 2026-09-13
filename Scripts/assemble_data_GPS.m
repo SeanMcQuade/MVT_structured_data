@@ -1,11 +1,52 @@
-function [] = assemble_data_GPS(processingDay)
-% This function processes AV GPS data from the MVT and produces JSON file for a
-% single MVT test day.
-% (C) 2025 by Sulaiman Almatrudi
+function [] = assemble_data_GPS(processingDay, varargin)
+% ASSEMBLE_DATA_GPS  Assemble the CIRCLES control-vehicle GPS data for one day.
+%
+% Purpose
+%   Combines the per-vehicle 10 Hz on-board GPS/CAN recordings with the
+%   server-side ping records, resolves vehicles by VIN, projects positions into
+%   the I-24 MOTION coordinate frame, and matches each AV run to the MOTION
+%   trajectory that represents the same vehicle. The result is the single GPS
+%   file the downstream stages consume.
+%
+% Inputs
+%   processingDay  16, 17, or 18 (November 2022)
+%   varargin       options struct and/or name/value pairs (see mvt.options);
+%                  Force, Clean, DryRun, Verbose
+%   Files:
+%     <data>/cars/cars_gps/circles_v2_1_car*.csv   10 Hz on-vehicle records
+%     <data>/cars/cars_vins.csv                    car number <-> VIN map
+%     <data>/cars/veh_ping_202211DD.csv            1 Hz server-side pings
+%     <data>/i24motion/2022-11-DD/*_0_*.json       raw MOTION segments
+%
+% Outputs
+%   <results>/gps/CIRCLES_GPS_10Hz_2022-11-DD.json
+%
+% Algorithm
+%   1. Load every control vehicle's GPS CSV, resolve VIN -> car number, and
+%      split each vehicle's day into runs.
+%   2. Convert coordinates into the MOTION frame (origin at x = 309804.0625 ft)
+%      and merge in the server ping records (control state, ACC settings).
+%   3. For each MOTION segment overlapping an AV run, find candidate matching
+%      trajectories within maxMatchDist / maxMatchSpdDiff / maxMatchLaneDiff
+%      and keep matches lasting at least minMatchTime seconds.
+%   4. Assemble the matched runs into one structure and write it as JSON.
+%
+% Parallel safety
+%   Not shardable: the matching pass accumulates state across MOTION segments
+%   into a single output file. Different days are independent, so run days in
+%   parallel instead.
+%
+% Dependencies
+%   mvt.options, mvt.paths, mvt.dayDir, mvt.isStale, mvt.sources,
+%   mvt.atomicWrite, mvt.ensureDir, mvt.log
+%
+% (C) 2025-2026 CIRCLES Consortium. Author: Sulaiman Almatrudi. BSD-3-Clause.
 if nargin < 1
 error(['Specify the day of Nov. 2022 MVT to generate AVs '...
         'GPS data files (from 16 to 18) to run assemble_data_GPS ']);
 end
+mvt.assertDay(processingDay)
+opts = mvt.options(varargin{:});
 
 % Continue with processing...
 fprintf('Starting the assembly of AV GPS data for %dth Nov. 2022\n', processingDay);
@@ -23,28 +64,42 @@ ft2meterFactor = 0.3048; % [m/ft] conversion factor from feet to meter
 %========================================================================
 % Load, parse, and preprocess AVs GPS data
 %========================================================================
-% Get file path of base GPS data
-[parentDirectory, ~, ~] = fileparts(pwd);
-% directory above contains only the git repository
-[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
-% directory above that contains the data/ folder
-gpsFolderPath = fullfile(dataRootDirectory, 'data', 'cars', 'cars_gps');
+% Resolve the layout: the repository is a sibling of data/ and results/.
+% mvt.paths derives this from the location of the code, so the stage no longer
+% depends on the current folder being Scripts/.
+p = mvt.paths();
+parentDirectory = p.repoRoot;   % used by the interactive folder fallback below
+dataRootDirectory = p.dataRoot;
+gpsFolderPath = fullfile(p.dataDir, 'cars', 'cars_gps');
 
 % Build the output path and filename
-outputPath = fullfile(dataRootDirectory, 'results', 'gps');
+outputPath = mvt.dayDir('gps', processingDay);
 filenameWrite = ['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'];
 fullOutputPath = fullfile(outputPath, filenameWrite);
 
-% Check if file already exists
-if isfile(fullOutputPath)
-    fprintf('Output file already exists: %s\nSkipping processing.\n', fullOutputPath);
+% Rebuild when the output is missing, older than its inputs, or older than the
+% code that produced it (mvt.isStale); Force overrides.
+stageInputs = { ...
+    fullfile(gpsFolderPath, 'circles_v2_1_car*.csv'), ...
+    fullfile(p.dataDir, 'cars', 'cars_vins.csv'), ...
+    fullfile(p.dataDir, 'cars', sprintf('veh_ping_202211%d.csv', processingDay)), ...
+    fullfile(mvt.dayDir('raw', processingDay), '*_0_*.json')};
+[stale, staleReason] = mvt.isStale(fullOutputPath, stageInputs, ...
+    mvt.sources('assemble_data_GPS', opts), opts);
+if ~stale
+    mvt.log(opts, 'skip %s: %s', filenameWrite, staleReason);
     return  % Exit the function
+end
+mvt.log(opts, 'build %s: %s', filenameWrite, staleReason);
+if opts.Clean && isfile(fullOutputPath) && ~opts.DryRun
+    delete(fullOutputPath)
+end
+if opts.DryRun
+    return
 end
 
 % Create output directory if needed
-if ~isfolder(outputPath)
-    mkdir(outputPath)
-end
+mvt.ensureDir(outputPath)
 
 
 
@@ -87,7 +142,7 @@ minFileNr = max(1,floor((minAVStart-dataTLimits(1))/60/10));
 maxAVStart = max([dataGPS0([dataGPS0.starting_time]<dataTLimits(2)).ending_time]);
 maxFileNr = min(24,floor((maxAVStart-dataTLimits(1))/60/10)+1);
 % Find I24 MOTION data files in the same folder outside the repository
-dataFolderPath = fullfile(dataRootDirectory,'data','i24motion', ...
+dataFolderPath = fullfile(p.dataDir,'i24motion', ...
     ['2022-11-' num2str(processingDay) ]) ;
 if ~isfolder(dataFolderPath)
     error('Folder %s does not exist.\n',dataFolderPath)
@@ -112,6 +167,13 @@ matchedSegments(10*length(dataGPS0),1).av_trj_i = [];
 matchedSegments(10*length(dataGPS0),1).x_diff =   [];
 matchedSegments(10*length(dataGPS0),1).timestamp = [];
 segmentsCounter = 1;
+% The count is the AV activity window, not all 24 segments: a MOTION segment
+% recorded before the first control vehicle entered, or after the last left,
+% has nothing to match against and is not decoded. The label says so, because
+% "3/22" against 24 raw files otherwise reads as a bug.
+reportMatch = mvt.progress(maxFileNr - minFileNr + 1, ...
+    sprintf('gps match 2022-11-%d (segments %d-%d of %d, the AV activity window)', ...
+    processingDay, minFileNr, maxFileNr, numel(dataFiles)), 'Opts', opts);
 for fileNr = minFileNr:maxFileNr
     % Load MOTION data file
     filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
@@ -208,7 +270,9 @@ for fileNr = minFileNr:maxFileNr
         end
     end
     fprintf('Done (%0.0fsec).\n',toc)
+    reportMatch(fileNr - minFileNr + 1, dataFiles(fileNr).name);
 end
+reportMatch();
 matchedSegments(segmentsCounter:end) = [];
 % Calculate median offset between GPS runs and I24 matched signals
 xd_match = [];
@@ -228,9 +292,9 @@ end
 % Add controller status and clean data structure
 %========================================================================
 fprintf('Adding controller status and preparing output data... ');tic
-avPingsData = readtable(fullfile(dataRootDirectory,'data', 'cars', ['veh_ping_202211' ...
+avPingsData = readtable(fullfile(p.dataDir, 'cars', ['veh_ping_202211' ...
     num2str(processingDay) '.csv']));
-avVINs = readtable(fullfile(dataRootDirectory,'data', 'cars','cars_vins.csv'));
+avVINs = readtable(fullfile(p.dataDir, 'cars','cars_vins.csv'));
 avConnectionStatus  = get_connection_status(avPingsData,avVINs);
 nAVs = length(dataGPS0);
 clear dataGPS
@@ -251,6 +315,8 @@ dataGPS(nAVs,1).last_timestamp = [];
 dataGPS(nAVs,1).control_car = [];
 dataGPS(nAVs,1).control_last30 = [];
 % Loop over processed AV runs and append to output data structure 
+reportAssemble = mvt.progress(nAVs, ...
+    sprintf('gps assemble 2022-11-%d', processingDay), 'Opts', opts);
 for avInd =1:nAVs
     avVeh = dataGPS0(avInd);
     % Locate start of the run in the server data
@@ -292,7 +358,9 @@ for avInd =1:nAVs
     % Append modified control status signal to correct for controller
     % showing as inactive when the vehicle stops
     dataGPS(avInd) = get_control_car_status(dataGPS(avInd));
+    reportAssemble(avInd);
 end
+reportAssemble();
 % Clip trajectories at testbed limits and prepare data for writing
 XLIMS = [-400 2.54e4] *ft2meterFactor; % testbed limits
 gpsDataFields = string(fieldnames(dataGPS));
@@ -319,9 +387,9 @@ fprintf('Done (%0.0fsec).\n',toc)
 fprintf('Encoding and writing file %s to file... ',filenameWrite);tic
 jsonStr = jsonencode(dataGPS);
 
-fid = fopen(fullfile(outputPath, filenameWrite), 'w');
-fwrite(fid, jsonStr, 'char');
-fclose(fid);
+% Write via a temporary file and rename, so an interrupted run cannot leave a
+% truncated JSON that later looks complete to the staleness check.
+mvt.atomicWrite(fullfile(outputPath, filenameWrite), jsonStr);
 clear jsonStr
 fprintf('Done (%0.0fsec).\n',toc)
 end

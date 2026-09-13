@@ -1,0 +1,21 @@
+# Ready-made service for the Python MVT analysis in a container.
+#
+# Point DATA_DIR and RESULTS_DIR at the host folders (defaults assume the
+# standard sibling layout, two levels up from this file), then:
+#
+#   DATA_DIR=/abs/data RESULTS_DIR=/abs/results \
+#     docker compose run --rm mvtpy samples --day 16
+#
+# Anything after the service name is passed straight to the `mvt` CLI, e.g.
+#   docker compose run --rm mvtpy all --day 16
+#   docker compose run --rm mvtpy figures --day 17
+
+services:
+  mvtpy:
+    build: .
+    image: mvtpy
+    volumes:
+      # data is read-only; results is writable so outputs land on the host.
+      - ${DATA_DIR:-../../data}:/work/data:ro
+      - ${RESULTS_DIR:-../../results}:/work/results
+    # `mvt` is the entrypoint; provide the stage/args on the command line.

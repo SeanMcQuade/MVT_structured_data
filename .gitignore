@@ -39,3 +39,27 @@ codegen/
 
 # Octave session info
 octave-workspace
+
+# macOS metadata
+.DS_Store
+
+# Python build artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Verification / scratch result trees (not the real results, which live outside the repo anyway)
+results_verify/
+results_python/
+results_groundtruth/
+
+# Test manifests are committed fixtures, not generated data
+!tests/manifests/*.json
+
+# Expected-checksum manifests are the reference the pipeline is verified
+# against, not generated data. They are small (about 4 KB per day) and must
+# travel with the repository, or mvt.verify has nothing to check.
+!python/expected/*.json
+
+# Local diagnostic captures (machine-specific, not part of the pipeline)
+crashlog-*.txt

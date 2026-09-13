@@ -1,15 +1,45 @@
-function [] = generate_data_mvt_full(processingDay)
-% (C) 2025 CIRCLES Energy team 
+function [] = generate_data_mvt_full(processingDay, varargin)
+% GENERATE_DATA_MVT_FULL  Build the full (both directions) MVT data set (see mvt.dataVersion).
 %
-% Function that process base I-24 MOTION data from the MVT to generate
-% a full version of CIRCLES' v2.1 of the data, used in the team nature
-% paper submission, and saves it to json files.
+% Purpose
+%   Same processing as GENERATE_DATA_MVT_SLIM, but retains material the paper
+%   does not use: eastbound and reference trajectories, plus the flat-road fuel
+%   consumption and direction fields. Useful to other researchers; not required
+%   to reproduce the article's results.
 %
-% Generated json files will be saved in .\Data\Data_{DATE}__MVT_Full folder.
+% Inputs
+%   processingDay  16, 17, or 18 (November 2022)
+%   varargin       options struct and/or name/value pairs (see mvt.options);
+%                  Force, Clean, DryRun, Verbose, Shard, SettleSeconds
+%   Files:
+%     <data>/i24motion/2022-11-DD/*_{wed,thu,fri}_0_*.json   raw MOTION segments
+%     <results>/gps/CIRCLES_GPS_10Hz_2022-11-DD.json         assembled GPS
+%     <repo>/Models/Eastbound_grade_fit.csv                  road grade fit
+%     <repo>/Models/fuel_model_*_simplified.m                fuel models
+%
+% Outputs
+%   <results>/full/2022-11-DD/I-24MOTION_2022-11-DD_HH-MM-SS.json  (24 files)
+%
+% Algorithm
+%   As GENERATE_DATA_MVT_SLIM, minus the westbound filter and the field
+%   removal, plus road-grade-corrected and flat-road fuel estimates for both
+%   directions. See docs/ALGORITHMS.md for the step-by-step description.
+%
+% Parallel safety
+%   Segment-level work is independent; run shards as separate processes:
+%     generate_data_mvt_full(17, 'Shard', [2 4])   % worker 2 of 4
+%
+% Dependencies
+%   mvt.options, mvt.paths, mvt.manifest, mvt.isStale, mvt.sources,
+%   mvt.shardIndices, mvt.atomicWrite, mvt.segmentName, mvt.ensureDir
+%
+% (C) 2025-2026 CIRCLES Consortium (energy team). BSD-3-Clause.
 if nargin < 1
-error(['Specify the day of Nov. 2022 MVT to generate full'... 
+error(['Specify the day of Nov. 2022 MVT to generate full'...
         'MVT data files (from 16 to 18)']);
 end
+mvt.assertDay(processingDay)
+opts = mvt.options(varargin{:});
 %========================================================================
 % Parameters
 %========================================================================
@@ -42,58 +72,39 @@ originXPosition = 309804.0625; % [ft] location of the origin for the x-coordinat
 ft2meterFactor = 0.3048; % [m/ft] conversion factor from feet to meter
 meter2mileFactor = 6.213712e-04; % [mile/m] conversion factor from meter to mile
 g2gallonsFactor = 3.522294e-04; % [gallon/g] conversion factor from fuel gram to gallon
+% Use compensated summation for the fuel quadrature instead of MATLAB's `dot`.
+% `dot` calls the BLAS, whose accumulation order differs between platforms
+% (Accelerate on Mac, MKL on PC), which changes total_fuel_consumed_grams in the
+% 4th decimal on ~0.01% of trajectories and makes the released JSON
+% machine-dependent. Set false only to reproduce pre-2026-07 outputs.
+% See docs/REPRODUCIBLE_QUADRATURE.md.
+flag_deterministic_quadrature = true;
 mcDist = 0.225 ; %[mile] the distance between mill creek origin (MM58.675) and MM58.9
 % the estimated origin of the road grade map
 %========================================================================
 % Initilize
 %========================================================================
-% Get file path of base GPS data
-[parentDirectory, ~, ~] = fileparts(pwd);
-% directory above contains only the git repository
-[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
-% directory above that contains the data/ folder
-dataFolderPath = fullfile(dataRootDirectory, 'data', 'i24motion', ...
-    ['2022-11-', num2str(processingDay)]);
+% Resolve the layout: the repository is a sibling of data/ and results/.
+% mvt.paths derives this from the location of the code, so the stage no longer
+% depends on the current folder being Scripts/.
+p = mvt.paths();
+parentDirectory = p.repoRoot;
+dataRootDirectory = p.dataRoot;
+dataFolderPath = mvt.dayDir('raw', processingDay);
 
 %%
 % Build the output path and filename
-outputPath = fullfile(dataRootDirectory, 'results', 'full', ...
-    ['2022-11-', num2str(processingDay)]);
-
-% % Check if file already exists
-% if isfile(fullOutputPath)
-%     fprintf('Output file already exists: %s\nSkipping processing.\n', fullOutputPath);
-%     return  % Exit the function
-% end
-%%
+outputPath = mvt.dayDir('full', processingDay);
 
 % Create output directory if needed
-if ~isfolder(outputPath)
-    mkdir(outputPath)
-end
+mvt.ensureDir(outputPath)
 
-% [parentDirectory, ~, ~] = fileparts(pwd);
-% dataFolderPath = fullfile(parentDirectory,'Data',...
-%     ['Data_2022-11-' num2str(processingDay) '__I24_Base']);
-% dayAbbrvs = ["mon","tue","wed","thu","fri"];
-% dayAbbrv = dayAbbrvs(processingDay-13);
-% dataFiles = dir(fullfile(dataFolderPath, ['*_' char(dayAbbrv) '_0_*.json']));
-% if length(dataFiles) < 24
-%     error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.',processingDay)
-% end
+% Map each raw segment to the file it produces, without decoding it. This is
+% what lets the staleness check below run before the expensive jsondecode.
+segments = mvt.manifest(processingDay, opts);
+sourceFiles = mvt.sources('generate_data_mvt_full', opts);
 
-% [parentDirectory, ~, ~] = fileparts(pwd);
-% dataFolderPath = fullfile(parentDirectory,'Data',...
-%     ['Data_2022-11-' num2str(processingDay) '__I24_Base']);
-dayAbbrvs = ["mon","tue","wed","thu","fri"];
-dayAbbrv = dayAbbrvs(processingDay-13);
-dataFiles = dir(fullfile(dataFolderPath, ['*_' num2str(dayAbbrv) '_0_*.json']));
-
-% avoid processing files that start with .
-is_dotfile = startsWith({dataFiles.name},'.');
-dataFiles = dataFiles(~is_dotfile);
-
-if length(dataFiles) < 24
+if numel(segments) < 24
     error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.',processingDay)
 end
 
@@ -110,18 +121,36 @@ gradeDataSlope = gradeData(:,4);
 gradeDataIntercept = gradeData(:,5);
 % GPS Data is assumed to be processed. Run create_data_GPS.m to produce processed GPS files
 fprintf('\nLoading and decoding AVs GPS data file ...'); tic
-dataGPS = jsondecode(fileread(fullfile(dataRootDirectory,...
-    'results','gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])));
+dataGPS = jsondecode(fileread(fullfile(p.resultsDir,...
+    'gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])));
 fprintf('Done (%0.0fsec).\n',toc)
 %========================================================================
 % Process each I24 MOTION file 
 %========================================================================
 addpath(fullfile(parentDirectory, 'Models'));
-for fileNr = 1:24 % loop over base data files
+% Segments owned by this shard: worker k of N takes k, k+N, k+2N, ...
+for fileNr = mvt.shardIndices(numel(segments), opts.Shard)
+    segment = segments(fileNr);
+    filenameLoad = segment.rawPath;
+    % The output name is known from the manifest, so freshness is decided
+    % before the (multi-minute, multi-GB) decode rather than after it.
+    filenameSave = fullfile(outputPath, segment.outputName);
+    [stale, staleReason] = mvt.isStale(filenameSave, filenameLoad, sourceFiles, opts);
+    if ~stale
+        mvt.log(opts, 'skip %s: %s', segment.outputName, staleReason);
+        continue  % advance this part of the loop
+    end
+    mvt.log(opts, 'build %s: %s', segment.outputName, staleReason);
+    if opts.Clean && isfile(filenameSave) && ~opts.DryRun
+        delete(filenameSave)
+    end
+    if opts.DryRun
+        continue
+    end
+
     % Load MOTION data file
-    filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
-    fprintf('Loading and decoding MOTION data file, %d/24 (%s)... ', ...
-        fileNr,filenameLoad); tic
+    fprintf('Loading and decoding MOTION data file, %d/%d (%s)... ', ...
+        fileNr,numel(segments),filenameLoad); tic
     dataTemp = jsondecode(fileread(filenameLoad));
     fprintf('Done (%0.0fsec).\n',toc)
     % delete extra fields
@@ -129,25 +158,17 @@ for fileNr = 1:24 % loop over base data files
         'configuration_id','fine_vehicle_class','x_score','y_score','road_segment_ids'});
     fprintf('Identifying lanes and clipping lane changes ...'),tic
 
-    % determine if the file already exists or not...and skip if it does
-    % using dataTemp here, since it is the most recent file, to determine
-    % what the output file name should be
-    fileStartT = (datetime(dataTemp(1).first_timestamp, 'convertfrom', 'posixtime', ...
-    'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
-    fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
-    % outputFolder comes from the top of the file
-    filenameSave = fullfile(outputPath,...
-        ['I-24MOTION_',fileStartT,'.json']);
-    % Save the processed data to a file
-    
-    % Check if file already exists
-    if isfile(filenameSave)
-        fprintf('Output file already exists: %s\nSkipping processing.\n', filenameSave);
-        continue  % advance this part of the loop
-    else
-        fprintf('File %s does not exist...starting processing.', filenameSave);
+    % Guard against a stale manifest: the name derived from the decoded data
+    % must match the one the manifest predicted.
+    expectedName = mvt.segmentName(dataTemp(1).first_timestamp);
+    if ~strcmp(expectedName, segment.outputName)
+        error('mvt:generate_data_mvt_full:manifestMismatch', ...
+            ['Manifest predicted %s for %s but the data says %s. ', ...
+            'Delete %s and re-run.'], segment.outputName, segment.rawName, ...
+            expectedName, fullfile(p.manifestDir, ...
+            sprintf('segments_2022-11-%d.json', processingDay)));
     end
-    
+
     % Identify and assign lanes
     dataLanes = assign_lanes(dataTemp,processingOpts.laneIdentificationOpts);
     % Clip data to remove lane switches
@@ -156,7 +177,7 @@ for fileNr = 1:24 % loop over base data files
     fprintf('Calculating Distance to AVs ...'),tic
     distToAvsData = calculate_distance_to_avs(dataTemp,dataGPS);
     fprintf('Done (%0.0fsec).\n',toc)
-    fprintf('Generating v2.1 version of data ... '),tic
+    fprintf('Generating v%s version of data ... ', mvt.dataVersion()),tic
     n = length(dataTemp);
     data = init_data_struct(n);
     
@@ -264,7 +285,17 @@ for fileNr = 1:24 % loop over base data files
         end
         data(trjInd).energy_model = vehType;
         % Calculate total fuel
-        integrate = @(t,v) dot( t(2:end)-t(1:end-1) , (v(1:end-1)+v(2:end))/2); % quadrature
+        % Quadrature. flag_deterministic_quadrature selects mvt.neumaierDot
+        % (compensated summation: identical bits on every platform) over
+        % MATLAB's `dot`, which dispatches to the BLAS and so accumulates
+        % differently on Accelerate (Mac) and MKL (PC). See
+        % docs/REPRODUCIBLE_QUADRATURE.md. Set the flag false to reproduce
+        % pre-2026-07 outputs bit-for-bit.
+        if flag_deterministic_quadrature
+            integrate = @(t,v) mvt.neumaierDot( t(2:end)-t(1:end-1) , (v(1:end-1)+v(2:end))/2);
+        else
+            integrate = @(t,v) dot( t(2:end)-t(1:end-1) , (v(1:end-1)+v(2:end))/2);
+        end
         % Fuel consumption rate of drive on road
         eval(sprintf(['[fS,~,infeasible] = fuel_model_'...
             vehType '_simplified(v,a,theta,true);']))  
@@ -347,21 +378,16 @@ for fileNr = 1:24 % loop over base data files
         end
     end
     clear dataTemp
-    pause(5)
+    % Give the OS a moment to reclaim the freed memory before the encode step
+    % allocates the JSON string. Set SettleSeconds to 0 to disable.
+    pause(opts.SettleSeconds)
     fprintf('Done (%0.0fsec).\n',toc)
     fprintf('Encoding and Writing json file ... '),tic
-    % fileStartT = (datetime(data(1).first_timestamp, 'convertfrom', 'posixtime', ...
-    %     'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
-    % fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
-    % % outputFolder comes from the top of the file
-    % filenameSave = fullfile(outputPath,...
-    %     ['I-24MOTION_',fileStartT]);
     jsonStr = jsonencode(data);
     clear data
-    % filenamesave was created above
-    fid = fopen(filenameSave, 'w');
-    fwrite(fid, jsonStr, 'char');
-    fclose(fid);
+    % Write via a temporary file and rename, so an interrupted or parallel run
+    % can never leave a truncated JSON that later looks complete.
+    mvt.atomicWrite(filenameSave, jsonStr);
     fprintf('Done (%0.0fsec).\n',toc)
     clear jsonStr
     toc

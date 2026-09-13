@@ -1,10 +1,57 @@
-function [] = plot_AV_analysis()
-% Function to plot multiple analysis results for AV effect on fuel consumption 
-% for experiments run on the following dates: 11/16/2022, 11/17/2022, and 11/18/2022
-% (C) 2025 Sean McQuade and Sulaiman Almatrudi
-% This script uses data in ../Data/Data_for_Figures.
-% This licensed under BSD-3 clause license:
-% https://opensource.org/license/bsd-3-clause
+function [] = plot_AV_analysis(testDays, varargin)
+% PLOT_AV_ANALYSIS  Fuel-consumption results versus distance to an engaged AV.
+%
+% Purpose
+%   Produces the article's AV-effect results (Figure 2, Figure SM2, and
+%   Figure SM3) by binning the per-day sample sets by signed distance to the
+%   nearest engaged CIRCLES control vehicle and comparing days.
+%
+% Inputs
+%   testDays  (optional) days to analyze; default [16 17 18]
+%   varargin  options struct and/or name/value pairs (see mvt.options);
+%             Force, Clean, DryRun, Verbose
+%   Files:
+%     <results>/figures/2022-11-DD/samples_for_distance_analysis_DD.mat
+%     for each requested day (produced by GENERATE_DATA_SAMPLES)
+%
+% Outputs
+%   <results>/figures/                       (shared: these figures span days)
+%     fig_2_fuel_results_effective_<t1>_<t2>.{png,fig}
+%     fig_3_fuel_results_effective_mean_median_<t1>_<t2>.{png,fig}
+%     fig_SM2_vehicle_samples_counts_<stats>_<t1>_<t2>.{png,fig}
+%
+% Parameters (constants at the top of this file)
+%   MAXDIST = 350 m analysis half-window, AVLOCBUFFER = 1 m exclusion around
+%   the AV itself, maskingDist = 30 m masked band, XWINDOW and TWINDOW
+%   (06:45-09:15) selection windows, and the minimum-speed filters.
+%
+% Algorithm
+%   1. Load each day's samples and filter by position, time, and speed.
+%   2. Bin samples by signed distance to the nearest engaged AV, with a
+%      symmetric bin layout and a masked band either side of the AV.
+%   3. Per bin, compute mean, median, and "effective" fuel consumption plus
+%      sample counts and active-AV counts over time.
+%   4. Render the 3x3 comparison grids and the sample-count histogram.
+%
+% Notes
+%   Earlier versions wrote these cross-day figures into a per-day folder chosen
+%   by a loop variable left over from the data-loading loop, so they landed
+%   under whichever day happened to be processed last. They now go to the
+%   shared results/figures folder, which is what they actually describe.
+%
+% Dependencies
+%   mvt.options, mvt.paths, mvt.isStale, mvt.sources, mvt.expectedOutputs,
+%   mvt.ensureDir, mvt.removeOutputs, mvt.log
+%
+% (C) 2025-2026 CIRCLES Consortium. Authors: Sean McQuade and
+% Sulaiman Almatrudi. BSD-3-Clause.
+if nargin < 1 || isempty(testDays)
+    testDays = [16, 17, 18]; % date of test days to analyaze
+end
+for iDay = 1:numel(testDays)
+    mvt.assertDay(testDays(iDay));
+end
+opts = mvt.options(varargin{:});
 statsToPlotChoices = ["effective","mean","median"];
 MAXDIST = 350; % (m) maximum relative distance to an ego vehicle to be considered
 XWINDOW = [MAXDIST-122 7000]; % (m) , [West to East] set to -1 to include the full testbed.
@@ -17,10 +64,16 @@ minSpdMean = 1; % (m/s) minimum speed for samples when calculating the mean fuel
 figRes = [1600 1000]; 
 figScale = '-r384';
 plotCol = [0,0,1;1,0,0;0,.6,0]; %Plotting colors
-% Locate data to load
-[parentDirectory, ~, ~] = fileparts(pwd);
-[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
-% initiate grid of bin edges
+% Locate data to load. mvt.paths resolves the layout from the location of the
+% code, so this no longer depends on the current folder being Scripts/.
+p = mvt.paths();
+parentDirectory = p.repoRoot; %#ok<NASGU> % retained for local edits/debugging
+dataRootDirectory = p.dataRoot;
+% These figures compare days, so they belong in the shared figures folder
+% rather than in any one day's folder.
+figuresRoot = fullfile(p.resultsDir, 'figures');
+mvt.ensureDir(figuresRoot)
+% intiate grid of bin edges
 distToA = round(linspace(-MAXDIST,MAXDIST,ceil(MAXDIST*2/10)+1));
 distToA = [distToA(1:floor(length(distToA)/2)),-AVLOCBUFFER,AVLOCBUFFER,...
     distToA(floor(length(distToA)/2)+2:end)];
@@ -36,10 +89,28 @@ indicesPartitions{1} = indUnmaskedLeft;
 indicesPartitions{2} = indMaskedLeft;
 indicesPartitions{3} = indMaskedRight;
 indicesPartitions{4} = indUnmaskedRight;
-testDays = [16, 17, 18]; % date of test days to analyze 
+% (testDays is an input; see the function signature)
+% Skip re-plotting when every expected figure is newer than the per-day sample
+% files and this script; Force overrides.
+sampleFiles = arrayfun(@(d) fullfile(mvt.dayDir('figures', d), ...
+    ['samples_for_distance_analysis_' num2str(d) '.mat']), testDays, ...
+    'UniformOutput', false);
+[stale, staleReason] = mvt.isStale(mvt.expectedOutputs('av', testDays(1), opts), ...
+    sampleFiles, mvt.sources('plot_AV_analysis', opts), opts);
+if ~stale
+    mvt.log(opts, 'skip AV analysis figures: %s', staleReason);
+    return
+end
+mvt.log(opts, 'plot AV analysis figures: %s', staleReason);
+if opts.Clean && ~opts.DryRun
+    mvt.removeOutputs(mvt.expectedOutputs('av', testDays(1), opts), opts);
+end
+if opts.DryRun
+    return
+end
 fprintf('Loading aggregated data samples... ') ; tic
-for dayInd=1:length(testDays) % three days, Wed Thurs Fri
-    loadedData = load(fullfile(dataRootDirectory , 'results', ...
+for dayInd=1:length(testDays) % three days, Wed thrus fri
+    loadedData = load(fullfile(p.resultsDir, ...
         'figures', ['2022-11-', num2str(testDays(dayInd))],...
         ['samples_for_distance_analysis_' char(num2str(testDays(dayInd))) '.mat']));
     % filter data based on x position, time, and speed
@@ -154,11 +225,11 @@ nAVsActive = [];
 for dayInd=1:3 %Wed. Thurs. Fri. 
     % because of this nonstandard array use, we need to get this to 16
     % instead of 1
-    fieldFilename = fullfile(dataRootDirectory,'results' ,'figures',...
+    fieldFilename = fullfile(p.resultsDir,'figures',...
         ['2022-11-', num2str(15+dayInd)], ...
         char(strArray(dayInd)));
     load(fieldFilename)
-    GPSFilename = fullfile(dataRootDirectory, 'results',...
+    GPSFilename = fullfile(p.resultsDir,...
         'gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(15+dayInd) '.json']);
     data = jsondecode(fileread(GPSFilename));
     tStep = floor(mean(diff(t)));    
@@ -209,7 +280,12 @@ fprintf('Done (%0.0fsec).\n',toc)
 % Plot in 3x3 grid
 fprintf('Plotting stats... ') ; tic
 figure(1);
-clf
+% `clf` clears the children but keeps figure properties, so a figure left over
+% from plot_microscopic_trajectories (which sets Color to black for its dark
+% trajectory plot) would render these panels on black with unreadable text.
+% Reset the figure and state the background explicitly.
+clf reset
+set(gcf, 'Color', 'w')
 firstHour = floor(TWINDOW(1)/100); firstMinutes = mod(TWINDOW(1),100);
 secondHour = floor(TWINDOW(2)/100); secondMinutes = mod(TWINDOW(2),100);
 timeString = [num2str(firstHour), ':', num2str(firstMinutes), ' to ',...
@@ -300,8 +376,8 @@ for figInd = figsToProduce
     subplot(3,3,8), set(gca,'Position',[posX(2),posY(3),posW])
     fprintf('Done (%0.0fsec).\n',toc)    
     if flagSave
-        fname = fullfile(dataRootDirectory,'results', 'figures', ...
-            ['2022-11-', num2str(15+dayInd)], ...
+        % Shared folder: this figure compares all analyzed days.
+        fname = fullfile(figuresRoot, ...
             ['fig_' num2str(figInd)...
             '_fuel_results_',...
             char(strjoin(statsToPlotChoice(:),'_')), ...
@@ -313,7 +389,8 @@ for figInd = figsToProduce
 end
 % Plot histogram of samples used in analysis
 figure(2)
-clf
+clf reset
+set(gcf, 'Color', 'w')   % see the note on figure(1) above
 fontSize = 18;
 axx = 350;
 axy = [0, 1400000]; 
@@ -346,8 +423,8 @@ for dayInd =1:length(testDays)
     set(gca,'fontsize',18)
 end
 if flagSave
-    fname = fullfile(dataRootDirectory,'results', 'figures', ...
-        ['2022-11-', num2str(15+dayInd)], ...
+    % Shared folder: this figure summarizes all analyzed days.
+    fname = fullfile(figuresRoot, ...
         ['fig_SM' num2str(2)...
         '_vehicle_samples_counts_',...
         char(strjoin(statsToPlotChoice(:),'_')), ...

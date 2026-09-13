@@ -1,0 +1,9 @@
+# Keep the image small: only the package and its metadata are needed.
+.venv/
+tests/
+matlab_probes/
+tools/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
