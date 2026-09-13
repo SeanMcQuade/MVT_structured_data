@@ -1,7 +1,11 @@
 
-These scripts and data are from the CIRCLES consortium MegaVanderTest experiment that was conducted in Nashville on highway I-24 during the week of November 14th 2022. 
-This repository contains data recorded from the partially automated vehicles, called the GPS data (this includes GPS location data recoreded by the 
-installed raspberri pi and several flags to indicate the state of the vehicle) and data recorded by the I-24 MOTION observatory.
+These scripts and data are from the CIRCLES consortium MegaVanderTest experiment that was conducted in Nashville on highway I-24 during the week of November 14th 2022.  This repository contains data recorded from the partially automated vehicles, called the GPS data (this includes GPS location data recoreded by the installed raspberri pi and several flags to indicate the state of the vehicle) and data recorded by the I-24 MOTION observatory.
+
+These scripts provide analysis regarding the energy usage of vehicles during the CIRCLES consortium MegaVanderTest field experiments. The field experiments were conducted in Nashville on highway I-24 during the week of November 14th 2022. 
+
+The repository refers to data recorded from the I-24 MOTION observatory, as well as the CIRCLES partially automated vehicles. Those data must be obtained elsewhere, and will be privately stored or available only to CIRCLES Team members until the paper is released.
+
+For the peer review purposes, use branch: peer-review (https://github.com/SeanMcQuade/MVT_structured_data/tree/peer-review)
 
 # Contents
 - [Quick start](#quick-start)
@@ -11,9 +15,9 @@ installed raspberri pi and several flags to indicate the state of the vehicle) a
 - [Scripts to plot figures from the article](#scripts-to-plot-figures-from-the-article)
 - [Websites](#websites)
 
-## Quick start
+# Quick start
 
-### 1. Put the data in place
+## 1. Put the data in place
 
 The pipeline expects this repository to sit **next to** the `data/` and
 `results/` folders:
@@ -40,29 +44,39 @@ folders are elsewhere, point it at them:
 MVT_DATA_DIR=/abs/data MVT_RESULTS_DIR=/abs/results ./check_data.sh
 ```
 
-### 2. Run it
+## 2. Run it
+These examples use 3 concurrent processes. If your machine has a lot of ram, you can bump this up to 8 or 10.
 
-From MATLAB:
+### MATLAB:
+```matlab
+cd MVT_structured_data/Scripts
+make all Workers 3
+```
+
+### MATLAB (headless) from command prompt:
+```bash
+cd MVT_structured_data
+make -j3 all
+```
+
+### Python from command prompt:
+```bash
+cd MVT_structured_data/python
+./setup_venv.sh --full
+source .venv/bin/activate
+mvt build -j 3
+```
+
+#### MATLAB: more details
 
 ```matlab
 cd MVT_structured_data/Scripts
-make all Workers 6
+make all Workers 3
 ```
 
 That is the whole thing. It builds every stage, for all three days, in the right
-order, with the heavy stage spread across 6 MATLAB processes. Work that is
+order, with the heavy stage spread across 3 processes. Work that is
 already up to date is skipped, so an interrupted run picks up where it left off.
-
-`make` here is `Scripts/make.m`, not the Unix tool — no `make`, no toolbox and
-no environment variables are needed, on any platform including Windows. The `cd`
-is only so MATLAB can find it.
-
-Two commands worth running first:
-
-```matlab
-make config     % the paths it resolved, and the data set version
-make status     % what is stale, and why; builds nothing
-```
 
 Everything else — choosing the worker count, building one day or one stage,
 writing results elsewhere, the Unix `make`, and the Python port — is under
@@ -246,6 +260,19 @@ for day = [16 17 18]
 end
 mvt.build('av', [])
 ```
+**Using the make.m file in MATLAB**
+
+`make` here is `Scripts/make.m`, not the Unix tool — no `make`, no toolbox and
+no environment variables are needed, on any platform including Windows. The `cd`
+is only so MATLAB can find it.
+
+Two commands worth running first:
+
+```matlab
+make config     % the paths it resolved, and the data set version
+make status     % what is stale, and why; builds nothing
+```
+
 
 **The Unix Makefile** (macOS/Linux; drives MATLAB headlessly):
 
@@ -253,8 +280,17 @@ mvt.build('av', [])
 cd MVT_structured_data
 make status                     # what would run
 make -j3 all                    # everything, three days in parallel
+```
+If you want to run only one stage (slim) or on one day (slim-17):
+```bash
 make SHARDS=4 slim-17           # one stage, one day, 4 processes
+```
+To watch what is happening in another tab:
+```bash
 make watch                      # live progress, from a second terminal
+```
+To verify the output files match expected checksums:
+```bash
 make verify                     # check outputs against expected checksums
 ```
 
@@ -271,9 +307,196 @@ mvt build -j 8                  # everything stale, all three days
 mvt verify                      # check against the expected checksums
 ```
 
-## Scripts to generate the integrated data set.
+### 1. System Requirements
 
-### Step 0: Correct folder structure before you begin. 
+To carry out the analysis, the following software requirements are needed:
+
+#### Software Dependencies:
+
+- Install [MATLAB](https://mathworks.com/)
+- Only `Matlab` must be installed as a required toolbox
+- MATLAB v2025a and v2025b have both been tested
+- Tested on Mac Sequoia 15.6, Windows 11
+
+#### Installation Guide
+- Install MATLAB (approximately 20 minutes, depending on download speeds)
+- Fetch the data (will be made publicly available upon publication). The extraction should be to a hard drive with at least 700GB of available space, to ensure enough space to generate additional files.
+
+#### Demo
+
+##### Instructions to run the demo:
+
+- Navigate to the folder `MVT_structured_data/Scripts`.
+- Run the file `run_all_scripts.m`
+
+The execution of this file will take significant time. It will reproduce the style of plot for the data provided. 
+
+- Generate structured collections of data samples for this day from the `results/` folder
+- Generate the macroscopic fields (from the provided data)
+- Plot the macroscopic fields (from the provided data) with the GPS data from the cars (across the entire day)
+- Plot the microscopic fields of all cars (from above)
+- Carry out the analysis of fuel usage and comparisons (from the provided data)
+- Plot the fuel usage and comparisons (from above)
+
+A subset of these plots are synthesized in `results/figures/2022-11-17` in the released data set (available upon conclusion of peer review).
+
+##### Expected output: 
+
+Resulting files should be generated in the following folders for day 2022-11-17
+
+###### Found in `results/figures/2022-11-17`
+```
+fields_motion_2022-11-17.mat
+fig_2_fuel_results_effective_645_915.fig
+fig_2_fuel_results_effective_645_915.png
+fig_3_fuel_results_effective_mean_median_645_915.fig
+fig_3_fuel_results_effective_mean_median_645_915.png
+fig_field_20221117_west_laneall_motion_F_av_nature_large.png
+fig_field_20221117_west_laneall_motion_Phi_av_nature_large.png
+fig_field_20221117_west_laneall_motion_Psi_av_nature_large.png
+fig_field_20221117_west_laneall_motion_Q_av_nature_large.png
+fig_field_20221117_west_laneall_motion_Rho_av_nature_large.png
+fig_field_20221117_west_laneall_motion_U_av_nature_large.png
+fig_motion_trajectories_20221117_west_laneall_lowres.png
+fig_motion_trajectories_20221117_west_laneall_zoom_lowres.png
+fig_motion_trajectories_20221117_west_laneall_zoomwin_lowres.png
+fig_SM2_vehicle_samples_counts_effective_mean_median_645_915.fig
+fig_SM2_vehicle_samples_counts_effective_mean_median_645_915.png
+samples_for_distance_analysis_17.mat
+```
+
+An example image that should be produced represents the macroscopic flow rates, with overlay  is `results/figures/2022-11-17/fig_field_20221117_west_laneall_motion_Psi_av_nature_large.png` which describes the bulk fuel consumption with overlay of GPS data from our control cars, indicating when their control was active (or not) during their drives.
+
+![Bulk Fuel results (partial) with only a subset of data from 2022-11-17](../results/figures/2022-11-17/fig_field_20221117_west_laneall_motion_Psi_av_nature_large.png)
+
+**Note** there may be minor errors or warnings thrown, since the data pipeline is intended to reproduce exact figures with comparable max/min values and colors across multiple plots. If only one day with a subset of data into that anaysis, is included, plots may have
+
+- what seems to be missing large portions on the left/right of presented data
+- what seems to indicate that axes are 'zoomed out'
+
+These are artifacts of axes bounds that are normalized across multiple days for comparison, and thus the appropriate approach is to open those .fig files as plots with MATLAB, and then zoom in to explore.
+
+###### Found in `results/slim/2022-11-17`
+
+This will include a single .mat file that represents binary data in MATLAB format for quick review and analysis in subsequent plots.
+
+```
+I-24MOTION_2022-11-17_07-59-59_reduced.mat
+```
+
+###### Notes on warning messages
+
+*Note* several output messages will show in the MATLAB window that show warnings for additional legend entries that are not used. This is due to only a subset of data being shown for the demonstration data.
+
+```
+Warning: Ignoring extra legend entries. 
+> In legend>process_inputs (line 575)
+In legend>make_legend (line 294)
+In legend (line 245)
+In plot_AV_analysis>plot_one_sided (line 473)
+In plot_AV_analysis (line 310)
+In reproduce_plots (line 27) 
+```
+
+##### Expected Runtime
+
+It should take approximately 4-5 minutes or faster to regenerate plots if all intermediate data already are downloaded, and the `slim/` folder exists.
+
+
+## About CIRCLES data analyzed with this software
+
+### About data from I-24 MOTION
+
+The `results/slim` data include trajectories recorded and processed by the I-24 MOTION observatory. Primarily the data from I-24 MOTION are comprised of position and speed trajectories from all vehicles detected on the roadway by that observatory. The `results/slim` data align the location and state of each of the CIRCLES control cars includes GPS location data as well as data from on-board vehicle informatics recorded by custom hardware installed with a Raspberri Pi. Those data include information regarding to indicate the control and system state of the vehicle. 
+
+### About data from GPS and the CIRCLES Cars
+Two kinds of data were collected from the CIRCLES Cars, and found in the `results/gps` folder in the data archive. Each day provides a separate standalone file for the cars that ran on that day. Information includes GPS data, aligned with timeseries information from data collected directly from the car.
+
+#### Data collection from CIRCLES CARS with team-installed GPS Sensors
+Information from team-installed GPS sensors was collected at 10-Hz. These data include the position and speed of the vehicle at each sample point.
+
+#### Data Collection from CIRCLES Cars with team-designed on-board data collection
+Information from team-installed computers that interface with the Controller Area Network (CAN) were critical to sensing and control of the experiment cars. These data are aligned with the raw GPS information to provide the state of the vehicle at that time (speed, assigned lane of travel, desired cruise control set point, etc.). 
+
+## Data Install
+
+Download the data to your computer, it will be called either `data` or `results`. In the same folder that contains the data or results, clone this repository.
+
+## Reproduce Plots: Scripts to plot figures from the article.
+
+Ensure you have downloaded all the data, and stored it according to the structure described in the next step. 
+
+### Step 0: Correct folder structure for reproducing plots. 
+
+This git repository should be a *sibling* folder to the `results` folder. 
+
+```
+cd MVT_structured_data
+ls ..
+```
+This command should show you 
+
+```
+results/
+MVT_structured_data
+```
+
+You may also have folders like `data` if you have downloaded the bootstrapping/base data.
+
+If you want to confirm what it should look like from the 'parent' directory:
+
+```
+[Parent]
+  - MVT_structured_data
+  - results/
+  | - slim
+    | - 2022-11-16
+      | - I-24MOTION_2022-11-16_05-59-59.json
+      | - I-24MOTION_2022-11-16_06-09-59.json
+      | - ...
+    | - 2022-11-17
+      | - ...
+    | - 2022-11-18
+      | - ...
+  | - gps
+    | - CIRCLES_GPS_10Hz_2022-11-16.json
+    | - CIRCLES_GPS_10Hz_2022-11-17.json
+    | - CIRCLES_GPS_10Hz_2022-11-18.json
+  | - README.md
+```
+
+Once you run the scripts, additional folders and files will be produced in the `results` folder.
+
+### Step 1: Reproduce the plots
+To reproduce all the plots for all days, simply run 
+
+```
+cd MVT_structured_data/Scripts
+```
+and in that folder in matlab, run
+
+```
+reproduce_plots.m
+```
+
+This will run the below scripts for all days as well.
+
+Running `Scripts\plot_AV_analysis.m` generates the results from the article (figure 2, figure SM2, and Figure SM3).
+
+Running``"Scripts\plot_macroscopic_fields.m` to generate the macroscopic fields figures from the article (figure 3, and SM 5, as well as additional fields).
+
+### Step 2: Examine figures
+
+The outputs in `results/figures` provide reproductions of the figures used in the main graphics in the paper.
+
+## Advanced Bootstrap
+How to generate the integrated data set. (advanced only)
+
+***Note*** This step requires a different dataset to begin, and generates the `slim` and `full` results that are part of the release. These steps perform alignment of vehicle and I-24 MOTION data, from base files from I-24 MOTION and original GPS and vehicle CAN data files that are assigned by each car.
+
+This step is ADVANCED and OPTIONAL and is included mainly to provide the algorithmic insights to anyone interested in how those data are produced and aligned.
+
+### Step 0 (Advanced): Correct folder structure for bootstrap data synthesis. 
 
 This git repository should be a *sibling* folder to the data folder. 
 
@@ -319,6 +542,7 @@ If you want to confirm what it should look like from the 'parent' directory:
   - results
 ```
 
+### Step 1 (Advanced): run scripts to generate the data
 
 ### Step 1: run the stages
 
