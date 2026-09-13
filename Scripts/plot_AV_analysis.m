@@ -56,7 +56,7 @@ statsToPlotChoices = ["effective","mean","median"];
 MAXDIST = 350; % (m) maximum relative distance to an ego vehicle to be considered
 XWINDOW = [MAXDIST-122 7000]; % (m) , [West to East] set to -1 to include the full testbed.
 AVLOCBUFFER = 1; % (m) buffer around 0 distance from av within which data is not considered.
-TWINDOW = [0645, 0915]; % time window of intrest in military time
+TWINDOW = [0645, 0915]; % time window of interest in military time
 flagSave = true; % save figures
 minSpdRaw = 0; %(m/s) minimum speed to filter for all samples
 minSpdMean = 1; % (m/s) minimum speed for samples when calculating the mean fuel consumption
@@ -155,7 +155,7 @@ effectiveFc = zeros(length(testDays),length(binCenters));
 medianFcons = zeros(length(testDays),length(binCenters));
 binCounts   = zeros(length(testDays),length(binCenters));
 binnedInd   = cell(1,length(binCenters));
-% Loop over test days and binn samples based on distance to closest av
+% Loop over test days and bin samples based on distance to closest av
 for dayInd=1:length(testDays) 
     d = samplesDistCell{dayInd}; %used to put data into bins by distance
     for binInd = 1:length(binCenters) %bin the indices by distance from AV
@@ -172,7 +172,7 @@ for dayInd=1:length(testDays)
     end
 end
 fprintf('Done (%0.0fsec).\n',toc)
-% Create triplets of mean effictive median
+% Create triplets of mean effective median
 % Partition them into Left, Masked_left, Masked_right, Right
 % Calculate regression
 fprintf('Processing data samples... ') ; tic
@@ -194,7 +194,7 @@ for dayInd=1:length(testDays)
     % partitioned_stats{1}left, {2}masked left, {3}masked right, {4}right.
     % Each has three rows [mean_fcons; effective_fc; median_fcons]
     [partitionedSingleDay] = mask_nearby_points(statsToPlot{dayInd},indicesPartitions);
-    for s = 1:3 % loop over mean effictive median
+    for s = 1:3 % loop over mean effective median
         % Calculate regression lines 
         wRegLeft{dayInd}(s,:) = find_regression_line(binCenters(indicesPartitions{1}).', ...
             partitionedSingleDay{1}(s,:).', diag(binCounts(dayInd,indicesPartitions{1})));
@@ -222,7 +222,7 @@ end
 fprintf('Loading and processing GPS and field data... ') ; tic
 uTempMean = [];
 nAVsActive = [];
-for dayInd=1:3 %wed. thurs. fri. 
+for dayInd=1:3 %Wed. Thurs. Fri. 
     % because of this nonstandard array use, we need to get this to 16
     % instead of 1
     fieldFilename = fullfile(p.resultsDir,'figures',...
@@ -240,7 +240,7 @@ for dayInd=1:3 %wed. thurs. fri.
         rhoTempV = rhoTempV(~isnan(uTempV));
         uTempV = uTempV(~isnan(uTempV));
         totalRhoTemp = sum(rhoTempV);
-        % normlize speed by vehicle density
+        % normalize speed by vehicle density
         uTempMean(dayInd,tInd) = sum(uTempV .* rhoTempV)/totalRhoTemp;
         avsOnTheRoad = data([data.direction] == -1 & [data.first_timestamp] ...
             <= tTemp & [data.last_timestamp] >= tTemp + tStep);
@@ -407,7 +407,7 @@ for dayInd =1:length(testDays)
     plot([-30,-30],axy,'r:','LineWidth',2.5)
     plot([30,30],axy,'r:','LineWidth',2.5)
     title(weekDaysStr(dayInd),'FontSize',fontSize)
-    % add x and y labels for missle subplot
+    % add x and y labels for subplot
     if dayInd ==2
         xlabel('Distance to nearest AV in same lane (m)','FontSize',fontSize)
         ylabel('number of data points','FontSize',fontSize)
@@ -525,7 +525,7 @@ set(gca,'FontSize',FONTSIZE)
 end
 
 function [partitionedY] = mask_nearby_points(y,indicesPartitions)
-% Function to partision data into a cell array
+% Function to partition data into a cell array
 partitionedY{1,1} = y(:,indicesPartitions{1});
 partitionedY{1,2} = y(:,indicesPartitions{2});
 partitionedY{1,3} = y(:,indicesPartitions{3});
