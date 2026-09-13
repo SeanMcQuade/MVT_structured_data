@@ -353,6 +353,35 @@ option but not a free one: it changes `generate_data_mvt_slim.m`, so the release
 slim data (15 GB/day) would no longer match the code that produced it and would
 have to be regenerated along with the checksum manifests.
 
+### The `full` stage
+
+`full` was ported after `slim` and is byte-identical to MATLAB: three day-17
+segments (77,056 records, 2.55 GB) match the MATLAB output exactly, including
+one segment whose values the deterministic-quadrature change moved, so the
+Neumaier path is exercised and not merely the cases where the quadrature made
+no difference.
+
+Porting it surfaced a latent bug in the shared lane code. MATLAB handles
+eastbound in two steps that are not a re-signed version of the westbound
+expression:
+
+    yEast  = -yEast                     % before the outlier bounds
+    y_corr = -(Se*(-y - dl(x)) + Ce)    % negate, correct, negate back
+
+`slim` filters eastbound out before either step, so the Python port had folded
+the signs into the scale/offset constants -- which is not equivalent, because
+the driving line is subtracted from the flipped `y`. Corrected positions were
+off by up to 0.54 m, which then moved where lane-change clipping cut the
+trajectory and shifted every later record in the file. Fixed in `lanes.py`,
+with regression tests in `tests/test_full.py` that fail on the previous form.
+
+One caveat is inherent to the MATLAB formulation rather than the port. The
+reference trajectory switches between a two-phase and a three-phase form on
+`any(vRef < 0)` -- a branch on an exact floating-point comparison. A trajectory
+sitting an ULP either side of it takes a different formula, so every reference
+field changes together rather than in the last decimal. `full` therefore
+amplifies any upstream divergence instead of damping it, unlike `slim`.
+
 ## What is not ported yet
 
 Every stage is ported, and the byte-comparable products are byte-identical to
@@ -362,7 +391,7 @@ MATLAB's (see the parity section above). What remains is not parity work:
 | --- | --- |
 | `.mat` writers | The analysis stages write `.npz` rather than MATLAB `.mat`. The arrays match (`samples` exactly, `fields` to ~1e-11), but a MATLAB user cannot `load()` the Python output directly. |
 | Figures | Rendered with matplotlib: same colormap, limits, overlays and layout, deliberately not pixel-for-pixel. A checksum comparison is meaningless here and `mvt verify` skips them. |
-| `full` (both-directions data set) | Only `slim` is verified byte-for-byte; `full` shares the same code path but has no checksum manifest. |
+| `full` checksum manifest | `full` is ported and verified byte-identical to MATLAB by direct file comparison, but it is not in `python/expected/checksums-*.json`, so `mvt verify` does not cover it. Compare trees directly with `tools/compare_trees.py --product full`. |
 
 ## Running the checks
 

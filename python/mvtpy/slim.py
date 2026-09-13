@@ -150,12 +150,18 @@ def build_segment(raw_path, gps_path, grade_csv, limit: Optional[int] = None) ->
     return records
 
 
-def write_segment(records: Iterable[dict], output_path) -> Path:
-    """Round, encode, and write records exactly as the MATLAB stage does."""
+def write_segment(records: Iterable[dict], output_path,
+                  field_order: Sequence[str] = FIELD_ORDER) -> Path:
+    """Round, encode, and write records exactly as the MATLAB stage does.
+
+    ``field_order`` is a parameter so the full stage, whose struct has 45 fields
+    rather than 31, can reuse this writer: the rounding rule and MATLAB's
+    array-to-JSON mapping are identical between the two stages.
+    """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    payload = matjson.dumps([_prepare(record) for record in records])
+    payload = matjson.dumps([_prepare(record, field_order) for record in records])
     # Write to a temporary name and rename, mirroring mvt.atomicWrite.
     temporary = output_path.with_name(f".{output_path.name}.tmp")
     temporary.write_text(payload, encoding="utf-8")
@@ -170,10 +176,11 @@ def _negate(values):
     return None if values is None else -values
 
 
-def _prepare(record: Dict[str, object]) -> Dict[str, object]:
+def _prepare(record: Dict[str, object],
+             field_order: Sequence[str] = FIELD_ORDER) -> Dict[str, object]:
     """Round numeric fields and convert to JSON-ready values, in field order."""
     prepared: Dict[str, object] = {}
-    for name in FIELD_ORDER:
+    for name in field_order:
         value = record[name]
         if name == "trajectory_id" or isinstance(value, (str, dict)):
             prepared[name] = value

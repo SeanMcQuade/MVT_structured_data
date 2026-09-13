@@ -54,6 +54,9 @@ class Workspace:
     def slim_dir(self, day: int) -> Path:
         return self.results_dir / "slim" / f"2022-11-{day}"
 
+    def full_dir(self, day: int) -> Path:
+        return self.results_dir / "full" / f"2022-11-{day}"
+
     def figures_dir(self, day: int) -> Path:
         return self.results_dir / "figures" / f"2022-11-{day}"
 

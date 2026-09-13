@@ -135,6 +135,12 @@ def estimate_driving_line(
     x = np.concatenate(sampled_x)
     y = np.concatenate(sampled_y)
 
+    if direction > 0:
+        # MATLAB's `yEast = -yEast`: eastbound lateral offsets are negative in
+        # the raw data, and are flipped positive *before* the outlier bounds are
+        # applied, so the bounds mean the same thing in both directions.
+        y = -y
+
     upper = options.lane_width * options.y_up_lim
     lower = options.lane_width * options.y_low_lim
     keep = (y <= upper) & (y >= lower)
@@ -178,11 +184,14 @@ def assign_lanes(
     x = np.asarray(record["x_position"], dtype=float)
 
     if record["direction"] < 0:
-        scale, offset = options.scale_west, options.offset_west
+        y_corr = options.scale_west * (y - driving_line(x)) + options.offset_west
     else:
-        scale, offset = options.scale_east, options.offset_east
-
-    y_corr = scale * (y - driving_line(x)) + offset
+        # Eastbound is not the same expression with different constants: MATLAB
+        # flips y positive, applies the correction, then negates the whole
+        # result -- `-(Se*(-y - dl(x)) + Ce)`. Folding the signs into `scale`
+        # and `offset` gives a different answer, because the driving line is
+        # subtracted from the flipped y rather than the original.
+        y_corr = -(options.scale_east * (-y - driving_line(x)) + options.offset_east)
 
     lane_raw = (np.abs(y_corr) - options.lane_width / 2) / options.lane_width
     lane_raw = np.clip(lane_raw, 0.0, 5.0)

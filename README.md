@@ -87,6 +87,7 @@ writing results elsewhere, the Unix `make`, and the Python port — is under
 | Document | What it covers |
 | --- | --- |
 | [`docs/ALGORITHMS.md`](docs/ALGORITHMS.md) | The data-flow graph and what each stage computes, with the mapping to the paper's figures. Start here. |
+| [`docs/DATA_FILES.md`](docs/DATA_FILES.md) | What is in which file: an inventory of every input and output, the columns of each, and the shared vocabularies (vehicle class, direction, lane, coordinate frames). |
 | [`docs/DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md) | Every field of every output: units, dtype, rounding, null/empty semantics, and which stage writes it. |
 | [`docs/MATLAB_JSON_FORMAT.md`](docs/MATLAB_JSON_FORMAT.md) | How MATLAB's `jsonencode` formats numbers, needed for byte-identical output. |
 | [`docs/DATA_CHANGELOG.md`](docs/DATA_CHANGELOG.md) | Versions of the released data set, what changed in each, and how to tell which version a folder holds. |
@@ -543,47 +544,43 @@ If you want to confirm what it should look like from the 'parent' directory:
 
 ### Step 1 (Advanced): run scripts to generate the data
 
-Run `Scripts/run_all_scripts.m` which begins with the `base` data and produces all intermediate files, aligns GPS information, and synthesizes intermediate storage in `.mat` format that can ease additional plotting and analysis by future researchers.
+### Step 1: run the stages
 
-Some information on each of these scripts is below.
+`make all` runs everything below in order, for all three days. The individual
+scripts are listed so they can be run one at a time; each takes a day
+(`16`, `17`, or `18`) and writes under `results/`.
 
-#### `Scripts/assemble_data_GPS.m`
+| | Script | Produces |
+|---|---|---|
+| 1 | `assemble_data_GPS(day)` | `results/gps/CIRCLES_GPS_10Hz_2022-11-DD.json` |
+| 2 | `generate_data_mvt_slim(day)` | `results/slim/2022-11-DD/` — 24 segment files |
+| 3 | `generate_data_samples(day)` | `samples_for_distance_analysis_DD.mat` |
+| 4 | `generate_macroscopic_fields(day)` | `fields_motion_2022-11-DD.mat` |
+| 5 | `plot_macroscopic_fields(day)` | figure 3 and SM5 |
+| 5b | `plot_microscopic_trajectories(day)` | trajectory time-space figures |
+| 6 | `plot_AV_analysis()` | figures 2, SM2, SM3 (reads all three days) |
 
-Generates files in `results/gps` named `CIRCLES_GPS_10Hz_2022-11-{16,17,18}.json`, which combine individual vehicle data from each car (found in `data/cars` and `data/cars/cars_gps`).
+#### `slim` and `full`
 
-#### `Scripts/generate_data_mvt_full.m`
+`generate_data_mvt_full` produces a second, larger variant that additionally
+carries eastbound and reference trajectories plus flat-fuel and direction
+fields. **It is not built by `all`, in either the MATLAB or the Python
+implementation, and nothing downstream reads it.** Stages 3–6 all read `slim`,
+which is the released data set.
 
-This load files from `../data/cars/cars_gps` along with data from I-24 MOTION in `../data/i24motion/2022-11-{16,17,18}/*.json` and saves assembled GPS.json into `results/full/2022-11-{16,17,18}/I-24MOTION_2022-11-*.json` for each day. 
+Build it only if you need eastbound plots — `direction = 1` in
+`plot_microscopic_trajectories.m` switches to it:
 
-The "full" dataset includes trajectories from both westbound and eastbound lanes of I-24 Motion, though only westbound lanes are included in our analysis. Thus, there is no reason to utilize the `full` dataset for this paper, though the results may be of use to other researchers.
+```
+make full                      # MATLAB; or: make full Days 17
+mvt full --day 17              # Python; or: mvt build --target full -j 6
+```
 
+Both implementations produce it, and their output is byte-identical.
 
-#### `Scripts\generate_data_mvt_slim.`
-
-This load files from `../data/cars/cars_gps` along with data from I-24 MOTION in `../data/i24motion/2022-11-{16,17,18}/*.json` and saves assembled GPS.json into `results/slim/2022-11-{16,17,18}/I-24MOTION_2022-11-*.json` for each day. 
-
-The "slim" dataset includes trajectories from *only* westbound lanes of I-24 Motion, and also removes several fields from the resulting datafile, which are not utilized in our analysis. The `slim` dataset is the preferred dataset for release, given its slightly smaller size.
-
-#### `Scripts\generate_data_samples.m`
-
-Once the slimmed or full data is generated, this script produces MATLAB `.mat` files in the `full` (or `slim`) folder for each day. These data samples include the speed, position, vehicle class, fuel rates, etc. that are needed to compute the macroscopic fuel usage results.
-
-#### `Scripts\generate_macroscopic_fields.m`
-
-This scripts utilizes the `generate_data_samples` function to calculate macoscopic field data, preparing for plotting and AV influence analysis. The results are saved in `results/{slim,full}/2022-11-{16,17,18}/*.mat`. 
-
-#### `Scripts/plot_macroscopic_fields.m`
-
-This script produces Figure 3, and SM 5, as well as additional fields.
-
-
-#### (Optional) `Scripts/plot_microscopic_trajectories.m`
-
-***Note*** Plotting these trajectories may cause your computer to run slowly, or in some cases to crash, if there are challenges with memory or data access. These are supplemental figures that show the microscopic trajectories for each day, and thus represent significant numbers of points and can render graphing functions inadequate.
-
-#### `Scripts/plot_AV_analysis.m`
-
-This script produces Figure 2, Figure SM2, and Figure SM3.
+`make status` reports `full` as `opt-in` rather than `BUILD` while it has never
+been built, so a missing `full` tree does not read as pending work. Once you
+have built it, it is reported like any other stage.
 
 ## Websites
 [Visit the CIRCLES consortium website](https://circles-consortium.github.io/)
