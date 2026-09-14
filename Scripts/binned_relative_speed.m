@@ -29,7 +29,7 @@ for binInd = 1:length(binCenters) %bin the indices by distance from AV
     median_binned_speed(binInd) = prctile(binnedSpeed{binInd},50);
 end
 
-fontSize = 18;
+fontSize = 12;
 
 %plot histogram
 axX = 350;
@@ -42,26 +42,28 @@ plot([min(binCenters), max(binCenters)],[0,0],"LineStyle",":")
 plot([0,0],[-0.1,0.5],"LineStyle",":")
 text(axX*.03,axY(1)+diff(axY)*.90,'behind AV','FontSize',fontSize,...
     'HorizontalAlignment','left','VerticalAlignment','bottom')
-text(-axX*.03,axY(1)+diff(axY)*.90,'ahead of AV','FontSize',fontSize,...
-    'HorizontalAlignment','right','VerticalAlignment','bottom')
+% text(-axX*.03,axY(1)+diff(axY)*.90,'ahead of AV','FontSize',fontSize,...
+%     'HorizontalAlignment','right','VerticalAlignment','bottom')
 legend("mean relative speed (m/s)", "median relative speed (m/s)", "","","FontSize", fontSize,"Location","northwest");
 if day == 16 %Write the day in the title
-    formatSpec = "Relative speed histogram Wed";
+    formatSpec = "Relative speed histogram Wednesday 16-Nov-2022";
     title_string = sprintf(formatSpec);
 elseif day == 17
-    formatSpec = "Relative speed histogram Thurs";
+    formatSpec = "Relative speed histogram Thursday 17-Nov-2022";
     title_string = sprintf(formatSpec);
 elseif day == 18
-    formatSpec = "Relative speed histogram Fri";
+    formatSpec = "Relative speed histogram Friday 18-Nov-2022";
     title_string = sprintf(formatSpec);
 end
 
 titlestring = sprintf(title_string,day,j_start, j_end);
 title(titlestring,"FontSize", fontSize)
-xlabel('Distance to nearest AV in same lane (m)','FontSize',fontSize)
+xlabel('Distance behind nearest AV in same lane (m)','FontSize',fontSize)
 ylabel('Statistics calculated per bin','FontSize',fontSize)
-xlim([min(binCenters) max(binCenters)]);
+xlim([0 max(binCenters)]);
+% xlim([min(binCenters) max(binCenters)]);
 
-formatSpecSave = "../../results/figures/Relative speeds behind AV, day %d.fig";
+formatSpecSave = "../../results/figures/Relative speeds behind AV, day %d.pdf";
 savename = sprintf(formatSpecSave,day);
-saveas(gcf,savename)
+% saveas(gcf,savename)
+exportgraphics(gcf,savename,'ContentType','vector');
