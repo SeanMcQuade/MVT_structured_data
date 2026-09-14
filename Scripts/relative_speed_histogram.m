@@ -101,7 +101,8 @@ std_dev = [mean_rel_speed(j)-stddev_rel_speed(j),...
     mean_rel_speed(j) + stddev_rel_speed(j)];
 plot(std_dev, [0.5,0.5],"LineWidth",3)
 plot(interquartile, [0.5,0.5],"LineWidth",4)
-fontsize = 24;
+% fontsize = 24;
+fontsize=12;
 legend("Histogram", "Mean speed", "Median Speed", ...
                   "Standard Dev", "Interquartile","FontSize",fontsize)
 xlabel("Relative Speed m/s","FontSize",fontsize);
@@ -148,7 +149,8 @@ std_dev = [mean_all_fil_rel_speed-stddev_fil_all_rel_speed,...
 interquartile_all = [first_quartile_fil_all, third_quartile_fil_all];
 plot(std_dev, [10,10],"LineWidth",3)
 plot(interquartile_all, [0.5,0.5],"LineWidth",4)
-fontsize = 24;
+% fontsize = 24;
+fontsize=12;
 legendformatSpec_mean = "mean speed = %3.3f";
 mean_legend = sprintf(legendformatSpec_mean,mean_all_fil_rel_speed);
 legendformatSpec_med = "median speed = %3.3f";
