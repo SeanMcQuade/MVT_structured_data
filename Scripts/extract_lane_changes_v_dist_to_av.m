@@ -1,9 +1,14 @@
+function [] = extract_lane_changes_v_dist_to_av(processingDay, varargin)
+
+
 %========================================================================
 % Initialize
 %========================================================================
-clear
-
-processingDay = 16; % TODO: change to an input of the script
+% clear
+% 
+% for d=16:18
+% 
+% processingDay = d; % TODO: change to an input of the script
 [parentDirectory, ~, ~] = fileparts(pwd);
 [dataRootDirectory, ~, ~] = fileparts(parentDirectory);
 
@@ -154,3 +159,7 @@ all_lane_changes_start = vertcat(all_start_cell{:});
 all_lane_changes_end = vertcat(all_end_cell{:});
 save(fullfile(outputPath, ['LC_data_' char(num2str(processingDay)) '.mat'])...
 ,'all_lane_changes_end','all_lane_changes_start')
+
+% end
+
+end

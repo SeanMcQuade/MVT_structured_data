@@ -1,5 +1,8 @@
 clear 
-processingDay = 16;
+
+for d=16:18
+processingDay = d;
+day = d;
 
 [parentDirectory, ~, ~] = fileparts(pwd);
 [dataRootDirectory, ~, ~] = fileparts(parentDirectory);
@@ -11,6 +14,14 @@ dataGPS = jsondecode(fileread(fullfile(dataRootDirectory,...
     'results','gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])));
 dataGPS = dataGPS([dataGPS.direction]<0);
 
+title_day_string="ERROR";
+if day == 16 %Write the day in the title
+    title_day_string = "Wednesday 16-Nov-2022";
+elseif day == 17
+    title_day_string = "Thursday 17-Nov-2022";
+elseif day == 18
+    title_day_string = "Friday 18-Nov-2022";
+end
 
 max_T = posixtime(datetime(['2022-11-' char(num2str(processingDay)) ' 11:00:00'],...
     'InputFormat', 'yyyy-MM-dd HH:mm:ss', 'TimeZone', 'America/Chicago'));
@@ -39,7 +50,7 @@ dataEnd   = all_lane_changes_end;
 for caseIdx = 1:2
     figure( 'Color', 'w', 'Name', ['Merge Out: ', titleSuffix{caseIdx}]);
     t = tiledlayout(length(lanesToAnalyze), 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-    title(t, ['Merge Out (Leaving Lane) Relative to ', titleSuffix{caseIdx}], 'FontSize', 14, 'Color', 'k');
+    title(t, ['Merge Out (Leaving Lane) Relative to ', titleSuffix{caseIdx}, title_day_string], 'FontSize', 14, 'Color', 'k');
     
     for i = 1:length(lanesToAnalyze)
         currentLane = lanesToAnalyze(i);
@@ -76,7 +87,7 @@ end
 for caseIdx = 1:2
     figure('Color', 'w', 'Name', ['Merge In: ', titleSuffix{caseIdx}]);
     t = tiledlayout(length(lanesToAnalyze), 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-    title(t, ['Merge In (Entering Lane) Relative to ', titleSuffix{caseIdx}], 'FontSize', 14, 'Color', 'k');
+    title(t, ['Merge In (Entering Lane) Relative to ', titleSuffix{caseIdx}, title_day_string], 'FontSize', 14, 'Color', 'k');
     
     for i = 1:length(lanesToAnalyze)
         currentLane = lanesToAnalyze(i);
@@ -113,7 +124,7 @@ end
 for caseIdx = 1:2
     figure( 'Color', 'w', 'Name', ['In vs Out: ', titleSuffix{caseIdx}]);
     t = tiledlayout(length(lanesToAnalyze), 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-    title(t, ['Merge In vs Merge Out Relative to ', titleSuffix{caseIdx}], 'FontSize', 14, 'Color', 'k');
+    title(t, ['Merge In vs Merge Out Relative to ', titleSuffix{caseIdx}, title_day_string], 'FontSize', 14, 'Color', 'k');
     
     for i = 1:length(lanesToAnalyze)
         currentLane = lanesToAnalyze(i);
@@ -161,19 +172,19 @@ figComp= gobjects(2,1); tComp= gobjects(2,1);
 for caseIdx = 1:2
     figExp(caseIdx) = figure('Color', 'w', 'Name', ['Exposure: ', titleSuffix{caseIdx}]);
     tExp(caseIdx) = tiledlayout(length(lanesToAnalyze), 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-    title(tExp(caseIdx), ['Total Exposure Time: ', titleSuffix{caseIdx}], 'FontSize', 14, 'Color', 'k');
+    title(tExp(caseIdx), ['Total Exposure Time: ', titleSuffix{caseIdx}, title_day_string], 'FontSize', 14, 'Color', 'k');
 
     figOut(caseIdx) = figure('Color', 'w', 'Name', ['Rate Merge Out: ', titleSuffix{caseIdx}]);
     tOut(caseIdx) = tiledlayout(length(lanesToAnalyze), 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-    title(tOut(caseIdx), ['Rate: Merge Out Relative to ', titleSuffix{caseIdx}], 'FontSize', 14, 'Color', 'k');
+    title(tOut(caseIdx), ['Rate: Merge Out Relative to ', titleSuffix{caseIdx}, title_day_string], 'FontSize', 14, 'Color', 'k');
     
     figIn(caseIdx) = figure('Color', 'w', 'Name', ['Rate Merge In: ', titleSuffix{caseIdx}]);
     tIn(caseIdx) = tiledlayout(length(lanesToAnalyze), 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-    title(tIn(caseIdx), ['Rate: Merge In Relative to ', titleSuffix{caseIdx}], 'FontSize', 14, 'Color', 'k');
+    title(tIn(caseIdx), ['Rate: Merge In Relative to ', titleSuffix{caseIdx}, title_day_string], 'FontSize', 14, 'Color', 'k');
     
     figComp(caseIdx) = figure('Color', 'w', 'Name', ['Rate In vs Out: ', titleSuffix{caseIdx}]);
     tComp(caseIdx) = tiledlayout(length(lanesToAnalyze), 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-    title(tComp(caseIdx), ['Rate: Merge In vs Merge Out Relative to ', titleSuffix{caseIdx}], 'FontSize', 14, 'Color', 'k');
+    title(tComp(caseIdx), ['Rate: Merge In vs Merge Out Relative to ', titleSuffix{caseIdx}, title_day_string], 'FontSize', 14, 'Color', 'k');
 end
 
 % -----------------------------------------------------------------------
@@ -214,7 +225,7 @@ for i = 1:length(lanesToAnalyze)
         [unique_t, ~, idx_t] = unique(all_t);
         total_k = length(unique_t);
         
-        wb = waitbar(0, sprintf('Lane %d: Calculating Parallel Exposure (0%%)', currentLane), ...
+        wb = waitbar(0, [sprintf('Lane %d: Calculating Parallel Exposure (0%%)', currentLane), ' ', title_day_string],...
             'Name', 'Directional Grid Distances');
             
         for k = 1:total_k
@@ -358,4 +369,6 @@ for i = 1:length(lanesToAnalyze)
         if i == length(lanesToAnalyze), xlabel(tComp(caseIdx), xLabels{caseIdx}, 'FontSize', 12, 'Color', 'k'); end
         
     end
+end
+
 end

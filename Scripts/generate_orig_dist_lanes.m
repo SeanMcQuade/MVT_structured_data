@@ -1,4 +1,4 @@
-function [] = generate_orig_dist_lanes(processingDay)
+function [] = generate_orig_dist_lanes(processingDay, varargin)
 % (C) 2026 CIRCLES Energy team
 %
 % Function that process base I-24 MOTION data from the MVT to generate
@@ -6,11 +6,26 @@ function [] = generate_orig_dist_lanes(processingDay)
 % the slim version of CIRCLES' v2.1 of the data, used in the team nature
 % paper submission, and saves it to json files.
 %
+%
+% Inputs
+%   processingDay  16, 17, or 18 (November 2022)
+%   varargin       options struct and/or name/value pairs (see mvt.options);
+%                  Force, Clean, DryRun, Verbose
+% Outputs
+%   <results>/slim/2022-11-DD/
+%     I-24MOTION_2022-11-DD_HH-MM-SS_orig_dist_lane.mat
+%
+%
 % Generated .mat files will be saved in ..\results\slim\{DATE} folder.
 if nargin < 1
 error(['Specify the day of Nov. 2022 MVT to generate slim'... 
         'MVT data files (from 16 to 18)']);
 end
+mvt.assertDay(processingDay)
+opts = mvt.options(varargin{:});
+
+% TODO: update this file to take into account stale files or not
+
 %========================================================================
 % Parameters
 %========================================================================
