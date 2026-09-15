@@ -73,7 +73,7 @@ end
 
 %only keep
 clear filtered_ind filtered_dist filtered_speed;
-lower_Bnd = 7; %Sul suggests lowering this from 35 to 7. 
+lower_Bnd = 30; %per discussion, set at 30 to show the 35-45 m bin first. 
 upper_Bnd = 350;
 filtered_ind_low = find(lower_Bnd < av_dist_all_segments);
 filtered_ind_up = find(av_dist_all_segments < upper_Bnd);
