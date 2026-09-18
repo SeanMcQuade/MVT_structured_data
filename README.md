@@ -5,8 +5,6 @@ These scripts provide analysis regarding the energy usage of vehicles during the
 
 The repository refers to data recorded from the I-24 MOTION observatory, as well as the CIRCLES partially automated vehicles. Those data must be obtained elsewhere, and will be privately stored or available only to CIRCLES Team members until the paper is released.
 
-For the peer review purposes, use branch: peer-review (https://github.com/SeanMcQuade/MVT_structured_data/tree/peer-review)
-
 # Contents
 - [Quick start](#quick-start)
 - [Running the pipeline](#running-the-pipeline)
