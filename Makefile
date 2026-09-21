@@ -189,6 +189,47 @@ $(STAMPS):
 	@mkdir -p $(STAMPS)
 
 # ---------------------------------------------------------------------------
+# The derived inputs, as files
+#
+# The figure stages depend on these .mat files directly, not on the stamps of
+# the stages that make them. A results-only download already has them, and
+# depending on the stamps would rebuild gps and slim to recreate files that are
+# already on disk - which is exactly what `make figures-from-mat` used to do in
+# a fresh tree. If a file really is missing, the recipe below builds it; the
+# stamp is removed first so the stage runs even when a stale stamp claims it is
+# already done.
+# ---------------------------------------------------------------------------
+define derived_inputs
+$$(RESULTS)/analysis/2022-11-$(1)/fields_motion_2022-11-$(1).mat:
+	@rm -f $$(STAMPS)/fields-$(1)
+	$$(MAKE) $$(STAMPS)/fields-$(1)
+
+$$(RESULTS)/analysis/2022-11-$(1)/samples_for_distance_analysis_$(1).mat:
+	@rm -f $$(STAMPS)/samples-$(1)
+	$$(MAKE) $$(STAMPS)/samples-$(1)
+
+$$(RESULTS)/analysis/2022-11-$(1)/LC_data_$(1).mat:
+	@rm -f $$(STAMPS)/lc-$(1)
+	$$(MAKE) $$(STAMPS)/lc-$(1)
+
+$$(RESULTS)/analysis/2022-11-$(1)/relspeed_data_$(1).mat:
+	@rm -f $$(STAMPS)/relspeed-$(1)
+	$$(MAKE) $$(STAMPS)/relspeed-$(1)
+
+$$(RESULTS)/gps/CIRCLES_GPS_10Hz_2022-11-$(1).json:
+	@rm -f $$(STAMPS)/gps-$(1)
+	$$(MAKE) $$(STAMPS)/gps-$(1)
+endef
+$(foreach d,16 17 18,$(eval $(call derived_inputs,$(d))))
+
+# Shorthands for the per-day derived inputs
+fields_mat  = $(RESULTS)/analysis/2022-11-$(1)/fields_motion_2022-11-$(1).mat
+samples_mat = $(RESULTS)/analysis/2022-11-$(1)/samples_for_distance_analysis_$(1).mat
+lc_mat      = $(RESULTS)/analysis/2022-11-$(1)/LC_data_$(1).mat
+relspeed_mat= $(RESULTS)/analysis/2022-11-$(1)/relspeed_data_$(1).mat
+gps_json    = $(RESULTS)/gps/CIRCLES_GPS_10Hz_2022-11-$(1).json
+
+# ---------------------------------------------------------------------------
 # Stage rules
 #
 # Each stamp records "make last ran this stage successfully". The real output
@@ -217,19 +258,13 @@ $(STAMPS)/lc-%: $(SRC_lc) $(STAMPS)/slim-% $(STAMPS)/lanes-% | $(STAMPS)
 	$(call run_stage,lc,$*)
 	@touch $@
 
-# lcplot needs the day's extracted lane changes and the GPS trajectories.
-$(STAMPS)/lcplot-%: $(SRC_lcplot) $(STAMPS)/lc-% $(STAMPS)/gps-% | $(STAMPS)
-	$(call run_stage,lcplot,$*)
-	@touch $@
+
 
 $(STAMPS)/relspeed-%: $(SRC_relspeed) $(STAMPS)/slim-% | $(STAMPS)
 	$(call run_stage,relspeed,$*)
 	@touch $@
 
-# The figures come from the pooled samples, so they need no slim tree.
-$(STAMPS)/relspeedplot-%: $(SRC_relspeedplot) $(STAMPS)/relspeed-% | $(STAMPS)
-	$(call run_stage,relspeedplot,$*)
-	@touch $@
+
 
 $(STAMPS)/samples-%: $(SRC_samples) $(STAMPS)/slim-% | $(STAMPS)
 	$(call run_stage,samples,$*)
@@ -239,16 +274,31 @@ $(STAMPS)/fields-%: $(SRC_fields) $(STAMPS)/slim-% | $(STAMPS)
 	$(call run_stage,fields,$*)
 	@touch $@
 
-$(STAMPS)/macro-%: $(SRC_macro) $(STAMPS)/fields-% | $(STAMPS)
-	$(call run_stage,macro,$*)
-	@touch $@
+
 
 $(STAMPS)/micro-%: $(SRC_micro) $(STAMPS)/slim-% | $(STAMPS)
 	$(call run_stage,micro,$*)
 	@touch $@
 
+# Figures built from the derived .mat files. These depend on the files, so a
+# results-only tree builds them without touching gps or slim.
+define figure_from_mat_rules
+$$(STAMPS)/macro-$(1): $$(SRC_macro) $(call fields_mat,$(1)) $(call gps_json,$(1)) | $$(STAMPS)
+	$$(call run_stage,macro,$(1))
+	@touch $$@
+
+$$(STAMPS)/lcplot-$(1): $$(SRC_lcplot) $(call lc_mat,$(1)) $(call gps_json,$(1)) | $$(STAMPS)
+	$$(call run_stage,lcplot,$(1))
+	@touch $$@
+
+$$(STAMPS)/relspeedplot-$(1): $$(SRC_relspeedplot) $(call relspeed_mat,$(1)) | $$(STAMPS)
+	$$(call run_stage,relspeedplot,$(1))
+	@touch $$@
+endef
+$(foreach d,16 17 18,$(eval $(call figure_from_mat_rules,$(d))))
+
 # Cross-day: needs every requested day's samples first.
-$(STAMPS)/av: $(SRC_av) $(foreach d,$(DAYS),$(STAMPS)/samples-$(d)) | $(STAMPS)
+$(STAMPS)/av: $(SRC_av) $(foreach d,$(DAYS),$(call samples_mat,$(d))) | $(STAMPS)
 	cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) "mvt.build('av', [])"
 	@touch $@
 

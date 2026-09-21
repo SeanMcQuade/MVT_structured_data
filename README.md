@@ -27,12 +27,16 @@ The pipeline expects this repository to sit **next to** the `data/` and
   results/               <- processed inputs and outputs (slim/, gps/, figures/)
 ```
 
-The data are distributed separately, in three routes of increasing size —
-**~5 GB** for the figures that build from the `.mat` intermediates, **+51 GB**
-to regenerate those from the slim trajectories, **+59 GB** to rebuild
-everything from the raw data. Pick one in
-[What to download](#what-to-download) before going further; the smallest route
-needs no trajectory files at all.
+The data are distributed separately, in three routes of increasing size:
+
+| route | download | gets you |
+|---|---|---|
+| 1 | **~5 GB** — GPS + the derived `.mat` analysis files | every figure but the trajectory plots, with no trajectory data at all |
+| 2 | **+51 GB** — the slim trajectories | the trajectory plots, and regenerates the `.mat` rather than downloading it |
+| 3 | **+59 GB** — the raw data | rebuilds `gps`, `slim` and everything downstream |
+
+Pick one in [What to download](#what-to-download) before going further. Route 1
+is ~1.6 GB if you skip the cross-day fuel figures.
 
 Once you have them, check the layout is correct:
 
@@ -452,71 +456,128 @@ Information from team-installed computers that interface with the Controller Are
 
 ## What to download
 
-Three routes, easiest first. Each one is a superset of the one before it, so
-pick by how much you want to rebuild rather than by which figures you want.
+Three routes, easiest first. Each is a superset of the one before it, so pick by
+how much you want to rebuild rather than by which figures you want. Every route
+assumes this repository sits **next to** the folder you download into:
 
-### 1. Figures only (~5 GB) — `make figures-from-mat`
+```
+<some folder>/
+  MVT_structured_data/   <- this repository
+  results/               <- routes 1 and 2 download into here
+  data/                  <- route 3 adds this
+```
 
-Gets you the macroscopic field figures, the four lane-change figures per day,
-and the cross-day fuel figures, without decoding a single trajectory file.
-Download, into a `results/` folder beside this repository:
+Run everything from `MVT_structured_data/` (for `make`) or
+`MVT_structured_data/Scripts/` (for MATLAB).
 
-| what | size | needed by |
-|---|---|---|
-| `results/gps/` | 821 MB | `macro`, `lcplot` |
-| `fields_motion_2022-11-DD.mat` | 46 MB | `macro` |
-| `LC_data_DD.mat` | 40 MB | `lcplot` |
-| `samples_for_distance_analysis_DD.mat` | 3.9 GB | `av` |
+### Route 1: figures from the analysis files (~5 GB)
 
-The `.mat` files live in `results/figures/2022-11-DD/`. Then:
+The cheapest way to reproduce figures. No trajectory files at all: the stages
+read the derived `.mat` intermediates directly.
+
+Download into `results/`:
+
+| what | into | size | needed by |
+|---|---|---|---|
+| the three GPS files | `results/gps/` | 821 MB | `macro`, `lcplot` |
+| `fields_motion_2022-11-DD.mat` | `results/analysis/2022-11-DD/` | 46 MB | `macro` |
+| `LC_data_DD.mat` | `results/analysis/2022-11-DD/` | 40 MB | `lcplot` |
+| `relspeed_data_DD.mat` | `results/analysis/2022-11-DD/` | 690 MB | `relspeedplot` |
+| `samples_for_distance_analysis_DD.mat` | `results/analysis/2022-11-DD/` | 3.9 GB | `av` |
+
+Then:
 
 ```bash
+cd MVT_structured_data
 make figures-from-mat
 ```
 
-Skip `samples_*.mat` and you are down to **~0.9 GB** for the field and
-lane-change figures alone — the cheapest useful entry point.
+That produces, into `results/figures/`: six macroscopic field figures and four
+lane-change figures per day, two relative-speed figures per day, and three
+cross-day fuel and sample-count figures. Roughly 10 minutes per day, most of it
+`lcplot`.
 
-`micro` and `relspeed` are *not* in this route: both read the slim
-trajectories. `make` will attempt them after the others and report what is
-missing, which is why the figures that can be built are built first.
+This route has been tested end to end from a clean tree: 5.0 GB of downloads
+produced 15 figures without ever creating a `results/slim` folder.
 
-### 2. Slim data (+51 GB) — `make`
+Two things to know:
 
-Adds `results/slim/`, which lets every `.mat` intermediate above be
-regenerated rather than downloaded, and enables `micro` and `relspeed`.
+* **The cross-day fuel figures (`av`) need all three days.** That stage reads
+  every day's `samples_*.mat` and `fields_motion_*.mat` regardless of what you
+  pass as `DAYS`, so a single-day download will build `macro`, `lcplot` and
+  `relspeedplot` and then fail on `av`. Use `make -k` to let the rest finish, or
+  download all three days.
+* Leaving out `samples_for_distance_analysis_DD.mat` drops the download to
+  **~1.6 GB** and costs you only those cross-day figures.
+
+The two figures this route cannot make are the microscopic trajectory plots
+(`micro`), which need the trajectories themselves. `make figures-from-mat`
+deliberately excludes them, so it will not go looking for data you have not
+downloaded. Plain `make` would attempt them after everything else.
+
+### Route 2: add the slim trajectories (+51 GB)
+
+Adds `results/slim/`, the released westbound trajectories. Now every `.mat`
+above can be regenerated instead of downloaded, and the trajectory figures
+become available.
 
 ```bash
-make            # regenerates the .mat intermediates, then every figure
+make            # regenerates any missing intermediate, then every figure
+make micro      # or just the trajectory figures
 ```
 
-`micro` derives ~4.6 GB per day of reduced plotting caches from slim on first
-run (under `results/.mvt/cache/`); later runs reuse them.
+`micro` derives ~4.6 GB per day of reduced plotting caches from slim on its
+first run, under `results/.mvt/cache/`; later runs reuse them. Expect that
+first run to be slow.
 
-### 3. Raw data (+59 GB) — `make rebuild`
+### Route 3: add the raw data (+59 GB)
 
-Adds `data/`, the raw I-24 MOTION segments and car CSVs, and regenerates
-everything from them: `gps`, `slim`, `lanes`, then the intermediates and the
-figures. `full` stays opt-in.
+Adds `data/`, the raw I-24 MOTION segments and car CSVs, and rebuilds
+everything from them: `gps`, `slim`, the lane sidecars, then the intermediates
+and the figures.
 
 ```bash
 make rebuild                                   # in place
-make RESULTS=/path/to/results_test rebuild     # into a fresh tree instead
+make RESULTS=/path/to/results_new rebuild      # into a fresh tree instead
 ```
 
-Expect hours, not minutes. Use `Workers`/`SHARDS` to spread `slim` and `lanes`
-across processes, and size that by memory rather than by cores — each process
-holds a decoded segment.
+Hours, not minutes. Spread the sharded stages across processes with `SHARDS`,
+and size that by memory rather than cores — each process holds a decoded
+segment, several GB at peak:
 
-### Which figures need what
+```bash
+make SHARDS=6 slim-17     # one day, six MATLAB processes over 24 segments
+```
 
-| figure | stage | needs |
-|---|---|---|
-| macroscopic fields | `macro` | `fields_*.mat` + gps |
-| lane-change exposure, rate, cumulative excess | `lcplot` | `LC_data_DD.mat` + gps |
-| fuel results, sample counts | `av` | `samples_*.mat` |
-| trajectory plots | `micro` | slim (via the reduced caches) |
-| relative speed to the nearest AV | `relspeed` | slim |
+`full` (the eastbound and reference trajectories) is opt-in even here; add
+`make full` if you want it.
+
+### Which figures come from where
+
+| figure | stage | reads | route |
+|---|---|---|---|
+| macroscopic fields | `macro` | `fields_*.mat` + gps | 1 |
+| lane-change exposure, rate, cumulative excess | `lcplot` | `LC_data_DD.mat` + gps | 1 |
+| relative speed to the nearest AV | `relspeedplot` | `relspeed_data_DD.mat` | 1 |
+| fuel results, sample counts | `av` | `samples_*.mat` | 1 |
+| microscopic trajectories | `micro` | slim, via the reduced caches | 2 |
+
+### If something is missing
+
+`make status` says what each stage would do and why, and builds nothing. A
+stage whose inputs are absent names the file it wanted:
+
+```bash
+make status
+```
+
+On a machine without GNU make, every target above works from MATLAB too:
+
+```matlab
+cd MVT_structured_data/Scripts
+make figures-from-mat
+make status
+```
 
 ## Data Install
 
