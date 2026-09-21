@@ -125,19 +125,31 @@ endef
 # ---------------------------------------------------------------------------
 # Aggregate targets
 # ---------------------------------------------------------------------------
-.PHONY: all data figures gps slim full lanes lc lcplot relspeed samples fields \
+.PHONY: all data figures figures-from-mat figures-from-slim \
+        gps slim full lanes lc lcplot relspeed samples fields \
         macro micro av \
         status config test help migrate-cache migrate-lanes accept watch \
         watch-once verify
 
-all: figures av
+# `make` does the figures that need only the small .mat intermediates first, so
+# that a results-only download produces output before anything reaches for the
+# 51 GB slim tree. See docs/DOWNLOADS.md.
+all: figures-from-mat figures-from-slim
 
 # `lanes` and `lc` are part of the data set but not yet of `all`: the figures
 # that consume LC_data (plotting_LC_analysis) are not wired in yet, so nothing
 # downstream of them would be built.
 data: gps slim lanes lc samples fields
 
-figures: macro micro relspeed lcplot
+figures: figures-from-mat figures-from-slim
+
+# Buildable from results/gps plus the .mat intermediates (fields_*, samples_*,
+# LC_data_*) - no slim tree required.
+figures-from-mat: macro lcplot av
+
+# These read the slim JSON, or (for micro) the reduced plotting caches derived
+# from it, so they need one of the larger downloads.
+figures-from-slim: micro relspeed
 
 gps:     $(foreach d,$(DAYS),$(STAMPS)/gps-$(d))
 slim:    $(foreach d,$(DAYS),$(STAMPS)/slim-$(d))

@@ -10,8 +10,9 @@ function make(varargin)
 % Usage (command syntax works, so the quotes are optional)
 %   make                       % everything out of date, all three days
 %   make all                   % same
-%   make data                  % gps, slim, samples, fields
-%   make figures               % macro, micro
+%   make data                  % gps, slim, lanes, lc, samples, fields
+%   make figures               % macro, lcplot, av, micro, relspeed
+%   make figures-from-mat      % only the figures that need no slim tree
 %   make slim                  % one stage, all three days
 %   make slim Days 18          % one stage, one day
 %   make all Days 18 Workers 6 % one day, slim/full across 6 processes
@@ -21,8 +22,10 @@ function make(varargin)
 %   make slim Force true       % rebuild regardless of timestamps
 %
 % Inputs
-%   target   'all' (default) | 'data' | 'figures' | a single stage name
-%            ('gps', 'slim', 'full', 'samples', 'fields', 'macro', 'micro',
+%   target   'all' (default) | 'data' | 'figures' | 'figures-from-mat' |
+%            'figures-from-slim' | a single stage name
+%            ('gps', 'slim', 'full', 'lanes', 'lc', 'lcplot', 'relspeed',
+%            'samples', 'fields', 'macro', 'micro',
 %            'av') | 'status' | 'config'
 %   Name/value:
 %     'Log'      write a timestamped log under <results>/.mvt/logs
@@ -30,7 +33,8 @@ function make(varargin)
 %     'KeepGoing' attempt every stage and report failures at the end,
 %                instead of stopping at the first one (default false)
 %     'Workers'  MATLAB processes for the stages that shard (default 1).
-%                Only 'slim' and 'full' shard; everything else ignores it.
+%                Only 'slim', 'full' and 'lanes' shard; everything else
+%                ignores it.
 %                Size by memory, not cores: each worker peaks at several GB.
 %     'Days'     days to build (default [16 17 18])
 %     ...        any other option goes to mvt.options: Force, Clean, DryRun,
@@ -75,7 +79,7 @@ failures = {};
 for day = days
     for iStage = 1:numel(perDay)
         stage = perDay{iStage};
-        if workers > 1 && ismember(stage, {'slim', 'full'})
+        if workers > 1 && ismember(stage, {'slim', 'full', 'lanes'})
             thunk = @() mvt.runShards(stage, day, workers, opts);
         else
             thunk = @() mvt.build(stage, day, opts);
@@ -220,20 +224,32 @@ end
 
 % ---------------------------------------------------------------------------
 function stages = expandTarget(target)
+% The figure stages are split by what they read, so that a results-only
+% download can build everything it is able to before anything reaches for the
+% slim tree: 'figures-from-mat' needs only results/gps and the .mat
+% intermediates, 'figures-from-slim' needs the slim JSON (or, for micro, the
+% reduced plotting caches derived from it). See docs/DOWNLOADS.md.
 switch target
     case 'all'
-        stages = {'gps', 'slim', 'samples', 'fields', 'macro', 'micro', 'av'};
+        stages = {'gps', 'slim', 'lanes', 'lc', 'samples', 'fields', ...
+            'macro', 'lcplot', 'av', 'micro', 'relspeed'};
     case 'data'
-        stages = {'gps', 'slim', 'samples', 'fields'};
+        stages = {'gps', 'slim', 'lanes', 'lc', 'samples', 'fields'};
     case 'figures'
-        stages = {'macro', 'micro'};
-    case {'gps', 'slim', 'full', 'samples', 'fields', 'macro', 'micro', 'av'}
+        stages = {'macro', 'lcplot', 'av', 'micro', 'relspeed'};
+    case 'figures-from-mat'
+        stages = {'macro', 'lcplot', 'av'};
+    case 'figures-from-slim'
+        stages = {'micro', 'relspeed'};
+    case {'gps', 'slim', 'full', 'lanes', 'lc', 'lcplot', 'relspeed', ...
+            'samples', 'fields', 'macro', 'micro', 'av'}
         stages = {target};
     otherwise
         error('mvt:make:unknownTarget', ...
-            ['Unknown target ''%s''. Expected all, data, figures, status, ', ...
-             'config, or a stage: gps slim full samples fields macro micro av.'], ...
-            target);
+            ['Unknown target ''%s''. Expected all, data, figures, ', ...
+             'figures-from-mat, figures-from-slim, status, config, or a ', ...
+             'stage: gps slim full lanes lc lcplot relspeed samples fields ', ...
+             'macro micro av.'], target);
 end
 end
 

@@ -27,16 +27,25 @@ The pipeline expects this repository to sit **next to** the `data/` and
   results/               <- processed inputs and outputs (slim/, gps/, figures/)
 ```
 
-The data are distributed separately (see the download instructions further
-down). Once you have them, check the layout is correct:
+The data are distributed separately, in three routes of increasing size —
+**~5 GB** for the figures that build from the `.mat` intermediates, **+51 GB**
+to regenerate those from the slim trajectories, **+59 GB** to rebuild
+everything from the raw data. Pick one in
+[What to download](#what-to-download) before going further; the smallest route
+needs no trajectory files at all.
+
+Once you have them, check the layout is correct:
 
 ```bash
 ./check_data.sh          # reports what's present and which workflows can run
 ```
 
-It tells you whether you can **plot/analyze** (needs `results/slim` + `results/gps`)
-and/or **bootstrap from raw data** (needs `data/cars` + `data/i24motion`). If the
-folders are elsewhere, point it at them:
+It tells you whether you can **plot/analyze** (needs `results/slim` +
+`results/gps`) and/or **bootstrap from raw data** (needs `data/cars` +
+`data/i24motion`). Note that it does not yet know about the smallest download
+route: `make figures-from-mat` needs only `results/gps` and the `.mat`
+intermediates, so `check_data.sh` will report that plotting is unavailable even
+when that route will work. If the folders are elsewhere, point it at them:
 
 ```bash
 MVT_DATA_DIR=/abs/data MVT_RESULTS_DIR=/abs/results ./check_data.sh
@@ -113,18 +122,43 @@ and does nothing otherwise. Editing a script therefore causes exactly the
 affected outputs to rebuild — the older behavior ("output file exists, skip")
 meant a code change silently produced nothing until you deleted files by hand.
 
+### Stages
+
+| stage | what it makes | reads |
+|---|---|---|
+| `gps` | `results/gps/CIRCLES_GPS_10Hz_*.json` | raw car CSVs + MOTION segments |
+| `slim` | released westbound trajectories | raw MOTION segments + gps |
+| `full` | adds eastbound and reference trajectories | the same (opt-in; not built by `all`) |
+| `lanes` | 24 origin/destination-lane sidecars per day | raw MOTION segments |
+| `lc` | `LC_data_DD.mat`, the day's lane-change events | slim + the sidecars |
+| `samples` | `samples_for_distance_analysis_DD.mat` | slim |
+| `fields` | `fields_motion_2022-11-DD.mat` | slim |
+| `macro` | macroscopic field figures | `fields_*.mat` + gps |
+| `lcplot` | four lane-change figures per day | `LC_data_DD.mat` + gps |
+| `av` | cross-day fuel and sample-count figures | `samples_*.mat`, all days |
+| `micro` | trajectory figures | reduced plotting caches, derived from slim |
+| `relspeed` | two relative-speed figures per day | slim |
+
+`lanes`, `slim` and `full` shard by segment; the rest ignore `Workers`.
+
 ### Targets
 
 ```matlab
 make                          % everything out of date, all three days
-make all Workers 6            % the same, with slim across 6 processes
-make data                     % gps, slim, samples, fields
-make figures                  % macro, micro
+make all Workers 6            % the same, with slim and lanes across 6 processes
+make data                     % gps, slim, lanes, lc, samples, fields
+make figures                  % macro, lcplot, av, micro, relspeed
+make figures-from-mat         % only the figures that need no slim tree
+make figures-from-slim        % the rest: micro, relspeed
 make slim                     % one stage
 make slim Days 18             % one stage, one day
 make status                   % what is stale, and why; builds nothing
 make config                   % resolved paths, days, workers, data version
 ```
+
+`make` builds `figures-from-mat` before `figures-from-slim`, so a results-only
+download produces everything it can before anything reaches for the 51 GB slim
+tree. See [What to download](#what-to-download).
 
 Options may follow any target: `Workers`, `Days`, `Force`, `Clean`, `DryRun`,
 `Verbose`, `SettleSeconds` (see `Scripts/+mvt/options.m`). Command syntax is
@@ -415,6 +449,74 @@ Information from team-installed GPS sensors was collected at 10-Hz. These data i
 
 #### Data Collection from CIRCLES Cars with team-designed on-board data collection
 Information from team-installed computers that interface with the Controller Area Network (CAN) were critical to sensing and control of the experiment cars. These data are aligned with the raw GPS information to provide the state of the vehicle at that time (speed, assigned lane of travel, desired cruise control set point, etc.). 
+
+## What to download
+
+Three routes, easiest first. Each one is a superset of the one before it, so
+pick by how much you want to rebuild rather than by which figures you want.
+
+### 1. Figures only (~5 GB) — `make figures-from-mat`
+
+Gets you the macroscopic field figures, the four lane-change figures per day,
+and the cross-day fuel figures, without decoding a single trajectory file.
+Download, into a `results/` folder beside this repository:
+
+| what | size | needed by |
+|---|---|---|
+| `results/gps/` | 821 MB | `macro`, `lcplot` |
+| `fields_motion_2022-11-DD.mat` | 46 MB | `macro` |
+| `LC_data_DD.mat` | 40 MB | `lcplot` |
+| `samples_for_distance_analysis_DD.mat` | 3.9 GB | `av` |
+
+The `.mat` files live in `results/figures/2022-11-DD/`. Then:
+
+```bash
+make figures-from-mat
+```
+
+Skip `samples_*.mat` and you are down to **~0.9 GB** for the field and
+lane-change figures alone — the cheapest useful entry point.
+
+`micro` and `relspeed` are *not* in this route: both read the slim
+trajectories. `make` will attempt them after the others and report what is
+missing, which is why the figures that can be built are built first.
+
+### 2. Slim data (+51 GB) — `make`
+
+Adds `results/slim/`, which lets every `.mat` intermediate above be
+regenerated rather than downloaded, and enables `micro` and `relspeed`.
+
+```bash
+make            # regenerates the .mat intermediates, then every figure
+```
+
+`micro` derives ~4.6 GB per day of reduced plotting caches from slim on first
+run (under `results/.mvt/cache/`); later runs reuse them.
+
+### 3. Raw data (+59 GB) — `make rebuild`
+
+Adds `data/`, the raw I-24 MOTION segments and car CSVs, and regenerates
+everything from them: `gps`, `slim`, `lanes`, then the intermediates and the
+figures. `full` stays opt-in.
+
+```bash
+make rebuild                                   # in place
+make RESULTS=/path/to/results_test rebuild     # into a fresh tree instead
+```
+
+Expect hours, not minutes. Use `Workers`/`SHARDS` to spread `slim` and `lanes`
+across processes, and size that by memory rather than by cores — each process
+holds a decoded segment.
+
+### Which figures need what
+
+| figure | stage | needs |
+|---|---|---|
+| macroscopic fields | `macro` | `fields_*.mat` + gps |
+| lane-change exposure, rate, cumulative excess | `lcplot` | `LC_data_DD.mat` + gps |
+| fuel results, sample counts | `av` | `samples_*.mat` |
+| trajectory plots | `micro` | slim (via the reduced caches) |
+| relative speed to the nearest AV | `relspeed` | slim |
 
 ## Data Install
 
