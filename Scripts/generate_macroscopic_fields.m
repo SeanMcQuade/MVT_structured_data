@@ -86,7 +86,7 @@ parentDirectory = p.repoRoot; %#ok<NASGU> % retained for local edits/debugging
 dataRootDirectory = p.dataRoot;
 dataFolderPath = mvt.dayDir('slim', processingDay);
 
-outputPath = mvt.dayDir('figures', processingDay);
+outputPath = mvt.dayDir('analysis', processingDay);
 
 mvt.ensureDir(outputPath)
 

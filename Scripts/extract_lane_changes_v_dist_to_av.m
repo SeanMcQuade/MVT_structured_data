@@ -14,7 +14,7 @@ function [] = extract_lane_changes_v_dist_to_av(processingDay, varargin)
 %                  Force, Clean, DryRun, Verbose
 %
 % Outputs
-%   <results>/figures/2022-11-DD/LC_data_DD.mat, holding
+%   <results>/analysis/2022-11-DD/LC_data_DD.mat, holding
 %     all_lane_changes_start  merge-in events (one row per AV the event was
 %                             measured against, upstream and downstream)
 %     all_lane_changes_end    merge-out events, likewise
@@ -50,7 +50,7 @@ opts = mvt.options(varargin{:});
 % Initialize
 %========================================================================
 slimPath = mvt.dayDir('slim', processingDay);
-outputPath = mvt.dayDir('figures', processingDay);
+outputPath = mvt.dayDir('analysis', processingDay);
 mvt.ensureDir(outputPath)
 
 % Segment order comes from the manifest rather than from dir(), so the slim

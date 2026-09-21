@@ -71,7 +71,7 @@ end
 
 % create the save output folder if it does not already exist
 
-outputPath = mvt.dayDir('figures', processingDay);
+outputPath = mvt.dayDir('analysis', processingDay);
 
 mvt.ensureDir(outputPath)
 

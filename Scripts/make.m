@@ -231,18 +231,18 @@ function stages = expandTarget(target)
 % reduced plotting caches derived from it). See docs/DOWNLOADS.md.
 switch target
     case 'all'
-        stages = {'gps', 'slim', 'lanes', 'lc', 'samples', 'fields', ...
-            'macro', 'lcplot', 'av', 'micro', 'relspeed'};
+        stages = {'gps', 'slim', 'lanes', 'lc', 'relspeed', 'samples', ...
+            'fields', 'macro', 'lcplot', 'av', 'relspeedplot', 'micro'};
     case 'data'
-        stages = {'gps', 'slim', 'lanes', 'lc', 'samples', 'fields'};
+        stages = {'gps', 'slim', 'lanes', 'lc', 'relspeed', 'samples', 'fields'};
     case 'figures'
-        stages = {'macro', 'lcplot', 'av', 'micro', 'relspeed'};
+        stages = {'macro', 'lcplot', 'av', 'relspeedplot', 'micro'};
     case 'figures-from-mat'
-        stages = {'macro', 'lcplot', 'av'};
+        stages = {'macro', 'lcplot', 'av', 'relspeedplot'};
     case 'figures-from-slim'
-        stages = {'micro', 'relspeed'};
+        stages = {'micro'};
     case {'gps', 'slim', 'full', 'lanes', 'lc', 'lcplot', 'relspeed', ...
-            'samples', 'fields', 'macro', 'micro', 'av'}
+            'relspeedplot', 'samples', 'fields', 'macro', 'micro', 'av'}
         stages = {target};
     otherwise
         error('mvt:make:unknownTarget', ...

@@ -10,7 +10,7 @@ function build(stage, day, varargin)
 %
 % Inputs
 %   stage  'gps' | 'slim' | 'full' | 'lanes' | 'lc' | 'lcplot' | 'relspeed'
-%          | 'samples' | 'fields' | 'macro' | 'micro' | 'av'
+%          | 'relspeedplot' | 'samples' | 'fields' | 'macro' | 'micro' | 'av'
 %   day    16, 17, or 18; ignored (may be []) for the cross-day 'av' stage
 %   ...    options struct and/or name/value pairs (see mvt.options)
 %
@@ -46,6 +46,8 @@ switch stage
         extract_lane_changes_v_dist_to_av(day, opts);
     case 'relspeed'
         relative_speed_histogram(day, opts);
+    case 'relspeedplot'
+        plot_relative_speed(day, opts);
     case 'lcplot'
         plotting_LC_analysis(day, opts);
     case 'samples'
@@ -61,7 +63,8 @@ switch stage
     otherwise
         error('mvt:build:unknownStage', ...
             ['Unknown stage ''%s''. Expected one of: gps, slim, full, ', ...
-            'lanes, lc, lcplot, relspeed, samples, fields, macro, micro, av.'], stage);
+            'lanes, lc, lcplot, relspeed, relspeedplot, samples, fields, macro, ', ...
+            'micro, av.'], stage);
 end
 
 % Record what this folder now holds. Never let bookkeeping fail a stage that

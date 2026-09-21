@@ -45,8 +45,9 @@ for processingDay = opts.Days
     mvt.build('lc', processingDay, opts);
     % Lane-change rates and exposure relative to the engaged AVs
     mvt.build('lcplot', processingDay, opts);
-    % Relative speed of traffic to the nearest engaged AV
+    % Relative speed of traffic to the nearest engaged AV: pool, then plot
     mvt.build('relspeed', processingDay, opts);
+    mvt.build('relspeedplot', processingDay, opts);
     % Generate samples for analysis
     mvt.build('samples', processingDay, opts);
     % Generate macroscopic fields from MOTION data

@@ -15,7 +15,8 @@ function outputs = expectedOutputs(stage, day, opts)
 %            'full'     generate_data_mvt_full
 %            'lanes'    generate_orig_dist_lanes (per-segment sidecars)
 %            'lc'       extract_lane_changes_v_dist_to_av
-%            'relspeed' relative_speed_histogram (+ binned_relative_speed)
+%            'relspeed' relative_speed_histogram (pooled samples)
+%            'relspeedplot' plot_relative_speed (+ binned_relative_speed)
 %            'lcplot'   plotting_LC_analysis
 %            'samples'  generate_data_samples
 %            'fields'   generate_macroscopic_fields
@@ -44,6 +45,9 @@ end
 mvt.assertDay(day);
 
 figuresDir = mvt.dayDir('figures', day);
+% The derived .mat intermediates live apart from the generated figures, so a
+% results-only download can take the inputs without also taking the outputs.
+analysisDir = mvt.dayDir('analysis', day);
 dateTag = sprintf('202211%d', day);   % yyyyMMdd as used in figure names
 
 switch lower(stage)
@@ -64,24 +68,29 @@ switch lower(stage)
         % (I-24MOTION_<date>_<time>_orig_dist_lane.mat). Derived from the
         % manifest, so the 24 names are known without decoding anything.
         %
-        % These live under figures/ rather than beside the slim JSON they
+        % These live under analysis/ rather than beside the slim JSON they
         % describe: slim/ is the released data set, and a per-segment
         % intermediate of a downstream analysis does not belong in it.
         segments = mvt.manifest(day, opts);
         outputs = cell(1, numel(segments));
         for iSeg = 1:numel(segments)
-            outputs{iSeg} = fullfile(figuresDir, ...
+            outputs{iSeg} = fullfile(analysisDir, ...
                 mvt.laneSidecarName(segments(iSeg).outputName));
         end
 
     case 'lc'
-        outputs = {fullfile(figuresDir, sprintf('LC_data_%d.mat', day))};
+        outputs = {fullfile(analysisDir, sprintf('LC_data_%d.mat', day))};
 
     case 'relspeed'
+        % The pooled relative-speed samples: the expensive half, so that the
+        % figures can be remade without the slim tree.
+        outputs = {fullfile(analysisDir, sprintf('relspeed_data_%d.mat', day))};
+
+    case 'relspeedplot'
         % These sit at the figures root, not in a day folder, and keep the
         % spaces in their names: the paper already cites them that way. The
-        % segment range is a tunable at the top of the stage, so the first is
-        % matched as a glob the way the other figure stages are.
+        % segment range is a tunable of the data stage, so the first is matched
+        % as a glob the way the other figure stages are.
         p = mvt.paths();
         figuresRoot = fullfile(p.resultsDir, 'figures');
         outputs = { ...
@@ -100,11 +109,11 @@ switch lower(stage)
             fullfile(figuresDir, sprintf('fig_lc_cumulative_excess_combined_%s.png', dateTag))};
 
     case 'samples'
-        outputs = {fullfile(figuresDir, ...
+        outputs = {fullfile(analysisDir, ...
             sprintf('samples_for_distance_analysis_%d.mat', day))};
 
     case 'fields'
-        outputs = {fullfile(figuresDir, ...
+        outputs = {fullfile(analysisDir, ...
             sprintf('fields_motion_2022-11-%d.mat', day))};
 
     case 'macro'
@@ -130,6 +139,7 @@ switch lower(stage)
     otherwise
         error('mvt:expectedOutputs:unknownStage', ...
             ['Unknown stage ''%s''. Expected one of: gps, slim, full, ', ...
-            'lanes, lc, lcplot, relspeed, samples, fields, macro, micro, av.'], stage);
+            'lanes, lc, lcplot, relspeed, relspeedplot, samples, fields, macro, ', ...
+            'micro, av.'], stage);
 end
 end

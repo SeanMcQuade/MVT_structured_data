@@ -66,7 +66,9 @@ colorbarLimit.Psi =  0.22; % (g/m)
 p = mvt.paths();
 parentDirectory = p.repoRoot; %#ok<NASGU> % retained for local edits/debugging
 dataRootDirectory = p.dataRoot;
-inputPath = mvt.dayDir('figures', processingDay);
+inputPath = mvt.dayDir('analysis', processingDay);   % fields_motion_*.mat
+outputPath = mvt.dayDir('figures', processingDay);   % the .png this writes
+mvt.ensureDir(outputPath)
 
 filename = fullfile(inputPath ,['fields_motion_2022-11-'...
      num2str(processingDay) '.mat']);
@@ -211,7 +213,7 @@ for i = 1:length(plotFields)
             filename = [filename,'_av'];
         end
         filename = [filename,'_nature_large'];
-        filename = fullfile(inputPath,filename);
+        filename = fullfile(outputPath,filename);
         fprintf('Save figure in %s ...',filename), tic
         set(gcf,'Position',[10 50 figRes],'PaperPositionMode','auto')
         set(gca,'Position',[.023 .093 .92 .866])

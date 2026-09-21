@@ -46,7 +46,9 @@ outputPath = mvt.dayDir('figures', processingDay);
 mvt.ensureDir(outputPath)
 
 outputs = mvt.expectedOutputs('lcplot', processingDay, opts);
-filenameLoad = fullfile(outputPath, ...
+% The lane-change events are a derived .mat intermediate, and live apart from
+% the figures this stage writes.
+filenameLoad = fullfile(mvt.dayDir('analysis', processingDay), ...
     ['LC_data_' char(num2str(processingDay)) '.mat']);
 gpsFile = fullfile(p.resultsDir, 'gps', ...
     ['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json']);

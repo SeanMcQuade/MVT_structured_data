@@ -14,7 +14,7 @@ function [] = generate_orig_dist_lanes(processingDay, varargin)
 %                  Force, Clean, DryRun, Verbose, Shard
 %
 % Outputs
-%   <results>/figures/2022-11-DD/
+%   <results>/analysis/2022-11-DD/
 %     I-24MOTION_2022-11-DD_HH-MM-SS_orig_dist_lane.mat
 %   one per raw segment, holding dataTemp_lane_orig_dist: a struct array with
 %   origin_lane and destination_lane, in the same order as the trajectories in
@@ -93,7 +93,7 @@ parentDirectory = p.repoRoot;
 % The sidecars live with the other analysis .mat products, not in slim/, which
 % holds the released data set. mvt.expectedOutputs is the single declaration of
 % both the folder and the 24 names.
-outputPath = mvt.dayDir('figures', processingDay);
+outputPath = mvt.dayDir('analysis', processingDay);
 mvt.ensureDir(outputPath)
 
 % Map each raw segment to the file it produces, without decoding it. This is

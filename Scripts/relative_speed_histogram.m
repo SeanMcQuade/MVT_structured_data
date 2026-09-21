@@ -3,10 +3,11 @@ function [] = relative_speed_histogram(processingDay, varargin)
 % (C) 2026/05/26 by Benjamin Seibold, added to by Sean McQuade
 %
 % Purpose
-%   Builds the paper's relative-speed figures for one day: a histogram of the
-%   relative speed between each vehicle and the engaged AV ahead of it, and
-%   (via binned_relative_speed) the same statistic binned by distance behind
-%   that AV.
+%   Pools, for one day, the relative speed between each vehicle and the engaged
+%   AV ahead of it, and saves the result. This is the expensive half of the
+%   relative-speed analysis: it decodes all 24 slim segments. plot_relative_speed
+%   turns the saved samples into the figures, so those can be remade without the
+%   slim tree.
 %
 % Inputs
 %   processingDay  16, 17, or 18 (November 2022)
@@ -14,12 +15,11 @@ function [] = relative_speed_histogram(processingDay, varargin)
 %                  Force, Clean, DryRun, Verbose
 %
 % Outputs
-%   <results>/figures/
-%     Relative speed histogram, day DD for files j = 1 to 24.pdf
-%     Relative speeds behind AV, day DD.pdf
-%   The names, spaces included, are the ones the paper already cites, and the
-%   figures sit at the figures root rather than in a day folder, which is where
-%   this script has always put them. Both are declared in mvt.expectedOutputs.
+%   <results>/analysis/2022-11-DD/relspeed_data_DD.mat, holding
+%     filtered_dist_all_files   distance to the nearest engaged AV (m), pooled
+%                               over the day's segments
+%     filtered_speed_all_files  the matching relative speeds (m/s)
+%     plus the bounds and segment range they were pooled under, as provenance
 %
 % Algorithm
 %   1. Rebuild only when the figures are older than the day's slim segments or
@@ -27,18 +27,15 @@ function [] = relative_speed_histogram(processingDay, varargin)
 %   2. Per segment, difference the distance to the downstream engaged AV to get
 %      a relative speed, using one-sided stencils where the tracked AV changes
 %      or the distance jumps, then smooth it.
-%   3. Pool samples between lower_Bnd and upper_Bnd metres over the whole day,
-%      plot the histogram with mean/median/spread, and hand the pooled samples
-%      to binned_relative_speed for the distance-binned figure.
+%   3. Pool samples between lower_Bnd and upper_Bnd metres over the whole day
+%      and save them for plot_relative_speed.
 %
 % Notes
 %   Needs the Statistics and Machine Learning Toolbox (prctile, adtest).
-%   Figures are rendered off-screen and closed, so this is safe under
-%   `matlab -batch`.
 %
 % Dependencies
 %   mvt.options, mvt.dayDir, mvt.manifest, mvt.expectedOutputs, mvt.isStale,
-%   mvt.sources, mvt.ensureDir, mvt.progress, mvt.log, binned_relative_speed
+%   mvt.sources, mvt.atomicSave, mvt.ensureDir, mvt.progress, mvt.log
 %
 if nargin < 1
     error(['Specify the day of Nov. 2022 MVT to build the relative speed ' ...
@@ -57,18 +54,13 @@ edges = -30:0.5:30;          % histogram bin edges for the relative speed (m/s)
 % Only samples this far from the AV are pooled: 30 m puts the 35-45 m bin first
 lower_Bnd = 30;              % (m) nearest relative distance considered
 upper_Bnd = 350;             % (m) furthest relative distance considered
-% Figure canvas in pixels. Pinned for the same reason as in
-% binned_relative_speed: exportgraphics crops to content, and the content
-% extent follows a figure size MATLAB otherwise takes from the screen.
-figRes = [700 420];
 
 %========================================================================
 % Initialize
 %========================================================================
 outputs = mvt.expectedOutputs('relspeed', processingDay, opts);
-histogramFile = outputs{1};
-binnedFile = outputs{2};
-mvt.ensureDir(fileparts(binnedFile))
+outputFile = outputs{1};
+mvt.ensureDir(fileparts(outputFile))
 
 segments = mvt.manifest(processingDay, opts);
 slimPath = mvt.dayDir('slim', processingDay);
@@ -80,12 +72,10 @@ end
 [stale, staleReason] = mvt.isStale(outputs, slimFiles, ...
     mvt.sources('relative_speed_histogram', opts), opts);
 if ~stale
-    mvt.log(opts, 'skip relative speed figures for 2022-11-%d: %s', ...
-        processingDay, staleReason);
+    mvt.log(opts, 'skip relspeed_data_%d.mat: %s', processingDay, staleReason);
     return
 end
-mvt.log(opts, 'build relative speed figures for 2022-11-%d: %s', ...
-    processingDay, staleReason);
+mvt.log(opts, 'build relspeed_data_%d.mat: %s', processingDay, staleReason);
 if opts.Clean && ~opts.DryRun
     mvt.removeOutputs(outputs, opts);
 end
@@ -209,67 +199,19 @@ reportProgress(j - j_start + 1, filename);
 end
 reportProgress();
 
-number_of_data_all_files = length(filtered_speed_all_files);
-mean_all_fil_rel_speed = mean(filtered_speed_all_files,'omitnan');
-median_fil_all_files = prctile(filtered_speed_all_files,50);
-stddev_fil_all_rel_speed = std(filtered_speed_all_files, 'omitnan');
-first_quartile_fil_all = prctile(filtered_speed_all_files, 25);
-third_quartile_fil_all = prctile(filtered_speed_all_files,75);
-
-%plot relative speed histogram for all files
-fig = figure('Visible', 'off', 'Position', [10 50 figRes], ...
-    'PaperPositionMode', 'auto');
-closeFigure = onCleanup(@() close(fig));
-hold on
-H = histogram(filtered_speed_all_files,edges);
-plot(mean_all_fil_rel_speed*ones(2,1), [0,max(H.Values)],"LineWidth",2)
-plot(median_fil_all_files*ones(2,1),[0,0.5*max(H.Values)],"LineWidth",2)
-std_dev = [mean_all_fil_rel_speed-stddev_fil_all_rel_speed,...
-           mean_all_fil_rel_speed + stddev_fil_all_rel_speed];
-interquartile_all = [first_quartile_fil_all, third_quartile_fil_all];
-plot(std_dev, [10,10],"LineWidth",3)
-plot(interquartile_all, [0.5,0.5],"LineWidth",4)
-% fontsz = 24;
-fontsz=8;
-legendformatSpec_mean = "mean speed = %3.3f (m/s)";
-mean_legend = sprintf(legendformatSpec_mean,mean_all_fil_rel_speed);
-legendformatSpec_med = "median speed = %3.3f (m/s)";
-med_legend = sprintf(legendformatSpec_med,median_fil_all_files);
-legend("histogram", mean_legend, med_legend, "Standard Dev", "Interquartile", ...
-                                                       "FontSize",fontsz)
-
-if day == 16 %Write the day in the title
-    % formatSpec = "Relative speed histogram Wed, " + ...
-    %     "for files %d to %d, total data points = %d";
-    % title_string = sprintf(formatSpec,j_start,j_end,number_of_data_all_files);
-    title_string = "Relative speed histogram Wednesday 16-Nov-2022";
-elseif day == 17
-    % formatSpec = "Relative speed histogram Thurs, " + ...
-    %     "for files %d to %d, total data points = %d";
-    % title_string = sprintf(formatSpec,j_start,j_end,number_of_data_all_files);
-    title_string = "Relative speed histogram Thursday 17-Nov-2022";
-elseif day == 18
-    % formatSpec = "Relative speed histogram Fri, " + ...
-    %     "for file %d to %d, total data points = %d";
-    % title_string = sprintf(formatSpec, j_start, j_end,number_of_data_all_files);
-    title_string = "Relative speed histogram Friday 18-Nov-2022";
-end
-
-title(title_string,"FontSize",fontsz);
-xlim([-15 15]);
-xlabel("Relative Speed (m/s)","FontSize",fontsz);
-% ylabel_formatSpec = "Frequency of speeds";
-% ylabel_string = sprintf(ylabel_formatSpec, lower_Bnd, upper_Bnd);
-ylabel_string = "Number of samples";
-ylabel(ylabel_string,"FontSize",fontsz);
-fprintf('Save figure in %s ...', histogramFile), tic
-exportgraphics(fig, histogramFile, 'ContentType', 'vector');
+%========================================================================
+% Save the pooled samples
+%========================================================================
+% The bounds and segment range travel with the data: the figures are only
+% comparable across days if they were pooled the same way.
+fprintf('Writing %s (%d samples) ...', outputFile, ...
+    numel(filtered_speed_all_files)); tic
+mvt.atomicSave(outputFile, struct( ...
+    'filtered_dist_all_files', filtered_dist_all_files, ...
+    'filtered_speed_all_files', filtered_speed_all_files, ...
+    'lower_Bnd', lower_Bnd, 'upper_Bnd', upper_Bnd, ...
+    'j_start', j_start, 'j_end', j_end, 'day', processingDay));
 fprintf(' Done (%0.0fsec).\n', toc)
-
-% average speed in standard distance bins from the AV; once a script sharing
-% this workspace, now a function taking what it needs
-binned_relative_speed(filtered_dist_all_files, filtered_speed_all_files, ...
-    day, binnedFile);
 
 % Returns h = 1 if the data is NOT Gaussian, h = 0 if it IS Gaussian
 [h,p] = adtest(filtered_speed_all_files);

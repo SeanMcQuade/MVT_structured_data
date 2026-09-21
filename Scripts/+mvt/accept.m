@@ -35,7 +35,7 @@ function accepted = accept(varargin)
 
 opts = mvt.options(varargin{:});
 stages = {'gps', 'slim', 'full', 'lanes', 'lc', 'lcplot', 'relspeed', ...
-    'samples', 'fields', 'macro', 'micro'};
+    'relspeedplot', 'samples', 'fields', 'macro', 'micro'};
 accepted = {};
 
 for day = opts.Days

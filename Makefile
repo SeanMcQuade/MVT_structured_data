@@ -81,8 +81,9 @@ SRC_slim    := $(SCRIPTS)/generate_data_mvt_slim.m $(FUEL_MODELS)
 SRC_full    := $(SCRIPTS)/generate_data_mvt_full.m $(FUEL_MODELS)
 SRC_lanes   := $(SCRIPTS)/generate_orig_dist_lanes.m
 SRC_lc      := $(SCRIPTS)/extract_lane_changes_v_dist_to_av.m
-SRC_relspeed := $(SCRIPTS)/relative_speed_histogram.m $(SCRIPTS)/binned_relative_speed.m
+SRC_relspeed := $(SCRIPTS)/relative_speed_histogram.m
 SRC_lcplot  := $(SCRIPTS)/plotting_LC_analysis.m
+SRC_relspeedplot := $(SCRIPTS)/plot_relative_speed.m $(SCRIPTS)/binned_relative_speed.m
 SRC_samples := $(SCRIPTS)/generate_data_samples.m
 SRC_fields  := $(SCRIPTS)/generate_macroscopic_fields.m
 SRC_macro   := $(SCRIPTS)/plot_macroscopic_fields.m
@@ -126,7 +127,7 @@ endef
 # Aggregate targets
 # ---------------------------------------------------------------------------
 .PHONY: all data figures figures-from-mat figures-from-slim \
-        gps slim full lanes lc lcplot relspeed samples fields \
+        gps slim full lanes lc lcplot relspeed relspeedplot samples fields \
         macro micro av \
         status config test help migrate-cache migrate-lanes accept watch \
         watch-once verify
@@ -139,23 +140,24 @@ all: figures-from-mat figures-from-slim
 # `lanes` and `lc` are part of the data set but not yet of `all`: the figures
 # that consume LC_data (plotting_LC_analysis) are not wired in yet, so nothing
 # downstream of them would be built.
-data: gps slim lanes lc samples fields
+data: gps slim lanes lc relspeed samples fields
 
 figures: figures-from-mat figures-from-slim
 
 # Buildable from results/gps plus the .mat intermediates (fields_*, samples_*,
 # LC_data_*) - no slim tree required.
-figures-from-mat: macro lcplot av
+figures-from-mat: macro lcplot av relspeedplot
 
 # These read the slim JSON, or (for micro) the reduced plotting caches derived
 # from it, so they need one of the larger downloads.
-figures-from-slim: micro relspeed
+figures-from-slim: micro
 
 gps:     $(foreach d,$(DAYS),$(STAMPS)/gps-$(d))
 slim:    $(foreach d,$(DAYS),$(STAMPS)/slim-$(d))
 lanes:   $(foreach d,$(DAYS),$(STAMPS)/lanes-$(d))
 lc:      $(foreach d,$(DAYS),$(STAMPS)/lc-$(d))
 relspeed: $(foreach d,$(DAYS),$(STAMPS)/relspeed-$(d))
+relspeedplot: $(foreach d,$(DAYS),$(STAMPS)/relspeedplot-$(d))
 lcplot:  $(foreach d,$(DAYS),$(STAMPS)/lcplot-$(d))
 full:    $(foreach d,$(DAYS),$(STAMPS)/full-$(d))
 samples: $(foreach d,$(DAYS),$(STAMPS)/samples-$(d))
@@ -166,12 +168,13 @@ av:      $(STAMPS)/av
 
 # Convenience aliases so `make slim-17` works as well as `make $(STAMPS)/slim-17`
 define day_aliases
-.PHONY: gps-$(1) slim-$(1) full-$(1) lanes-$(1) lc-$(1) lcplot-$(1) relspeed-$(1) samples-$(1) fields-$(1) macro-$(1) micro-$(1) day-$(1)
+.PHONY: gps-$(1) slim-$(1) full-$(1) lanes-$(1) lc-$(1) lcplot-$(1) relspeed-$(1) relspeedplot-$(1) samples-$(1) fields-$(1) macro-$(1) micro-$(1) day-$(1)
 gps-$(1):     $(STAMPS)/gps-$(1)
 slim-$(1):    $(STAMPS)/slim-$(1)
 lanes-$(1):   $(STAMPS)/lanes-$(1)
 lc-$(1):      $(STAMPS)/lc-$(1)
 relspeed-$(1): $(STAMPS)/relspeed-$(1)
+relspeedplot-$(1): $(STAMPS)/relspeedplot-$(1)
 lcplot-$(1):  $(STAMPS)/lcplot-$(1)
 full-$(1):    $(STAMPS)/full-$(1)
 samples-$(1): $(STAMPS)/samples-$(1)
@@ -221,6 +224,11 @@ $(STAMPS)/lcplot-%: $(SRC_lcplot) $(STAMPS)/lc-% $(STAMPS)/gps-% | $(STAMPS)
 
 $(STAMPS)/relspeed-%: $(SRC_relspeed) $(STAMPS)/slim-% | $(STAMPS)
 	$(call run_stage,relspeed,$*)
+	@touch $@
+
+# The figures come from the pooled samples, so they need no slim tree.
+$(STAMPS)/relspeedplot-%: $(SRC_relspeedplot) $(STAMPS)/relspeed-% | $(STAMPS)
+	$(call run_stage,relspeedplot,$*)
 	@touch $@
 
 $(STAMPS)/samples-%: $(SRC_samples) $(STAMPS)/slim-% | $(STAMPS)
@@ -381,7 +389,7 @@ clean-cache:
 	rm -rf $(STATE)/cache
 
 define clean_aliases
-.PHONY: clean-figures-$(1) clean-slim-$(1) clean-full-$(1) clean-lanes-$(1) clean-lc-$(1) clean-lcplot-$(1) clean-relspeed-$(1)
+.PHONY: clean-figures-$(1) clean-slim-$(1) clean-full-$(1) clean-lanes-$(1) clean-lc-$(1) clean-lcplot-$(1) clean-relspeed-$(1) clean-relspeedplot-$(1)
 clean-figures-$(1):
 	rm -f $(RESULTS)/figures/2022-11-$(1)/fig_*.png $(RESULTS)/figures/2022-11-$(1)/fig_*.fig
 	rm -f $(STAMPS)/macro-$(1) $(STAMPS)/micro-$(1)
@@ -394,18 +402,21 @@ clean-full-$(1):
 	rm -f $(RESULTS)/full/2022-11-$(1)/I-24MOTION_*.json
 	rm -f $(STAMPS)/full-$(1)
 clean-lanes-$(1):
-	rm -f $(RESULTS)/figures/2022-11-$(1)/I-24MOTION_*_orig_dist_lane.mat
+	rm -f $(RESULTS)/analysis/2022-11-$(1)/I-24MOTION_*_orig_dist_lane.mat
 	rm -f $(STAMPS)/lanes-$(1)
 clean-lcplot-$(1):
 	rm -f $(RESULTS)/figures/2022-11-$(1)/fig_lc_*_202211$(1).png
 	rm -f $(STAMPS)/lcplot-$(1)
 clean-lc-$(1):
-	rm -f $(RESULTS)/figures/2022-11-$(1)/LC_data_$(1).mat
+	rm -f $(RESULTS)/analysis/2022-11-$(1)/LC_data_$(1).mat
 	rm -f $(STAMPS)/lc-$(1)
 clean-relspeed-$(1):
+	rm -f $(RESULTS)/analysis/2022-11-$(1)/relspeed_data_$(1).mat
+	rm -f $(STAMPS)/relspeed-$(1)
+clean-relspeedplot-$(1):
 	rm -f "$(RESULTS)/figures/Relative speed histogram, day $(1) for files j = "*.pdf
 	rm -f "$(RESULTS)/figures/Relative speeds behind AV, day $(1).pdf"
-	rm -f $(STAMPS)/relspeed-$(1)
+	rm -f $(STAMPS)/relspeedplot-$(1)
 endef
 $(foreach d,16 17 18,$(eval $(call clean_aliases,$(d))))
 
