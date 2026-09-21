@@ -39,6 +39,14 @@ for processingDay = opts.Days
     mvt.build('full', processingDay, opts);
     % Generate slim version of the data for a full test day
     mvt.build('slim', processingDay, opts);
+    % Record the origin and destination lane of every slim trajectory
+    mvt.build('lanes', processingDay, opts);
+    % Collect lane-change events and their distance to the AVs
+    mvt.build('lc', processingDay, opts);
+    % Lane-change rates and exposure relative to the engaged AVs
+    mvt.build('lcplot', processingDay, opts);
+    % Relative speed of traffic to the nearest engaged AV
+    mvt.build('relspeed', processingDay, opts);
     % Generate samples for analysis
     mvt.build('samples', processingDay, opts);
     % Generate macroscopic fields from MOTION data

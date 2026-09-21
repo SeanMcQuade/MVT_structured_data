@@ -1,30 +1,57 @@
 function [] = generate_orig_dist_lanes(processingDay, varargin)
+% GENERATE_ORIG_DIST_LANES  Origin and destination lane of every slim trajectory.
 % (C) 2026 CIRCLES Energy team
 %
-% Function that process base I-24 MOTION data from the MVT to generate
-% a .mat file containing origin and distention of all trajectories in 
-% the slim version of CIRCLES' v2.1 of the data, used in the team nature
-% paper submission, and saves it to json files.
-%
+% Purpose
+%   Processes base I-24 MOTION data from the MVT to record, for every
+%   trajectory in the slim data set, the lane it came from and the lane it went
+%   to. The slim JSON itself carries only the lane the (clipped) trajectory was
+%   driven in, so the lane-change analysis needs this sidecar alongside it.
 %
 % Inputs
 %   processingDay  16, 17, or 18 (November 2022)
 %   varargin       options struct and/or name/value pairs (see mvt.options);
-%                  Force, Clean, DryRun, Verbose
+%                  Force, Clean, DryRun, Verbose, Shard
+%
 % Outputs
-%   <results>/slim/2022-11-DD/
+%   <results>/figures/2022-11-DD/
 %     I-24MOTION_2022-11-DD_HH-MM-SS_orig_dist_lane.mat
+%   one per raw segment, holding dataTemp_lane_orig_dist: a struct array with
+%   origin_lane and destination_lane, in the same order as the trajectories in
+%   the matching slim JSON, which is what lets the consumer pair them by index.
 %
+% Algorithm
+%   1. Resolve paths and the raw-segment manifest (raw file -> output name).
+%   2. Take this shard's segments (mvt.shardIndices; worker k of N takes
+%      k, k+N, ...), and for each one rebuild only when the sidecar is older
+%      than the raw input or the code (mvt.isStale) - checked before the
+%      multi-GB decode, because the manifest already knows the output name.
+%   3. Keep westbound trajectories, assign lanes, and clip lane changes; the
+%      clipping records the origin and destination lane of each clipped piece.
+%   4. Write the sidecar through a temporary name (mvt.atomicSave).
 %
-% Generated .mat files will be saved in ..\results\slim\{DATE} folder.
+% Notes
+%   FORK: the local assign_lanes and clip_lane_changes below are a fork of the
+%   ones in generate_data_mvt_slim.m, extended to track origin_lane and
+%   destination_lane through the clipping. The two copies must stay in step:
+%   the sidecar is paired with the slim JSON *by index*, so any divergence in
+%   the clipping silently mispairs lanes with trajectories rather than failing.
+%   mvt.sources cannot see this coupling, so editing one copy will not
+%   invalidate the other's outputs.
+%   TODO: factor the shared clipping into one file both stages call, and have
+%   this stage keep only the origin/destination bookkeeping.
+%
+% Dependencies
+%   mvt.options, mvt.paths, mvt.dayDir, mvt.manifest, mvt.expectedOutputs,
+%   mvt.isStale, mvt.sources, mvt.shardIndices, mvt.segmentName,
+%   mvt.atomicSave, mvt.ensureDir, mvt.progress, mvt.log
+%
 if nargin < 1
-error(['Specify the day of Nov. 2022 MVT to generate slim'... 
+error(['Specify the day of Nov. 2022 MVT to generate slim'...
         'MVT data files (from 16 to 18)']);
 end
 mvt.assertDay(processingDay)
 opts = mvt.options(varargin{:});
-
-% TODO: update this file to take into account stale files or not
 
 %========================================================================
 % Parameters
@@ -57,32 +84,25 @@ processingOpts.laneChangeClippingOpts.ChangeBufferThresh = 0.2;
 %========================================================================
 % Initilize
 %========================================================================
-% Get file path of base GPS data
-[parentDirectory, ~, ~] = fileparts(pwd);
-% directory above contains only the git repository
-[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
-% directory above that contains the data/ folder
-dataFolderPath = fullfile(dataRootDirectory, 'data', 'i24motion', ...
-    ['2022-11-', num2str(processingDay)]);
+% Resolve the layout: the repository is a sibling of data/ and results/.
+% mvt.paths derives this from the location of the code, so the stage no longer
+% depends on the current folder being Scripts/.
+p = mvt.paths();
+parentDirectory = p.repoRoot;
 
-% Build the output path and filename
-outputPath = fullfile(dataRootDirectory, 'results', 'slim', ...
-    ['2022-11-', num2str(processingDay)]);
+% The sidecars live with the other analysis .mat products, not in slim/, which
+% holds the released data set. mvt.expectedOutputs is the single declaration of
+% both the folder and the 24 names.
+outputPath = mvt.dayDir('figures', processingDay);
+mvt.ensureDir(outputPath)
 
-% Create output directory if needed
-if ~isfolder(outputPath)
-    mkdir(outputPath)
-end
+% Map each raw segment to the file it produces, without decoding it. This is
+% what lets the staleness check below run before the expensive jsondecode.
+segments = mvt.manifest(processingDay, opts);
+outputs = mvt.expectedOutputs('lanes', processingDay, opts);
+sourceFiles = mvt.sources('generate_orig_dist_lanes', opts);
 
-dayAbbrvs = ["mon","tue","wed","thu","fri"];
-dayAbbrv = dayAbbrvs(processingDay-13);
-dataFiles = dir(fullfile(dataFolderPath ,['*_' num2str(dayAbbrv) '_0_*.json']));
-
-% avoid processing files that start with .
-is_dotfile = startsWith({dataFiles.name},'.');
-dataFiles = dataFiles(~is_dotfile);
-
-if length(dataFiles) < 24
+if numel(segments) < 24
     error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.'...
         ,processingDay)
 end
@@ -91,27 +111,54 @@ end
 % Process each I24 MOTION file 
 %========================================================================
 addpath(fullfile(parentDirectory, 'Models'));
-for fileNr = 1:24 % loop over base data files
+% Restores the path even when a segment throws, which the trailing rmpath the
+% loop used to end with did not.
+restoreModelsPath = onCleanup(@() rmpath(fullfile(parentDirectory, 'Models'))); %#ok<NASGU>
+% Segments owned by this shard: worker k of N takes k, k+N, k+2N, ...
+shardSegments = mvt.shardIndices(numel(segments), opts.Shard);
+reportProgress = mvt.progress(numel(shardSegments), ...
+    sprintf('lanes 2022-11-%d', processingDay), 'Opts', opts);
+segmentsDone = 0;
+for fileNr = shardSegments % loop over base data files
+    segment = segments(fileNr);
+    filenameLoad = segment.rawPath;
+    % The output name is known from the manifest, so freshness is decided
+    % before the (multi-minute, multi-GB) decode rather than after it.
+    filenameSave = outputs{fileNr};
+    [~, sidecarName, sidecarExt] = fileparts(filenameSave);
+    sidecarName = [sidecarName sidecarExt];
+    [stale, staleReason] = mvt.isStale(filenameSave, filenameLoad, sourceFiles, opts);
+    if ~stale
+        mvt.log(opts, 'skip %s: %s', sidecarName, staleReason);
+        continue  % advance this part of the loop
+    end
+    mvt.log(opts, 'build %s: %s', sidecarName, staleReason);
+    if opts.Clean && isfile(filenameSave) && ~opts.DryRun
+        delete(filenameSave)
+    end
+    if opts.DryRun
+        continue
+    end
+
     % Load MOTION data file
-    filenameLoad = fullfile(dataFolderPath,dataFiles(fileNr).name);
-    fprintf('Loading and decoding MOTION data file, %d/24 ... ', ...
-        fileNr); tic
+    fprintf('Loading and decoding MOTION data file, %d/%d ... ', ...
+        fileNr, numel(segments)); tic
     dataTemp = jsondecode(fileread(filenameLoad));
     fprintf('Done (%0.0fsec).\n',toc)
 
-        % determine if the file already exists or not...and skip if it does
-    % using dataTemp here, since it is the most recent file, to determine
-    % what the output file name should be
-    fileStartT = (datetime(dataTemp(1).first_timestamp, 'convertfrom', 'posixtime', ...
-    'Format', 'HH:mm:ss.SSS','TimeZone' ,'America/Chicago'));
-    fileStartT = datestr(fileStartT,'YYYY-mm-dd_HH-MM-SS');
-    % outputFolder comes from the top of the file
-    filenameSave = fullfile(outputPath,...
-        ['I-24MOTION_',fileStartT,'.json']);
-    % Save the processed data to a file
-    
+    % Guard against a stale manifest: the name derived from the decoded data
+    % must match the one the manifest predicted.
+    expectedName = mvt.segmentName(dataTemp(1).first_timestamp);
+    if ~strcmp(mvt.laneSidecarName(expectedName), sidecarName)
+        error('mvt:generate_orig_dist_lanes:manifestMismatch', ...
+            ['Manifest predicted %s for %s but the data says %s. ', ...
+            'Delete %s and re-run.'], sidecarName, segment.rawName, ...
+            mvt.laneSidecarName(expectedName), fullfile(p.manifestDir, ...
+            sprintf('segments_2022-11-%d.json', processingDay)));
+    end
+
     % remove eastbound trajectories
-    dataTemp = dataTemp([dataTemp.direction]<0); 
+    dataTemp = dataTemp([dataTemp.direction]<0);
     % delete extra fields
     dataTemp = rmfield(dataTemp,{'flags','compute_node_id','fragment_ids','merged_ids',...
         'configuration_id','fine_vehicle_class','x_score','y_score','road_segment_ids'});
@@ -120,14 +167,26 @@ for fileNr = 1:24 % loop over base data files
     dataLanes = assign_lanes(dataTemp,processingOpts.laneIdentificationOpts);
     % Clip data to remove lane switches
     dataTemp = clip_lane_changes(dataTemp,dataLanes,processingOpts.laneChangeClippingOpts);
+    fprintf('Done (%0.0fsec).\n',toc)
+    % Preallocated fresh for every segment: reusing the variable across
+    % iterations left the previous segment's trailing entries in place whenever
+    % this one yielded fewer trajectories, which also made the result depend on
+    % which segments a shard happened to own.
+    dataTemp_lane_orig_dist = repmat( ...
+        struct('origin_lane', [], 'destination_lane', []), 1, length(dataTemp));
     for i = 1:length(dataTemp)
         dataTemp_lane_orig_dist(i).origin_lane =  dataTemp(i).origin_lane;
         dataTemp_lane_orig_dist(i).destination_lane = dataTemp(i).destination_lane;
     end
-    save([filenameSave(1:end-5) '_orig_dist_lane.mat'],'dataTemp_lane_orig_dist')
-   
+    % Written through a temporary name: a sidecar truncated by an interrupted
+    % run would still satisfy isfile and be taken for a finished product.
+    mvt.atomicSave(filenameSave, ...
+        struct('dataTemp_lane_orig_dist', dataTemp_lane_orig_dist));
+    clear dataTemp dataTemp_lane_orig_dist dataLanes
+    segmentsDone = segmentsDone + 1;
+    reportProgress(segmentsDone, sidecarName);
 end
-rmpath(fullfile(parentDirectory, 'Models'));
+reportProgress();
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%% Local Functions Definitions %%%%%%%%%%%%%%%%%%%%%%%%

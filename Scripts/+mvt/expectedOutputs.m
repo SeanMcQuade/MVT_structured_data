@@ -13,6 +13,10 @@ function outputs = expectedOutputs(stage, day, opts)
 %            'gps'      assemble_data_GPS
 %            'slim'     generate_data_mvt_slim
 %            'full'     generate_data_mvt_full
+%            'lanes'    generate_orig_dist_lanes (per-segment sidecars)
+%            'lc'       extract_lane_changes_v_dist_to_av
+%            'relspeed' relative_speed_histogram (+ binned_relative_speed)
+%            'lcplot'   plotting_LC_analysis
 %            'samples'  generate_data_samples
 %            'fields'   generate_macroscopic_fields
 %            'macro'    plot_macroscopic_fields
@@ -26,8 +30,8 @@ function outputs = expectedOutputs(stage, day, opts)
 %   outputs  cellstr of absolute paths, possibly containing '*' globs
 %
 % Notes
-%   'slim'/'full' consult mvt.manifest, so the caller learns all 24 expected
-%   filenames without decoding any raw data.
+%   'slim'/'full'/'lanes' consult mvt.manifest, so the caller learns all 24
+%   expected filenames without decoding any raw data.
 %
 % Dependencies
 %   mvt.paths, mvt.dayDir, mvt.manifest, mvt.options
@@ -54,6 +58,46 @@ switch lower(stage)
         for iSeg = 1:numel(segments)
             outputs{iSeg} = fullfile(outDir, segments(iSeg).outputName);
         end
+
+    case 'lanes'
+        % One sidecar per raw segment, named after the slim file it pairs with
+        % (I-24MOTION_<date>_<time>_orig_dist_lane.mat). Derived from the
+        % manifest, so the 24 names are known without decoding anything.
+        %
+        % These live under figures/ rather than beside the slim JSON they
+        % describe: slim/ is the released data set, and a per-segment
+        % intermediate of a downstream analysis does not belong in it.
+        segments = mvt.manifest(day, opts);
+        outputs = cell(1, numel(segments));
+        for iSeg = 1:numel(segments)
+            outputs{iSeg} = fullfile(figuresDir, ...
+                mvt.laneSidecarName(segments(iSeg).outputName));
+        end
+
+    case 'lc'
+        outputs = {fullfile(figuresDir, sprintf('LC_data_%d.mat', day))};
+
+    case 'relspeed'
+        % These sit at the figures root, not in a day folder, and keep the
+        % spaces in their names: the paper already cites them that way. The
+        % segment range is a tunable at the top of the stage, so the first is
+        % matched as a glob the way the other figure stages are.
+        p = mvt.paths();
+        figuresRoot = fullfile(p.resultsDir, 'figures');
+        outputs = { ...
+            fullfile(figuresRoot, sprintf( ...
+                'Relative speed histogram, day %d for files j = * to *.pdf', day)), ...
+            fullfile(figuresRoot, sprintf( ...
+                'Relative speeds behind AV, day %d.pdf', day))};
+
+    case 'lcplot'
+        % Order matters: plotting_LC_analysis saves its four figures against
+        % this list by index.
+        outputs = { ...
+            fullfile(figuresDir, sprintf('fig_lc_exposure_%s.png', dateTag)), ...
+            fullfile(figuresDir, sprintf('fig_lc_rate_merge_out_%s.png', dateTag)), ...
+            fullfile(figuresDir, sprintf('fig_lc_cumulative_excess_%s.png', dateTag)), ...
+            fullfile(figuresDir, sprintf('fig_lc_cumulative_excess_combined_%s.png', dateTag))};
 
     case 'samples'
         outputs = {fullfile(figuresDir, ...
@@ -86,6 +130,6 @@ switch lower(stage)
     otherwise
         error('mvt:expectedOutputs:unknownStage', ...
             ['Unknown stage ''%s''. Expected one of: gps, slim, full, ', ...
-            'samples, fields, macro, micro, av.'], stage);
+            'lanes, lc, lcplot, relspeed, samples, fields, macro, micro, av.'], stage);
 end
 end
