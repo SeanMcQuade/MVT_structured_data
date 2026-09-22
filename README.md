@@ -517,14 +517,24 @@ downloaded. Plain `make` would attempt them after everything else.
 
 ### Route 2: add the slim trajectories (+51 GB)
 
-Adds `results/slim/`, the released westbound trajectories. Now every `.mat`
-above can be regenerated instead of downloaded, and the trajectory figures
-become available.
+Adds `results/slim/`, the released westbound trajectories. The trajectory
+figures become available, and most of the `.mat` files above can be regenerated
+instead of downloaded.
 
 ```bash
-make            # regenerates any missing intermediate, then every figure
+make            # regenerates what it can, then every figure
 make micro      # or just the trajectory figures
 ```
+
+**One exception, worth knowing before you delete anything.** `fields_*.mat`,
+`samples_*.mat` and `relspeed_data_*.mat` all rebuild from `slim/`. The
+lane-change products do **not**: `LC_data_DD.mat` is built from the lane
+origin/destination sidecars, and those are derived from the **raw** MOTION
+segments, because the released `slim` data no longer carries the lane a
+trajectory came from. So on this route, keep the `LC_data_DD.mat` you
+downloaded for route 1 (40 MB) — or the 24 sidecars per day (3.6 MB total, if
+you would rather re-derive `LC_data` yourself). Without one of them, `lcplot`
+will try to build the sidecars and fail for want of `data/`.
 
 `micro` derives ~4.6 GB per day of reduced plotting caches from slim on its
 first run, under `results/.mvt/cache/`; later runs reuse them. Expect that
@@ -562,14 +572,36 @@ make SHARDS=6 slim-17     # one day, six MATLAB processes over 24 segments
 | fuel results, sample counts | `av` | `samples_*.mat` | 1 |
 | microscopic trajectories | `micro` | slim, via the reduced caches | 2 |
 
-### If something is missing
+`LC_data_DD.mat` is the one intermediate that route 2 cannot regenerate: the
+lane sidecars behind it come from the raw segments, so rebuilding it needs
+route 3. Download it (or the sidecars) on any route below that.
 
-`make status` says what each stage would do and why, and builds nothing. A
-stage whose inputs are absent names the file it wanted:
+### If something looks wrong
+
+`make status` says what each stage would do and why, and builds nothing. Start
+there:
 
 ```bash
 make status
 ```
+
+**A stage whose inputs are absent** names the file it wanted. Check it against
+the download table for your route.
+
+**A stage that says a script "is newer than" a file you downloaded** is the one
+confusing case. Freshness is decided by modification time, and an archive that
+preserves timestamps can arrive older than the code you just cloned. The stage
+is not telling you the data is wrong — only that it cannot prove it is current.
+You downloaded these outputs rather than building them, so say so:
+
+```bash
+make accept-verified    # checks the published checksums, then marks them current
+make accept             # same, without the checksum pass
+```
+
+This matters most on routes 2 and 3: left alone, `make` may decide the slim
+trajectories need rebuilding, which on route 2 fails for want of `data/` and on
+route 3 spends hours regenerating files you already have.
 
 On a machine without GNU make, every target above works from MATLAB too:
 
