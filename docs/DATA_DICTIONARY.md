@@ -142,7 +142,7 @@ computation treats as "engaged" when present (falling back to
 
 ---
 
-## Macroscopic fields — `results/figures/*/fields_motion_2022-11-DD.mat`
+## Macroscopic fields — `results/analysis/*/fields_motion_2022-11-DD.mat`
 
 MATLAB `.mat` file (`-v7`, not JSON) written by `generate_macroscopic_fields.m`.
 Fields are kernel-weighted averages over a regular time-space grid (5 s × 50 m,
@@ -173,7 +173,7 @@ The fields `F` and their definitions:
 
 ---
 
-## Sample collections — `results/figures/*/samples_for_distance_analysis_DD.mat`
+## Sample collections — `results/analysis/*/samples_for_distance_analysis_DD.mat`
 
 MATLAB `.mat` file (`-v7.3`) written by `generate_data_samples.m`: flat column
 vectors, one entry per qualifying sample, pooled over the day. Every sample is
@@ -190,3 +190,62 @@ to produce the fuel-vs-distance results (Figures 2, SM2, SM3).
 | `samples_xpos` | m | Longitudinal position. |
 | `samples_lane` | lane | Lane number. |
 | `samples_t` | s | Seconds after 06:00. |
+
+## Lane origin and destination — `results/analysis/*/I-24MOTION_<timestamp>_orig_dist_lane.mat`
+
+MATLAB `.mat` written by `generate_orig_dist_lanes.m`, one per raw segment.
+A single struct array, `dataTemp_lane_orig_dist`, whose entry *i* describes
+released trajectory *i* of the slim segment with the matching name. Consumed by
+`extract_lane_changes_v_dist_to_av.m`.
+
+| Field | Unit | Notes |
+|---|---|---|
+| `origin_lane` | lane | Lane the trajectory entered from. Equals `lane_number` when it did not merge in. |
+| `destination_lane` | lane | Lane it left for. Equals `lane_number` when it did not merge out. |
+
+Lane numbering follows the released convention: 1 leftmost (HOV) through
+4 rightmost, 0 off the highway, 5 on an on/off ramp. The pairing with the slim
+data is positional and carries no identifier of its own.
+
+## Lane-change events — `results/analysis/*/LC_data_DD.mat`
+
+MATLAB `.mat` written by `extract_lane_changes_v_dist_to_av.m`, one per day.
+Two struct arrays; consumed by `plotting_LC_analysis.m`. One lane change
+produces one row per AV it could be measured against, so row counts exceed
+event counts.
+
+`all_lane_changes_start` — merges **into** a lane, measured at the trajectory's
+first timestamp:
+
+| Field | Unit | Notes |
+|---|---|---|
+| `lane_number` | lane | Lane the trajectory was driven in. |
+| `lane_change_at_start` | lanes | `lane_number − origin_lane`; sign gives the direction of the move. |
+| `dist_to_av_at_start` | m | Distance to the nearest AV, upstream or downstream depending on the row. |
+| `dist_to_eng_av_at_start` | m | Distance to the nearest *engaged* AV, empty if there was none. |
+| `av_at_start` | id | Identifier of the AV the row is measured against. |
+| `eng_av_at_start` | id | Identifier of the engaged AV, empty if there was none. |
+| `x_position_at_start` | m | Longitudinal position of the event. |
+| `t_at_start` | s | POSIX timestamp of the event. |
+
+`all_lane_changes_end` — merges **out of** a lane, measured at the last
+timestamp. Identical fields with `_at_end` in place of `_at_start`, and
+`lane_change_at_end` = `destination_lane − lane_number`.
+
+## Pooled relative speeds — `results/analysis/*/relspeed_data_DD.mat`
+
+MATLAB `.mat` written by `relative_speed_histogram.m`, one per day: the
+distance/speed pairs pooled over the day's 24 segments, after filtering.
+Consumed by `plot_relative_speed.m` and `binned_relative_speed.m`.
+
+| Variable | Unit | Notes |
+|---|---|---|
+| `filtered_dist_all_files` | m | Distance to the nearest downstream engaged AV, within `[lower_Bnd, upper_Bnd]`. |
+| `filtered_speed_all_files` | m/s | Relative speed, smoothed; positive when the gap is opening. |
+| `lower_Bnd` | m | Lower distance bound used when pooling (30). |
+| `upper_Bnd` | m | Upper distance bound used when pooling (350). |
+| `j_start`, `j_end` | index | Range of the day's 24 segments pooled (1, 24). |
+| `day` | — | 16, 17 or 18. |
+
+The bounds and segment range are saved with the data so that two days' figures
+can be shown to have been pooled the same way.
