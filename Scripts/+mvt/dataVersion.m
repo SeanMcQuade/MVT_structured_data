@@ -9,7 +9,7 @@ function version = dataVersion()
 %   is unchanged by anything here.
 %
 % Outputs
-%   version  char, e.g. '2.1.1'
+%   version  char, e.g. '2.2'
 %
 % Versioning scheme
 %   MAJOR.MINOR.PATCH, where a consumer reads it as:
@@ -31,6 +31,18 @@ function version = dataVersion()
 %          affected values move by 0.0001 g on roughly one trajectory in ten
 %          thousand. Rationale and measurements:
 %          docs/REPRODUCIBLE_QUADRATURE.md.
+%   2.2    New derived products, and a folder move. The lane-change and
+%          relative-speed analyses became pipeline stages, adding three
+%          products under a new results/analysis/ folder: the per-segment lane
+%          origin/destination sidecars, the day's lane-change events
+%          (LC_data_DD.mat), and the pooled relative-speed samples
+%          (relspeed_data_DD.mat). The existing samples_for_distance_analysis
+%          and fields_motion files moved there too, out of results/figures/,
+%          which now holds only rendered figures. No field of gps, slim or full
+%          changes, and their bytes are unchanged - but any code that opened
+%          the two .mat files by path must be updated, which is what makes this
+%          MINOR rather than PATCH. See docs/ALGORITHMS.md and
+%          docs/DATA_FILES.md.
 %
 % Notes
 %   Bump PATCH whenever a change alters, or could alter, the bytes of the
@@ -40,5 +52,5 @@ function version = dataVersion()
 %
 % (C) 2026 CIRCLES Consortium. BSD-3-Clause.
 
-version = '2.1.1';
+version = '2.2';
 end
