@@ -1,4 +1,7 @@
 function [] = plotting_LC_analysis(processingDay)
+% This script processes AV-induced lane-changing event data to calculate the 
+% excess merge-out rate and the cumulative disturbance footprint, 
+% and generates relevant figures.
 [parentDirectory, ~, ~] = fileparts(pwd);
 [dataRootDirectory, ~, ~] = fileparts(parentDirectory);
 outputPath = fullfile(dataRootDirectory, 'results', 'slim', ...
