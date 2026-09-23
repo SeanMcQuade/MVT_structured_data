@@ -527,14 +527,19 @@ make micro      # or just the trajectory figures
 ```
 
 **One exception, worth knowing before you delete anything.** `fields_*.mat`,
-`samples_*.mat` and `relspeed_data_*.mat` all rebuild from `slim/`. The
-lane-change products do **not**: `LC_data_DD.mat` is built from the lane
-origin/destination sidecars, and those are derived from the **raw** MOTION
-segments, because the released `slim` data no longer carries the lane a
-trajectory came from. So on this route, keep the `LC_data_DD.mat` you
-downloaded for route 1 (40 MB) — or the 24 sidecars per day (3.6 MB total, if
-you would rather re-derive `LC_data` yourself). Without one of them, `lcplot`
-will try to build the sidecars and fail for want of `data/`.
+`samples_*.mat` and `relspeed_data_*.mat` all rebuild from `slim/`. The lane
+sidecars do **not**: they are derived from the **raw** MOTION segments, because
+the released `slim` data no longer carries the lane a trajectory came from. So
+this route needs one of:
+
+* the 24 lane sidecars per day (**3.6 MB** for all three days), from which
+  `LC_data_DD.mat` rebuilds in about five minutes; or
+* the `LC_data_DD.mat` files themselves (**40 MB**), if you would rather not
+  spend the five minutes.
+
+Without either, `lcplot` has nothing to build from and will say so. Both paths
+are tested: a tree holding only `slim/`, `gps/` and the analysis files produced
+all 15 of one day's figures.
 
 `micro` derives ~4.6 GB per day of reduced plotting caches from slim on its
 first run, under `results/.mvt/cache/`; later runs reuse them. Expect that
@@ -599,9 +604,11 @@ make accept-verified    # checks the published checksums, then marks them curren
 make accept             # same, without the checksum pass
 ```
 
-This matters most on routes 2 and 3: left alone, `make` may decide the slim
-trajectories need rebuilding, which on route 2 fails for want of `data/` and on
-route 3 spends hours regenerating files you already have.
+This is worth doing on routes 2 and 3, though it is no longer load-bearing:
+stages depend on the files they read rather than on the stages that made them,
+so a downloaded tree builds without it. What `accept` saves is the time spent
+regenerating intermediates you already downloaded — about five minutes for
+`LC_data`, longer for `samples`.
 
 On a machine without GNU make, every target above works from MATLAB too:
 
