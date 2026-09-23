@@ -25,10 +25,11 @@ function failed = runShards(stage, day, nWorkers, varargin)
 %   mvt.runShards('slim', 18, 8)        % eight concurrent MATLAB processes
 %
 % Notes
-%   Only stages that shard by segment gain from this: 'slim' and 'full' split
-%   their 24 segments via mvt.shardIndices. 'gps', 'samples', 'fields', 'macro'
-%   and 'micro' ignore Shard and would each do the whole job N times, so this
-%   refuses to launch more than one worker for them.
+%   Only stages that shard by segment gain from this: 'slim', 'full' and
+%   'lanes' split their 24 segments via mvt.shardIndices. 'gps', 'lc',
+%   'samples', 'fields', 'macro' and 'micro' ignore Shard and would each do the
+%   whole job N times, so this refuses to launch more than one worker for
+%   them.
 %
 %   Size nWorkers by memory, not cores: each process holds a decoded segment,
 %   several GB at peak.
@@ -42,7 +43,7 @@ function failed = runShards(stage, day, nWorkers, varargin)
 %
 % (C) 2026 CIRCLES Consortium. BSD-3-Clause.
 
-shardedStages = {'slim', 'full'};
+shardedStages = {'slim', 'full', 'lanes'};
 
 parser = inputParser;
 parser.KeepUnmatched = true;

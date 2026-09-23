@@ -46,6 +46,52 @@ It is deliberately **excluded from the checksum manifests**: it mixes
 reproducible facts with run provenance, so it is machine-specific by design and
 would fail a byte comparison for reasons unrelated to the data.
 
+## 2.2
+
+**New derived products, and a folder move.** Three analyses that were run by
+hand became pipeline stages, and their outputs joined the data set:
+
+| Product | Where | Size | Written by |
+| --- | --- | --- | --- |
+| Lane origin/destination sidecars | `results/analysis/2022-11-DD/I-24MOTION_*_orig_dist_lane.mat` | 24/day, 3.6 MB total | `generate_orig_dist_lanes` |
+| Lane-change events | `results/analysis/2022-11-DD/LC_data_DD.mat` | 1/day, 40 MB | `extract_lane_changes_v_dist_to_av` |
+| Pooled relative speeds | `results/analysis/2022-11-DD/relspeed_data_DD.mat` | 1/day, 690 MB | `relative_speed_histogram` |
+
+At the same time the two existing analysis `.mat` products moved:
+
+```
+results/figures/2022-11-DD/samples_for_distance_analysis_DD.mat
+results/figures/2022-11-DD/fields_motion_2022-11-DD.mat
+                    ↓
+results/analysis/2022-11-DD/...
+```
+
+`results/figures/` now holds only rendered figures.
+
+*Why MINOR and not PATCH.* No field of `gps`, `slim` or `full` changes, and
+their bytes are unchanged — `make verify` passes against the 2.1.1 checksum
+manifests without modification. But two published files moved, so code that
+opened them by path has to be updated. Under the scheme above that is a
+re-specification of the data's layout, which is a MINOR change, not a PATCH.
+
+*Why the move.* The `.mat` files are *inputs* to the figures; the `.png` and
+`.pdf` are the outputs. Keeping them in one folder meant that downloading the
+inputs needed to rebuild a figure also meant downloading the figure. Separated,
+the figure inputs are about 5 GB against the 51 GB of trajectories, which is
+what makes it practical to reproduce most of the paper's figures without the
+trajectory data at all. See the download routes in the README.
+
+*What to do if you hold 2.1.1.* Move the two files rather than regenerating
+them; the contents are identical.
+
+```bash
+mkdir -p results/analysis/2022-11-DD
+mv results/figures/2022-11-DD/*.mat results/analysis/2022-11-DD/
+```
+
+*Not yet in the Python port.* The five new stages are MATLAB-only, and the port
+still writes its `.npz` to `results/figures/`. See `docs/PYTHON_PORT.md`.
+
 ## 2.1.1
 
 **Deterministic fuel quadrature.** `mvt.neumaierDot` (compensated summation)

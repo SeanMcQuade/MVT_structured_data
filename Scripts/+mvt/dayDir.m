@@ -10,7 +10,8 @@ function d = dayDir(kind, day)
 %           'raw'      raw I-24 MOTION segments   <data>/i24motion/2022-11-DD
 %           'slim'     westbound processed JSON   <results>/slim/2022-11-DD
 %           'full'     full processed JSON        <results>/full/2022-11-DD
-%           'figures'  .mat + figures             <results>/figures/2022-11-DD
+%           'analysis' derived .mat intermediates <results>/analysis/2022-11-DD
+%           'figures'  generated figures           <results>/figures/2022-11-DD
 %           'gps'      assembled GPS JSON         <results>/gps        (day-less)
 %           'cache'    derived caches             <results>/.mvt/cache/2022-11-DD
 %   day   numeric day of Nov. 2022 (16, 17, or 18)
@@ -34,6 +35,8 @@ switch lower(kind)
         d = fullfile(p.resultsDir, 'slim', dayName);
     case 'full'
         d = fullfile(p.resultsDir, 'full', dayName);
+    case 'analysis'
+        d = fullfile(p.resultsDir, 'analysis', dayName);
     case 'figures'
         d = fullfile(p.resultsDir, 'figures', dayName);
     case 'gps'
@@ -43,6 +46,6 @@ switch lower(kind)
     otherwise
         error('mvt:dayDir:unknownKind', ...
             ['Unknown kind ''%s''. Expected one of: raw, slim, full, ', ...
-            'figures, gps, cache.'], kind);
+            'analysis, figures, gps, cache.'], kind);
 end
 end

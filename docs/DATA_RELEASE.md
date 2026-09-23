@@ -1,36 +1,68 @@
 # Releasing the data: what to publish, and how to lay it out
 
-The team is releasing two things: the raw inputs in `data/`, and the processed
-westbound trajectories in `results/slim/`. `slim` is awkward to classify — it is
-the *output* of this pipeline, but the *input* to the fuel-savings analysis that
-produces the paper figures. This note recommends how to handle that.
+The team is releasing three things, each one derived from the one before it:
+the raw inputs in `data/`, the processed westbound trajectories in
+`results/slim/`, and the analysis intermediates in `results/analysis/`. The
+middle two are awkward to classify — each is the *output* of one step and the
+*input* to the next. This note recommends how to handle that.
 
 Measured sizes of the current tree:
 
-| | size | files |
-|---|---|---|
-| `data/i24motion/` | 55 GB | 72 JSON (24 × 10 min × 3 days) |
-| `data/cars/` | 4.5 GB | GPS/CAN CSV, VIN map |
-| `results/slim/` | 51 GB | 72 JSON |
-| `results/gps/` | 821 MB | 3 JSON |
-| `results/figures/` | 4.1 GB | `.mat` + `.png` |
+| | size | files | role |
+|---|---|---|---|
+| `data/i24motion/` | 55 GB | 72 JSON (24 × 10 min × 3 days) | raw |
+| `data/cars/` | 4.5 GB | GPS/CAN CSV, VIN map | raw |
+| `results/slim/` | 51 GB | 72 JSON | derived trajectories |
+| `results/gps/` | 821 MB | 3 JSON | derived trajectories |
+| `results/analysis/` | 4.6 GB | 84 `.mat` | figure inputs |
+| `results/figures/` | 208 MB | 51 `.png`/`.pdf`/`.fig` | rendered output |
+
+The layering is the point. `analysis/` is reproducible from `slim/` + `gps/`,
+which are reproducible from `data/`, and `figures/` is reproducible from
+`analysis/`. Each layer is roughly an order of magnitude smaller than the one
+it came from, which is what makes publishing more than one of them worthwhile:
+a reader who only wants to redraw a figure needs 4.6 GB, not 60.
 
 ## Recommendation
 
-**Publish them as two separate, independently cited datasets. Do not move
-`slim` into `data/`, and do not rename it.**
+**Publish them as three separate, independently cited datasets, each citing
+the one it derives from. Do not move `slim` into `data/`, and do not rename
+it.**
 
 Concretely:
 
 * **Dataset 1 — MVT raw inputs.** `data/` as it stands: I-24 MOTION segments,
-  on-vehicle GPS/CAN, the VIN map, `data/README.md`.
-* **Dataset 2 — MVT derived trajectories, v2.1.1.** `slim/` plus `gps/`, each
-  with its `dataset_info.json`, plus the checksum manifests. Its metadata cites
-  Dataset 1 as its source and names the pipeline commit that produced it.
+  on-vehicle GPS/CAN, the VIN map, `data/README.md`. ~60 GB.
+* **Dataset 2 — MVT derived trajectories, v2.2.** `slim/` plus `gps/`, each
+  with its `dataset_info.json`, plus the checksum manifests. ~52 GB. Its
+  metadata cites Dataset 1 as its source and names the pipeline commit that
+  produced it.
+* **Dataset 3 — MVT analysis intermediates, v2.2.** `results/analysis/`: the
+  distance samples, macroscopic fields, lane origin/destination sidecars,
+  lane-change events and pooled relative speeds, with its `dataset_info.json`.
+  ~4.6 GB. Cites Dataset 2 as its source.
 
-Each gets its own DOI. Dataset 2's landing page states, in one line, that it is
-derived from Dataset 1 by the code at a specific commit and is reproducible
-from it.
+Each gets its own DOI, and each landing page states in one line that it is
+derived from the previous one by the code at a specific commit and is
+reproducible from it.
+
+### Why Dataset 3 is worth separating rather than folding into Dataset 2
+
+It is a different download for a different reader. Someone reproducing the
+paper's figures needs 4.6 GB and no trajectory data at all — `make
+figures-from-mat` rebuilds every figure but the microscopic trajectory plots
+from `analysis/` and `gps/` alone. Someone doing new trajectory work needs the
+51 GB of `slim/` and may never open an `.mat`. Publishing them together forces
+the first reader to take twelve times more data than they need, and gives them
+no identifier for the thing they actually used.
+
+The general rule this follows: **separate a derived layer when reproducing it is
+expensive and its audience is distinct.** `analysis/` qualifies on both counts —
+rebuilding it means decoding the whole slim tree, and its audience is the
+paper's readers. `figures/` qualifies on neither: it is 208 MB, it rebuilds from
+`analysis/` in minutes, and the paper is already the citable artifact for those
+images. Publish it inside Dataset 3 for convenience if you like, but do not give
+it a DOI of its own.
 
 ### The derived data is being released first
 
@@ -97,6 +129,11 @@ and does not need special handling. It is what an *intermediate published
 product* is, and the established practice is to publish it as such rather than
 to relabel it by whichever role is convenient.
 
+The same argument applies one layer down: `results/analysis/` is derived from
+`slim/`, and putting it anywhere that implies otherwise would lose the same
+fact. Publishing it as its own dataset that cites Dataset 2 keeps the chain
+explicit at every link.
+
 ## Why publish it at all, rather than "just publish the code"
 
 Because regenerating it costs 59 GB of download, a MATLAB or Python
@@ -112,7 +149,7 @@ Most of this already exists in the repository; it is worth naming so it is not
 lost in the release process.
 
 * **A version on the data, distinct from the code version.** `mvt.dataVersion()`
-  → `2.1.1`, with the MAJOR/MINOR/PATCH meaning spelled out in
+  → `2.2`, with the MAJOR/MINOR/PATCH meaning spelled out in
   `DATA_CHANGELOG.md`. Two copies of `slim` differing only in the last decimal
   of a few fuel totals are otherwise indistinguishable by inspection; the
   version is how a recipient tells them apart.
@@ -128,17 +165,34 @@ lost in the release process.
   reproducibility and demonstrating it.
 * **The code, tagged at the commit that built the release**, so the sidecar's
   `code_commit` resolves to something permanent.
+* **A layered chain that can be checked one link at a time.** A reader with
+  Dataset 3 can rebuild the figures and compare them to the paper; a reader with
+  Dataset 2 can rebuild Dataset 3 and compare content hashes; a reader with
+  Dataset 1 can rebuild Dataset 2 and compare bytes. Each claim is testable on
+  its own, without the layers below it.
 
 ## Naming
 
 Keep `slim`, but do not let it travel alone. Inside the repository it is
 established and the documentation uses it consistently. On the release landing
-page it means nothing to an outsider, so title the dataset descriptively — e.g.
-"MVT processed westbound trajectories with fuel estimates (derived, v2.1.1)" —
-and note that the directory is named `slim` and that a `full` variant with
-eastbound and reference trajectories exists but is not released. Renaming the
-directory now would invalidate every path in the code, the docs and the
-manifests, to fix a problem a sentence of description solves.
+page it means nothing to an outsider, so title each dataset descriptively and
+note the directory name in the description:
+
+| Dataset | Suggested title | Directory |
+| --- | --- | --- |
+| 1 | MVT raw inputs: I-24 MOTION segments and control-vehicle GPS/CAN | `data/` |
+| 2 | MVT processed westbound trajectories with fuel estimates (derived, v2.2) | `results/slim/`, `results/gps/` |
+| 3 | MVT analysis intermediates: fuel-distance samples, macroscopic fields, lane changes and relative speeds (derived, v2.2) | `results/analysis/` |
+
+For Dataset 2, note that a `full` variant with eastbound and reference
+trajectories exists but is not released. Renaming the directories now would
+invalidate every path in the code, the docs and the manifests, to fix a problem
+a sentence of description solves.
+
+Dataset 3's title is long because its contents are heterogeneous — five
+products with different shapes. Resist compressing it to something like "MVT
+analysis data", which tells a reader nothing about whether what they want is
+inside.
 
 ## Suggested release checklist
 
@@ -146,15 +200,34 @@ Ordered for the derived-data-first release actually planned.
 
 1. Tag the code at the commit that builds the release.
 2. Build `slim` + `gps` from a clean tree; run `verify` to confirm 75/75.
-3. Confirm each `dataset_info.json` shows `2.1.1` and the tagged commit.
-4. **Reserve** the DOI for Dataset 1 (raw), without publishing it.
-5. Publish Dataset 2 (derived) with the checksum manifests alongside the data,
-   citing the code tag and the reserved raw DOI as its source. State that the
-   raw inputs are to be released separately.
-6. Have the paper cite the derived DOI and the code tag.
-7. When the raw inputs are ready, publish Dataset 1 against the reserved DOI.
+3. Build `analysis/` from that tree, then the figures from `analysis/`, so the
+   published intermediates are demonstrably the ones the figures came from.
+4. Confirm each `dataset_info.json` shows `2.2` and the tagged commit — there is
+   one per product folder, including `results/analysis/`.
+5. **Reserve** the DOI for Dataset 1 (raw), without publishing it.
+6. Publish Dataset 2 (derived trajectories) with the checksum manifests
+   alongside the data, citing the code tag and the reserved raw DOI as its
+   source. State that the raw inputs are to be released separately.
+7. Publish Dataset 3 (analysis intermediates), citing Dataset 2's now-real DOI
+   and the same code tag. Its landing page should say which figures it
+   reproduces and with which command.
+8. Have the paper cite Dataset 3 and the code tag — that is the dataset a reader
+   redrawing a figure actually needs — and Dataset 2 as the trajectories behind
+   it.
+9. When the raw inputs are ready, publish Dataset 1 against the reserved DOI.
    The citation in Dataset 2 begins resolving with no edit required.
 
-Step 4 is the one that is easy to skip and expensive to skip. Once Dataset 2 is
+Step 5 is the one that is easy to skip and expensive to skip. Once Dataset 2 is
 published with no source identifier, adding one later means amending a record
 that has already been cited.
+
+Two things to settle before step 6, both institutional rather than technical:
+
+* Whoever mints your DOIs may have a view on granularity — some repositories
+  discourage splitting a logical release across records. Worth a short
+  conversation before committing to three.
+* Express the derivation in the metadata rather than only in prose. DataCite's
+  `RelatedIdentifier` carries `IsDerivedFrom` and `IsSourceOf`, which is what
+  makes the chain machine-readable; the data-set version (`2.2`) belongs in the
+  `Version` field, and tracks something different from the DOI's own versioning.
+  Expect the two to diverge, and do not try to keep them in step.

@@ -1,15 +1,76 @@
-function [] = plotting_LC_analysis(processingDay)
-% This script processes AV-induced lane-changing event data to calculate the 
-% excess merge-out rate and the cumulative disturbance footprint, 
-% and generates relevant figures.
-[parentDirectory, ~, ~] = fileparts(pwd);
-[dataRootDirectory, ~, ~] = fileparts(parentDirectory);
-outputPath = fullfile(dataRootDirectory, 'results', 'slim', ...
-    ['2022-11-', num2str(processingDay)]);
-filenameLoad = fullfile(outputPath, ['LC_data_' char(num2str(processingDay)) '.mat']);
+function [] = plotting_LC_analysis(processingDay, varargin)
+% PLOTTING_LC_ANALYSIS  Lane-change rates and exposure relative to engaged AVs.
+%
+% Purpose
+%   Turns one day of extracted lane-change events (the 'lc' stage) into the
+%   paper's lane-change figures: how long traffic was exposed to an engaged AV
+%   at each relative distance, the rate of merging out of a lane at that
+%   distance, and the cumulative excess of merges over the far-field baseline.
+%
+% Inputs
+%   processingDay  16, 17, or 18 (November 2022)
+%   varargin       options struct and/or name/value pairs (see mvt.options);
+%                  Force, Clean, DryRun, Verbose
+%
+% Outputs
+%   <results>/figures/2022-11-DD/
+%     fig_lc_exposure_<yyyyMMdd>.png                   total exposure time
+%     fig_lc_rate_merge_out_<yyyyMMdd>.png             merge-out rate
+%     fig_lc_cumulative_excess_<yyyyMMdd>.png          cumulative excess, per lane
+%     fig_lc_cumulative_excess_combined_<yyyyMMdd>.png the three lanes together
+%
+% Notes
+%   Only the engaged-AV case is plotted; the exposure loop still accumulates
+%   the all-AV series so that case remains available for further analysis.
+%   Figures are rendered off-screen and closed, so this is safe under
+%   `matlab -batch`.
+%
+% Dependencies
+%   mvt.options, mvt.paths, mvt.dayDir, mvt.expectedOutputs, mvt.isStale,
+%   mvt.sources, mvt.ensureDir, mvt.progress, mvt.log
+%
+if nargin < 1
+    error(['Specify the day of Nov. 2022 MVT to plot the lane-change ' ...
+        'analysis (from 16 to 18)']);
+end
+mvt.assertDay(processingDay)
+opts = mvt.options(varargin{:});
+
+% Output resolution. The figures are laid out at three times their printed
+% width (twoColWidth below is 7.5in * 3), so 150 dpi here is ~450 dpi at the
+% size they are actually placed in the paper.
+figDPI = 150;
+
+p = mvt.paths();
+outputPath = mvt.dayDir('figures', processingDay);
+mvt.ensureDir(outputPath)
+
+outputs = mvt.expectedOutputs('lcplot', processingDay, opts);
+% The lane-change events are a derived .mat intermediate, and live apart from
+% the figures this stage writes.
+filenameLoad = fullfile(mvt.dayDir('analysis', processingDay), ...
+    ['LC_data_' char(num2str(processingDay)) '.mat']);
+gpsFile = fullfile(p.resultsDir, 'gps', ...
+    ['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json']);
+
+[stale, staleReason] = mvt.isStale(outputs, {filenameLoad, gpsFile}, ...
+    mvt.sources('plotting_LC_analysis', opts), opts);
+if ~stale
+    mvt.log(opts, 'skip lane-change figures for 2022-11-%d: %s', ...
+        processingDay, staleReason);
+    return
+end
+mvt.log(opts, 'build lane-change figures for 2022-11-%d: %s', ...
+    processingDay, staleReason);
+if opts.Clean && ~opts.DryRun
+    mvt.removeOutputs(outputs, opts);
+end
+if opts.DryRun
+    return
+end
+
 load(filenameLoad,'all_lane_changes_end','all_lane_changes_start')
-dataGPS = jsondecode(fileread(fullfile(dataRootDirectory,...
-    'results','gps',['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json'])));
+dataGPS = jsondecode(fileread(gpsFile));
 dataGPS = dataGPS([dataGPS.direction]<0);
 
 
@@ -45,24 +106,25 @@ dt_minutes = dt_seconds / 60;
 
 caseIdx = 1;
 figExp = figure('Color', 'w', 'Name', ['Exposure: ', titleSuffix{caseIdx}], ...
-    'Units', 'inches', 'Position', [1, 1, twoColWidth, twoColHeight]);
+    'Visible', 'off', 'Units', 'inches', 'Position', [1, 1, twoColWidth, twoColHeight]);
 tExp = tiledlayout(length(lanesToAnalyze), 1, 'TileSpacing', 'compact', 'Padding', 'compact');
 title(tExp, ['Total Exposure Time Relative to ', titleSuffix{caseIdx},' on ',...
     titleDay{processingDay-15}], 'FontSize', 20, 'Color', 'k', 'FontWeight', 'bold');
 
 figComp = figure('Color', 'w', 'Name', ['Rate Out: ', titleSuffix{caseIdx}], ...
-    'Units', 'inches', 'Position', [1, 1, twoColWidth, twoColHeight]);
+    'Visible', 'off', 'Units', 'inches', 'Position', [1, 1, twoColWidth, twoColHeight]);
 tComp = tiledlayout(length(lanesToAnalyze), 1, 'TileSpacing', 'compact', 'Padding', 'compact');
 title(tComp, ['Rate of Merge-Out Relative to ', titleSuffix{caseIdx}, ' on ',...
     titleDay{processingDay-15}], 'FontSize', 20, 'Color', 'k', 'FontWeight', 'bold');
 
 figIntegral = figure('Color', 'w', 'Name', 'Cumulative Excess Integral', ...
-    'Units', 'inches', 'Position', [1, 1, twoColWidth, twoColHeight]);
+    'Visible', 'off', 'Units', 'inches', 'Position', [1, 1, twoColWidth, twoColHeight]);
 tIntegral = tiledlayout(length(lanesToAnalyze), 1, 'TileSpacing', 'compact', 'Padding', 'compact');
 title(tIntegral, ['Cumulative Excess Merge-Out Relative to ', titleSuffix{caseIdx}, ' on ', ...
     titleDay{processingDay-15}], 'FontSize', 20, 'Color', 'k', 'FontWeight', 'bold');
 
-figCombinedG = figure('Color', 'w', 'Name', 'Combined Cumulative Excess g(x)');
+figCombinedG = figure('Color', 'w', 'Visible', 'off', ...
+    'Name', 'Combined Cumulative Excess g(x)');
 figCombinedG.Position = [100, 100, 800, 300]*2; 
 axCombined = axes('Parent', figCombinedG);
 hold(axCombined, 'on');
@@ -108,8 +170,11 @@ for i = 1:length(lanesToAnalyze)
         [unique_t, ~, idx_t] = unique(all_t);
         total_k = length(unique_t);
 
-        wb = waitbar(0, sprintf('Lane %d: Calculating Parallel Exposure (0%%)', currentLane), ...
-            'Name', 'Directional Grid Distances');
+        % mvt.progress rather than waitbar: a waitbar is a GUI window, which
+        % cannot open under `matlab -batch`.
+        reportExposure = mvt.progress(total_k, ...
+            sprintf('lcplot 2022-11-%d lane %d exposure', processingDay, currentLane), ...
+            'Opts', opts);
 
         for k = 1:total_k
             % Extract positions for this frame
@@ -154,11 +219,10 @@ for i = 1:length(lanesToAnalyze)
             end
 
             if mod(k, 100) == 0 || k == total_k
-                pct = k / total_k;
-                waitbar(pct, wb, sprintf('Lane %d: Calculating Parallel Exposure (%d%%)', currentLane, round(pct * 100)));
+                reportExposure(k);
             end
         end
-        close(wb);
+        reportExposure();
     end
 
     exposure_min_all(exposure_min_all == 0) = NaN;
@@ -353,4 +417,17 @@ set(axCombined, 'Units', 'normalized');
 
 
  linkaxes(findobj(figExp, 'Type', 'axes'), 'y');
+
+%========================================================================
+% Save
+%========================================================================
+% Order matches mvt.expectedOutputs('lcplot', ...), which is the single
+% declaration of these names.
+figures = [figExp, figComp, figIntegral, figCombinedG];
+for iFig = 1:numel(figures)
+    fprintf('Save figure in %s ...', outputs{iFig}); tic
+    exportgraphics(figures(iFig), outputs{iFig}, 'Resolution', figDPI);
+    fprintf(' Done (%0.0fsec).\n', toc)
+end
+close(figures)
 end

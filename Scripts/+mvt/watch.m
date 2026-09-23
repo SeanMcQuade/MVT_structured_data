@@ -173,7 +173,8 @@ activeSeconds = 30;
 % 'full' is omitted: it is an optional stage (eastbound/reference data the
 % paper does not use), so watching it would show 0/24 forever on a normal run.
 % Pass 'Stages' to include it.
-stages = {'gps', 'slim', 'samples', 'fields', 'macro', 'micro'};
+stages = {'gps', 'slim', 'lanes', 'lc', 'lcplot', 'relspeed', ...
+    'relspeedplot', 'samples', 'fields', 'macro', 'micro'};
 passthrough = {};
 
 iArg = 1;

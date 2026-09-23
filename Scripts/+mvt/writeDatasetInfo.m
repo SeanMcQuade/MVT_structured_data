@@ -9,7 +9,8 @@ function infoFile = writeDatasetInfo(stage, day, opts)
 %   them apart.
 %
 % Inputs
-%   stage  'gps' | 'slim' | 'full' | 'samples' | 'fields' | 'macro' | 'micro'
+%   stage  'gps' | 'slim' | 'full' | 'lanes' | 'lc' | 'samples' | 'fields'
+%          | 'macro' | 'micro'
 %   day    16, 17, or 18 (ignored for stages whose product is not per-day)
 %   opts   (optional) options struct; Verbose is honored, DryRun suppresses
 %
@@ -164,16 +165,26 @@ switch lower(char(stage))
         infoDir = fullfile(p.resultsDir, name);
         dataDir = mvt.dayDir(name, day);
         product = sprintf('%s (I-24 MOTION trajectories)', name);
-    case {'samples', 'fields', 'macro', 'micro'}
+    case {'lanes', 'lc', 'relspeed', 'samples', 'fields'}
+        % Derived .mat intermediates, kept apart from the generated figures.
+        if isempty(day)
+            return
+        end
+        infoDir = fullfile(p.resultsDir, 'analysis');
+        dataDir = mvt.dayDir('analysis', day);
+        product = 'derived analysis intermediates';
+    case {'lcplot', 'macro', 'micro'}
+        % 'relspeed' is handled with the cross-day products: it writes to the
+        % figures root, not a day folder.
         if isempty(day)
             return          % per-day product with no day: nothing to describe
         end
         infoDir = fullfile(p.resultsDir, 'figures');
         dataDir = mvt.dayDir('figures', day);
-        product = 'figures and analysis products';
-    case 'av'
-        % Cross-day: plot_AV_analysis writes into results/figures itself, with
-        % no day folder, so `day` is empty here by design.
+        product = 'generated figures';
+    case {'av', 'relspeedplot'}
+        % Written straight into results/figures with no day folder, so `day`
+        % is empty here (plot_AV_analysis) or simply unused (relspeed).
         infoDir = fullfile(p.resultsDir, 'figures');
         dataDir = infoDir;
         product = 'figures and analysis products (cross-day)';

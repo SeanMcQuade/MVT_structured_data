@@ -384,12 +384,55 @@ amplifies any upstream divergence instead of damping it, unlike `slim`.
 
 ## What is not ported yet
 
-Every stage is ported, and the byte-comparable products are byte-identical to
-MATLAB's (see the parity section above). What remains is not parity work:
+### Stage coverage
+
+The port covers the stages that produce the released data set and the figures
+built from it:
+
+| Stage | MATLAB | Python | Status |
+| --- | --- | --- | --- |
+| `gps` | `assemble_data_GPS` | `mvt gps` | ported, byte-identical |
+| `slim` | `generate_data_mvt_slim` | `mvt slim` | ported, byte-identical |
+| `full` | `generate_data_mvt_full` | `mvt full` | ported, byte-identical (not in the checksum manifest) |
+| `samples` | `generate_data_samples` | `mvt samples` | ported, arrays exact, `.npz` not `.mat` |
+| `fields` | `generate_macroscopic_fields` | `mvt fields` | ported, arrays to ~1e-11, `.npz` not `.mat` |
+| `macro` | `plot_macroscopic_fields` | `mvt figures` | ported, matplotlib, not pixel-comparable, different filenames |
+| `av` | `plot_AV_analysis` | `mvt figures` | partial — see below |
+| `micro` | `plot_microscopic_trajectories` | `mvt micro` | ported, matplotlib, not pixel-comparable |
+| `lanes` | `generate_orig_dist_lanes` | — | **not ported** |
+| `lc` | `extract_lane_changes_v_dist_to_av` | — | **not ported** |
+| `lcplot` | `plotting_LC_analysis` | — | **not ported** |
+| `relspeed` | `relative_speed_histogram` | — | **not ported** |
+| `relspeedplot` | `plot_relative_speed`, `binned_relative_speed` | — | **not ported** |
+
+Two rows deserve their exact status. `mvt figures` writes
+`fig_field_2022-11-DD_<field>.png`, where MATLAB writes
+`fig_field_<yyyyMMdd>_west_laneall_motion_<field>_av_nature_large.png`: the same
+six fields, under names that do not match. For `av` it writes one per-day
+`fig_av_fuel_2022-11-DD.png` from that day's samples; it does **not** reproduce
+MATLAB's cross-day `fig_2_*`, `fig_3_*` and `fig_SM2_*`, which pool all three
+days. So the paper's fuel figures come only from MATLAB.
+
+The five lane-change and relative-speed stages were added to the MATLAB
+pipeline in 2026-09 and have no Python equivalent. `mvt all` therefore builds a
+strict subset of what `make all` builds: the released data and the figures that
+predate those stages. Nothing in the Python tests or `mvt verify` covers them,
+and their absence is not reported as a failure — `mvt verify` walks a fixed list
+of products and simply does not look for `results/analysis/*.mat`.
+
+> One name is misleading. `mvtpy/lanes.py` is **not** the port of the `lanes`
+> stage. It ports `assign_lanes` and `clip_lane_changes` from
+> `generate_data_mvt_slim.m` — the lane identification that decides how a raw
+> trajectory becomes released segments. The `lanes` stage re-runs that same
+> clipping in a forked copy to recover each trajectory's origin and destination
+> lane, and that origin/destination tracking has no Python counterpart.
+
+### Other gaps
 
 | Piece | Notes |
 | --- | --- |
 | `.mat` writers | The analysis stages write `.npz` rather than MATLAB `.mat`. The arrays match (`samples` exactly, `fields` to ~1e-11), but a MATLAB user cannot `load()` the Python output directly. |
+| `.npz` location | MATLAB now writes the derived `.mat` to `results/analysis/2022-11-DD/`; the Python port still writes its `.npz` to `results/figures/2022-11-DD/` (`mvtpy/cli.py`, the `_run_samples` and `_run_fields` writers). The two layouts have diverged and should be reconciled. |
 | Figures | Rendered with matplotlib: same colormap, limits, overlays and layout, deliberately not pixel-for-pixel. A checksum comparison is meaningless here and `mvt verify` skips them. |
 | `full` checksum manifest | `full` is ported and verified byte-identical to MATLAB by direct file comparison, but it is not in `python/expected/checksums-*.json`, so `mvt verify` does not cover it. Compare trees directly with `tools/compare_trees.py --product full`. |
 

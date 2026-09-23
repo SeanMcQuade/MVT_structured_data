@@ -82,4 +82,4 @@ __version__ = "0.1.0"
 #:
 #:   2.1    the data set used for the Nature submission
 #:   2.1.1  deterministic fuel quadrature (docs/REPRODUCIBLE_QUADRATURE.md)
-DATA_VERSION = "2.1.1"
+DATA_VERSION = "2.2"

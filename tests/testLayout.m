@@ -83,11 +83,33 @@ end
 function testExpectedOutputsForDataStages(testCase)
 p = mvt.paths();
 outputs = mvt.expectedOutputs('samples', 16);
-verifyEqual(testCase, outputs{1}, fullfile(p.resultsDir, 'figures', '2022-11-16', ...
+verifyEqual(testCase, outputs{1}, fullfile(p.resultsDir, 'analysis', '2022-11-16', ...
     'samples_for_distance_analysis_16.mat'));
 
 outputs = mvt.expectedOutputs('fields', 17);
 verifySubstring(testCase, outputs{1}, 'fields_motion_2022-11-17.mat');
+end
+
+function testIntermediatesAndFiguresAreSeparate(testCase)
+% A results-only download takes analysis/ (the inputs) without figures/ (the
+% outputs), so no stage may mix the two.
+p = mvt.paths();
+for stage = {'lanes', 'lc', 'samples', 'fields'}
+    outputs = mvt.expectedOutputs(stage{1}, 17);
+    for iOut = 1:numel(outputs)
+        verifyEqual(testCase, fileparts(outputs{iOut}), ...
+            fullfile(p.resultsDir, 'analysis', '2022-11-17'), ...
+            sprintf('%s writes outside analysis/', stage{1}));
+    end
+end
+for stage = {'lcplot', 'macro', 'micro'}
+    outputs = mvt.expectedOutputs(stage{1}, 17);
+    for iOut = 1:numel(outputs)
+        verifyEqual(testCase, fileparts(outputs{iOut}), ...
+            fullfile(p.resultsDir, 'figures', '2022-11-17'), ...
+            sprintf('%s writes outside figures/', stage{1}));
+    end
+end
 end
 
 function testAvFiguresLiveInTheSharedFolder(testCase)

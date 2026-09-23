@@ -23,13 +23,23 @@ in the code or derivable from it.
 | Assembled GPS | `results/gps/CIRCLES_GPS_10Hz_2022-11-DD.json` | 1/day | 821 MB | stage 1 |
 | Slim trajectories | `results/slim/2022-11-DD/` | 24/day | 51 GB | stage 2 |
 | Full trajectories | `results/full/2022-11-DD/` | 24/day | 81 GB | stage 2 (opt-in) |
-| Distance samples | `results/figures/2022-11-DD/samples_for_distance_analysis_DD.*` | 1/day | ⎫ 4.1 GB | stage 3 |
-| Macroscopic fields | `results/figures/2022-11-DD/fields_motion_2022-11-DD.*` | 1/day | ⎬ | stage 4 |
-| Figures | `results/figures/` | many | ⎭ | stages 5, 5b, 6 |
+| Distance samples | `results/analysis/2022-11-DD/samples_for_distance_analysis_DD.*` | 1/day | 3.9 GB | stage 3 |
+| Macroscopic fields | `results/analysis/2022-11-DD/fields_motion_2022-11-DD.*` | 1/day | 46 MB | stage 4 |
+| Lane origin/destination | `results/analysis/2022-11-DD/I-24MOTION_*_orig_dist_lane.mat` | 24/day (72) | 3.6 MB | stage 3b |
+| Lane-change events | `results/analysis/2022-11-DD/LC_data_DD.mat` | 1/day | 40 MB | stage 3c |
+| Pooled relative speeds | `results/analysis/2022-11-DD/relspeed_data_DD.mat` | 1/day | 690 MB | stage 3d |
+| Figures | `results/figures/` | many | 207 MB | stages 5, 5b, 6 |
 | Provenance sidecar | `results/<product>/dataset_info.json` | 1/product | tiny | every stage |
 
 MATLAB writes `.mat` for the stage 3/4 products; Python writes `.npz` with the
-same arrays under the same names.
+same arrays under the same names. The stage 3b–3d products are MATLAB-only (see
+`PYTHON_PORT.md`).
+
+`results/analysis/` holds derived inputs to the figures; `results/figures/`
+holds only what is rendered from them. The split is what lets a reader download
+the inputs (~5 GB) without the outputs and rebuild the figures. Both are
+reproducible from `results/slim/`, and `results/.mvt/` is different again:
+build bookkeeping, never published, safe to delete (see the last section).
 
 ## How they connect
 
@@ -46,9 +56,14 @@ flowchart LR
     GPS["gps/*.json"]
     SLIM["slim/ 24/day"]
     FULL["full/ 24/day<br/>(opt-in)"]
-    SAM["samples_*"]
-    FLD["fields_*"]
-    FIG["figures"]
+    subgraph ana["analysis/ (figure inputs)"]
+      SAM["samples_*"]
+      FLD["fields_*"]
+      OD["*_orig_dist_lane<br/>24/day"]
+      LC["LC_data_*"]
+      RS["relspeed_data_*"]
+    end
+    FIG["figures/ (rendered)"]
   end
   M --> GPS
   G --> GPS
@@ -62,10 +77,25 @@ flowchart LR
   R --> FULL
   SLIM --> SAM
   SLIM --> FLD
+  M --> OD
+  SLIM --> LC
+  OD --> LC
+  SLIM --> RS
   SLIM --> FIG
   SAM --> FIG
   FLD --> FIG
+  GPS --> FIG
+  LC --> FIG
+  RS --> FIG
 ```
+
+Only two arrows into `figures/` start at `slim/`: the microscopic trajectory
+plots, and nothing else. Everything else a figure needs is in `analysis/` or
+`gps/`, which is why the smallest download route works.
+
+Note that `*_orig_dist_lane` is derived from the **raw** MOTION segments, not
+from `slim/` — it re-runs the lane clipping to recover what the released data
+drops. It is still paired with `slim/` by index, so the two must agree.
 
 `full` is a dead end by design: nothing downstream reads it. It exists for
 eastbound plots and as a superset of `slim`.
@@ -286,6 +316,53 @@ settings), one file per day.
 - `field_U` — speed
 - `field_F` — fuel rate
 - `field_Phi`, `field_Psi` — derived fuel/energy fields
+
+## Lane origin and destination — `I-24MOTION_<timestamp>_orig_dist_lane.mat`
+
+One per raw segment, 24 per day, named after the slim segment it accompanies.
+A single struct array, `dataTemp_lane_orig_dist`, with two fields:
+
+- `origin_lane` — int, the lane the trajectory entered from
+- `destination_lane` — int, the lane it left for
+
+**Entry *i* describes released trajectory *i* of the matching slim file.** The
+pairing is positional, not by id: the file carries no trajectory identifier, so
+it is meaningless without the slim segment of the same name, and the two must
+come from the same build. `extract_lane_changes_v_dist_to_av` checks the counts
+agree and refuses to run if they do not.
+
+Lane numbering is the released convention: 1 leftmost through 4 rightmost,
+0 off the highway, 5 on an on/off ramp.
+
+## Lane-change events — `LC_data_DD.mat`
+
+One per day. Two struct arrays, for merges into a lane and out of it:
+
+- `all_lane_changes_start` — merge-in events, measured at the trajectory's first
+  timestamp
+- `all_lane_changes_end` — merge-out events, measured at its last
+
+Roughly 160,000–220,000 rows each per day. **Rows are not vehicles**: an event
+is emitted once per AV it can be measured against, so one lane change yields two
+rows when both an upstream and a downstream AV existed. Fields are listed in
+`DATA_DICTIONARY.md`.
+
+## Pooled relative speeds — `relspeed_data_DD.mat`
+
+One per day: every sample of (distance to the nearest downstream engaged AV,
+relative speed) that survives filtering, pooled over the day's 24 segments.
+About 14 million samples per day.
+
+- `filtered_dist_all_files` — float64, distance to the AV, **m**, within
+  `[lower_Bnd, upper_Bnd]`
+- `filtered_speed_all_files` — float64, relative speed, **m/s**, positive when
+  the gap is opening
+- `lower_Bnd`, `upper_Bnd` — the distance bounds the pooling used (30 m, 350 m)
+- `j_start`, `j_end` — the segment range pooled (1, 24)
+- `day` — 16, 17 or 18
+
+The bounds and segment range travel with the data because the figures are only
+comparable across days if the pooling matched.
 
 ## Provenance sidecar — `dataset_info.json`
 

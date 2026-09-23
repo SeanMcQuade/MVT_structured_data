@@ -13,6 +13,11 @@ function outputs = expectedOutputs(stage, day, opts)
 %            'gps'      assemble_data_GPS
 %            'slim'     generate_data_mvt_slim
 %            'full'     generate_data_mvt_full
+%            'lanes'    generate_orig_dist_lanes (per-segment sidecars)
+%            'lc'       extract_lane_changes_v_dist_to_av
+%            'relspeed' relative_speed_histogram (pooled samples)
+%            'relspeedplot' plot_relative_speed (+ binned_relative_speed)
+%            'lcplot'   plotting_LC_analysis
 %            'samples'  generate_data_samples
 %            'fields'   generate_macroscopic_fields
 %            'macro'    plot_macroscopic_fields
@@ -26,8 +31,8 @@ function outputs = expectedOutputs(stage, day, opts)
 %   outputs  cellstr of absolute paths, possibly containing '*' globs
 %
 % Notes
-%   'slim'/'full' consult mvt.manifest, so the caller learns all 24 expected
-%   filenames without decoding any raw data.
+%   'slim'/'full'/'lanes' consult mvt.manifest, so the caller learns all 24
+%   expected filenames without decoding any raw data.
 %
 % Dependencies
 %   mvt.paths, mvt.dayDir, mvt.manifest, mvt.options
@@ -40,6 +45,9 @@ end
 mvt.assertDay(day);
 
 figuresDir = mvt.dayDir('figures', day);
+% The derived .mat intermediates live apart from the generated figures, so a
+% results-only download can take the inputs without also taking the outputs.
+analysisDir = mvt.dayDir('analysis', day);
 dateTag = sprintf('202211%d', day);   % yyyyMMdd as used in figure names
 
 switch lower(stage)
@@ -48,19 +56,55 @@ switch lower(stage)
             sprintf('CIRCLES_GPS_10Hz_2022-11-%d.json', day))};
 
     case {'slim', 'full'}
-        segments = mvt.manifest(day, opts);
         outDir = mvt.dayDir(lower(stage), day);
-        outputs = cell(1, numel(segments));
-        for iSeg = 1:numel(segments)
-            outputs{iSeg} = fullfile(outDir, segments(iSeg).outputName);
-        end
+        outputs = segmentOutputs(outDir, day, opts, '');
+
+    case 'lanes'
+        % One sidecar per raw segment, named after the slim file it pairs with
+        % (I-24MOTION_<date>_<time>_orig_dist_lane.mat). Derived from the
+        % manifest, so the 24 names are known without decoding anything.
+        %
+        % These live under analysis/ rather than beside the slim JSON they
+        % describe: slim/ is the released data set, and a per-segment
+        % intermediate of a downstream analysis does not belong in it.
+        outputs = segmentOutputs(analysisDir, day, opts, 'sidecar');
+
+    case 'lc'
+        outputs = {fullfile(analysisDir, sprintf('LC_data_%d.mat', day))};
+
+    case 'relspeed'
+        % The pooled relative-speed samples: the expensive half, so that the
+        % figures can be remade without the slim tree.
+        outputs = {fullfile(analysisDir, sprintf('relspeed_data_%d.mat', day))};
+
+    case 'relspeedplot'
+        % These sit at the figures root, not in a day folder, and keep the
+        % spaces in their names: the paper already cites them that way. The
+        % segment range is a tunable of the data stage, so the first is matched
+        % as a glob the way the other figure stages are.
+        p = mvt.paths();
+        figuresRoot = fullfile(p.resultsDir, 'figures');
+        outputs = { ...
+            fullfile(figuresRoot, sprintf( ...
+                'Relative speed histogram, day %d for files j = * to *.pdf', day)), ...
+            fullfile(figuresRoot, sprintf( ...
+                'Relative speeds behind AV, day %d.pdf', day))};
+
+    case 'lcplot'
+        % Order matters: plotting_LC_analysis saves its four figures against
+        % this list by index.
+        outputs = { ...
+            fullfile(figuresDir, sprintf('fig_lc_exposure_%s.png', dateTag)), ...
+            fullfile(figuresDir, sprintf('fig_lc_rate_merge_out_%s.png', dateTag)), ...
+            fullfile(figuresDir, sprintf('fig_lc_cumulative_excess_%s.png', dateTag)), ...
+            fullfile(figuresDir, sprintf('fig_lc_cumulative_excess_combined_%s.png', dateTag))};
 
     case 'samples'
-        outputs = {fullfile(figuresDir, ...
+        outputs = {fullfile(analysisDir, ...
             sprintf('samples_for_distance_analysis_%d.mat', day))};
 
     case 'fields'
-        outputs = {fullfile(figuresDir, ...
+        outputs = {fullfile(analysisDir, ...
             sprintf('fields_motion_2022-11-%d.mat', day))};
 
     case 'macro'
@@ -86,6 +130,54 @@ switch lower(stage)
     otherwise
         error('mvt:expectedOutputs:unknownStage', ...
             ['Unknown stage ''%s''. Expected one of: gps, slim, full, ', ...
-            'samples, fields, macro, micro, av.'], stage);
+            'lanes, lc, lcplot, relspeed, relspeedplot, samples, fields, macro, ', ...
+            'micro, av.'], stage);
+end
+end
+
+% ---------------------------------------------------------------------------
+function outputs = segmentOutputs(outDir, day, opts, kind)
+% The 24 per-segment filenames, from the raw manifest when the raw data is
+% present and from the product folder itself when it is not.
+%
+% Someone who downloaded the released trajectories without the raw inputs has
+% no manifest and cannot build one: it is derived from the raw segments. Asking
+% the folder what it holds lets such a tree still be described, accepted and
+% reasoned about. The trade-off is that a *missing* segment cannot be noticed
+% this way - but it could not be rebuilt either, so there is nothing to report.
+try
+    segments = mvt.manifest(day, opts);
+    outputs = cell(1, numel(segments));
+    for iSeg = 1:numel(segments)
+        name = segments(iSeg).outputName;
+        if strcmp(kind, 'sidecar')
+            name = mvt.laneSidecarName(name);
+        end
+        outputs{iSeg} = fullfile(outDir, name);
+    end
+    return
+catch err
+    if ~strcmp(err.identifier, 'mvt:manifest:noRawFolder') && ...
+            ~contains(err.message, 'Raw MOTION folder does not exist')
+        rethrow(err)
+    end
+end
+
+if strcmp(kind, 'sidecar')
+    pattern = 'I-24MOTION_*_orig_dist_lane.mat';
+else
+    pattern = 'I-24MOTION_*.json';
+end
+listing = dir(fullfile(outDir, pattern));
+listing = listing(~startsWith({listing.name}, '.'));
+if isempty(listing)
+    error('mvt:expectedOutputs:noManifestNoProduct', ...
+        ['Cannot list the expected segments for 2022-11-%d: the raw data is ', ...
+         'absent, so no manifest can be built, and %s holds no matching ', ...
+         'files to describe instead.'], day, outDir);
+end
+outputs = cell(1, numel(listing));
+for iFile = 1:numel(listing)
+    outputs{iFile} = fullfile(outDir, listing(iFile).name);
 end
 end

@@ -1,38 +1,105 @@
-% Specific for Nature
+function [] = relative_speed_histogram(processingDay, varargin)
+% RELATIVE_SPEED_HISTOGRAM  Relative speed of traffic to the nearest engaged AV.
 % (C) 2026/05/26 by Benjamin Seibold, added to by Sean McQuade
-tic
-%choose parameter: 16, 17, or 18 (16 = Wed, 17 = Thurs, or 18 = Fri). 
+%
+% Purpose
+%   Pools, for one day, the relative speed between each vehicle and the engaged
+%   AV ahead of it, and saves the result. This is the expensive half of the
+%   relative-speed analysis: it decodes all 24 slim segments. plot_relative_speed
+%   turns the saved samples into the figures, so those can be remade without the
+%   slim tree.
+%
+% Inputs
+%   processingDay  16, 17, or 18 (November 2022)
+%   varargin       options struct and/or name/value pairs (see mvt.options);
+%                  Force, Clean, DryRun, Verbose
+%
+% Outputs
+%   <results>/analysis/2022-11-DD/relspeed_data_DD.mat, holding
+%     filtered_dist_all_files   distance to the nearest engaged AV (m), pooled
+%                               over the day's segments
+%     filtered_speed_all_files  the matching relative speeds (m/s)
+%     plus the bounds and segment range they were pooled under, as provenance
+%
+% Algorithm
+%   1. Rebuild only when the figures are older than the day's slim segments or
+%      than the code (mvt.isStale).
+%   2. Per segment, difference the distance to the downstream engaged AV to get
+%      a relative speed, using one-sided stencils where the tracked AV changes
+%      or the distance jumps, then smooth it.
+%   3. Pool samples between lower_Bnd and upper_Bnd metres over the whole day
+%      and save them for plot_relative_speed.
+%
+% Notes
+%   Needs the Statistics and Machine Learning Toolbox (prctile, adtest).
+%
+% Dependencies
+%   mvt.options, mvt.dayDir, mvt.expectedOutputs, mvt.isStale,
+%   mvt.sources, mvt.atomicSave, mvt.ensureDir, mvt.progress, mvt.log
+%
+if nargin < 1
+    error(['Specify the day of Nov. 2022 MVT to build the relative speed ' ...
+        'figures (from 16 to 18)']);
+end
+mvt.assertDay(processingDay)
+opts = mvt.options(varargin{:});
 
-for d=16:18
-day = d; 
-%choose initial and terminal file, there are 24 files per day.
+%========================================================================
+% Parameters
+%========================================================================
+% First and last of the day's 24 segments to pool. These appear in the output
+% filename, so mvt.expectedOutputs matches them with a glob.
 j_start = 1; j_end = 24;
+edges = -30:0.5:30;          % histogram bin edges for the relative speed (m/s)
+% Only samples this far from the AV are pooled: 30 m puts the 35-45 m bin first
+lower_Bnd = 30;              % (m) nearest relative distance considered
+upper_Bnd = 350;             % (m) furthest relative distance considered
+
+%========================================================================
+% Initialize
+%========================================================================
+outputs = mvt.expectedOutputs('relspeed', processingDay, opts);
+outputFile = outputs{1};
+mvt.ensureDir(fileparts(outputFile))
+
+% The segment list comes from mvt.expectedOutputs rather than mvt.manifest.
+% This stage reads only the slim trajectories, so it must not require the raw
+% data: a reader who downloaded the released trajectories has no raw segments
+% and cannot build a manifest, and asking for one here failed the whole stage.
+slimFiles = mvt.expectedOutputs('slim', processingDay, opts);
+
+[stale, staleReason] = mvt.isStale(outputs, slimFiles, ...
+    mvt.sources('relative_speed_histogram', opts), opts);
+if ~stale
+    mvt.log(opts, 'skip relspeed_data_%d.mat: %s', processingDay, staleReason);
+    return
+end
+mvt.log(opts, 'build relspeed_data_%d.mat: %s', processingDay, staleReason);
+if opts.Clean && ~opts.DryRun
+    mvt.removeOutputs(outputs, opts);
+end
+if opts.DryRun
+    return
+end
+
+tic
+day = processingDay;
 
 %preallocate cell array to save rel speed strcat(datafolder,
 filtered_dist_all_files = [];
 filtered_speed_all_files = [];
 all_av_dist = [];
 
-%folder containing data
-formatSpec = "../../results/slim/2022-11-%d/";
-datafolder = sprintf(formatSpec, day);
-
+% Segment order is fixed for a given tree, so j indexes the same segment every
+% run regardless of how the folder happens to sort.
+reportProgress = mvt.progress(j_end - j_start + 1, ...
+    sprintf('relspeed 2022-11-%d', processingDay), 'Opts', opts);
 for j=j_start:j_end
-    %if 1 % activate upon first time, then deactivate
-        data_files = dir(strcat(datafolder,'I-24MOTION_*.json'));
-        % Load data file
-        filename = data_files(j).name;
+        [~, segName, segExt] = fileparts(slimFiles{j});
+        filename = [segName segExt];
         fprintf('Loading %s ...',filename), tic
-        fid = fopen(strcat(datafolder,filename));
-        data = fread(fid,inf);
-        fclose(fid);
+        data = jsondecode(fileread(slimFiles{j}));
         fprintf(' Done (%0.0fsec).\n',toc)
-        fprintf('Decoding data structures ...'), tic
-        data = jsondecode(char(data'));
-        fprintf(' Done (%0.0fsec).\n',toc)
-
-%histogram parameter
-edges = -30:0.5:30;
 
 % Process data
 av_dist_all_segments = [];
@@ -73,8 +140,6 @@ end
 
 %only keep
 clear filtered_ind filtered_dist filtered_speed;
-lower_Bnd = 30; %per discussion, set at 30 to show the 35-45 m bin first. 
-upper_Bnd = 350;
 filtered_ind_low = find(lower_Bnd < av_dist_all_segments);
 filtered_ind_up = find(av_dist_all_segments < upper_Bnd);
 filtered_ind = intersect(filtered_ind_low,filtered_ind_up);
@@ -92,6 +157,7 @@ interquartile = [first_quartile(j), third_quartile(j)];
 %save rel distance and speed from each iteration
 filtered_dist_all_files = [filtered_dist_all_files; filtered_dist];
 filtered_speed_all_files = [filtered_speed_all_files; filtered_speed];
+reportProgress(j - j_start + 1, filename);
 
 % %plot relative speed histogram for jth file
 % figure;
@@ -131,69 +197,24 @@ filtered_speed_all_files = [filtered_speed_all_files; filtered_speed];
 % savename = sprintf(formatSpecSave,day, j);
 % saveas(gcf,savename)
 end
+reportProgress();
 
-number_of_data_all_files = length(filtered_speed_all_files);
-mean_all_fil_rel_speed = mean(filtered_speed_all_files,'omitnan');
-median_fil_all_files = prctile(filtered_speed_all_files,50);
-stddev_fil_all_rel_speed = std(filtered_speed_all_files, 'omitnan');
-first_quartile_fil_all = prctile(filtered_speed_all_files, 25);
-third_quartile_fil_all = prctile(filtered_speed_all_files,75);
-
-%plot relative speed histogram for all files
-figure;
-hold on
-H = histogram(filtered_speed_all_files,edges);
-plot(mean_all_fil_rel_speed*ones(2,1), [0,max(H.Values)],"LineWidth",2)
-plot(median_fil_all_files*ones(2,1),[0,0.5*max(H.Values)],"LineWidth",2)
-std_dev = [mean_all_fil_rel_speed-stddev_fil_all_rel_speed,...
-           mean_all_fil_rel_speed + stddev_fil_all_rel_speed];
-interquartile_all = [first_quartile_fil_all, third_quartile_fil_all];
-plot(std_dev, [10,10],"LineWidth",3)
-plot(interquartile_all, [0.5,0.5],"LineWidth",4)
-% fontsz = 24;
-fontsz=8;
-legendformatSpec_mean = "mean speed = %3.3f (m/s)";
-mean_legend = sprintf(legendformatSpec_mean,mean_all_fil_rel_speed);
-legendformatSpec_med = "median speed = %3.3f (m/s)";
-med_legend = sprintf(legendformatSpec_med,median_fil_all_files);
-legend("histogram", mean_legend, med_legend, "Standard Dev", "Interquartile", ...
-                                                       "FontSize",fontsz)
-
-if day == 16 %Write the day in the title
-    % formatSpec = "Relative speed histogram Wed, " + ...
-    %     "for files %d to %d, total data points = %d";
-    % title_string = sprintf(formatSpec,j_start,j_end,number_of_data_all_files);
-    title_string = "Relative speed histogram Wednesday 16-Nov-2022";
-elseif day == 17
-    % formatSpec = "Relative speed histogram Thurs, " + ...
-    %     "for files %d to %d, total data points = %d";
-    % title_string = sprintf(formatSpec,j_start,j_end,number_of_data_all_files);
-    title_string = "Relative speed histogram Thursday 17-Nov-2022";
-elseif day == 18
-    % formatSpec = "Relative speed histogram Fri, " + ...
-    %     "for file %d to %d, total data points = %d";
-    % title_string = sprintf(formatSpec, j_start, j_end,number_of_data_all_files);
-    title_string = "Relative speed histogram Friday 18-Nov-2022";
-end
-
-title(title_string,"FontSize",fontsz);
-xlim([-15 15]);
-xlabel("Relative Speed (m/s)","FontSize",fontsz);
-% ylabel_formatSpec = "Frequency of speeds";
-% ylabel_string = sprintf(ylabel_formatSpec, lower_Bnd, upper_Bnd);
-ylabel_string = "Number of samples";
-ylabel(ylabel_string,"FontSize",fontsz);
-formatSpecSave= "../../results/figures/Relative speed histogram, day %d for files j = %d to %d.pdf";
-% fontsize(gcf, 24, "points")
-savename = sprintf(formatSpecSave,day, j_start, j_end);
-% saveas(gcf,savename)
-exportgraphics(gcf,savename,'ContentType','vector');
-
-% %run the script to show average speed in standard distance bins from AV
-binned_relative_speed
+%========================================================================
+% Save the pooled samples
+%========================================================================
+% The bounds and segment range travel with the data: the figures are only
+% comparable across days if they were pooled the same way.
+fprintf('Writing %s (%d samples) ...', outputFile, ...
+    numel(filtered_speed_all_files)); tic
+mvt.atomicSave(outputFile, struct( ...
+    'filtered_dist_all_files', filtered_dist_all_files, ...
+    'filtered_speed_all_files', filtered_speed_all_files, ...
+    'lower_Bnd', lower_Bnd, 'upper_Bnd', upper_Bnd, ...
+    'j_start', j_start, 'j_end', j_end, 'day', processingDay));
+fprintf(' Done (%0.0fsec).\n', toc)
 
 % Returns h = 1 if the data is NOT Gaussian, h = 0 if it IS Gaussian
-[h,p] = adtest(filtered_speed_all_files)
+[h,p] = adtest(filtered_speed_all_files);
+fprintf('Anderson-Darling on the pooled relative speeds: h = %d, p = %g\n', h, p);
 toc
-
 end

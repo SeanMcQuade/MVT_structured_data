@@ -34,7 +34,8 @@ function accepted = accept(varargin)
 % (C) 2026 CIRCLES Consortium. BSD-3-Clause.
 
 opts = mvt.options(varargin{:});
-stages = {'gps', 'slim', 'full', 'samples', 'fields', 'macro', 'micro'};
+stages = {'gps', 'slim', 'full', 'lanes', 'lc', 'lcplot', 'relspeed', ...
+    'relspeedplot', 'samples', 'fields', 'macro', 'micro'};
 accepted = {};
 
 for day = opts.Days
@@ -45,14 +46,42 @@ for day = opts.Days
             mvt.log(opts, 'skipping %s for 2022-11-%d (%s)', stages{iStage}, day, err.message);
             continue
         end
-        accepted = [accepted, touchAll(outputs, opts)]; %#ok<AGROW>
+        touched = touchAll(outputs, opts);
+        accepted = [accepted, touched]; %#ok<AGROW>
+        % Stamp the stage only when it actually has outputs. A stamp written
+        % for a stage that has produced nothing tells make the work is done,
+        % and `make lanes-16` then silently does nothing at all.
+        if ~isempty(touched)
+            touchStamp(sprintf('%s-%d', stages{iStage}, day), opts);
+        end
     end
 end
 
 % Cross-day figures
-accepted = [accepted, touchAll(mvt.expectedOutputs('av', opts.Days(1), opts), opts)];
+touched = touchAll(mvt.expectedOutputs('av', opts.Days(1), opts), opts);
+accepted = [accepted, touched];
+if ~isempty(touched)
+    touchStamp('av', opts);
+end
 
 mvt.log(opts, 'accepted %d existing output files as current', numel(accepted));
+end
+
+% ---------------------------------------------------------------------------
+function touchStamp(name, opts)
+% Mark a make stamp current, so `make` agrees with what accept just decided.
+p = mvt.paths();
+stampFile = fullfile(p.stampDir, name);
+if opts.DryRun
+    mvt.log(opts, 'would stamp %s', stampFile);
+    return
+end
+mvt.ensureDir(p.stampDir);
+fid = fopen(stampFile, 'a');
+if fid >= 0
+    fclose(fid);
+end
+touchFile(stampFile);
 end
 
 % ---------------------------------------------------------------------------
