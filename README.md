@@ -55,6 +55,24 @@ Machine Learning Toolbox. No Parallel Computing Toolbox is used anywhere. A
 Python implementation of the released-data stages lives in `python/`; see
 [`python/README.md`](python/README.md).
 
+**If your path contains a space** — `/Users/me/My Data/results` — everything
+here handles it except GNU make, which separates targets by whitespace and
+cannot be made to cope. `make` detects this and stops with an explanation
+rather than misbehaving quietly. Either run the same targets from MATLAB, which
+has no such limit:
+
+```matlab
+cd MVT_structured_data/Scripts
+make figures
+```
+
+or point make at a space-free symlink:
+
+```bash
+ln -s "/Users/me/My Data/results" ~/mvt-results
+make figures RESULTS=~/mvt-results
+```
+
 # Route 1 — plot the figures
 
 Download into `results/`:

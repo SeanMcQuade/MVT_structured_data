@@ -56,8 +56,52 @@ RESULTS   ?= $(WORKSPACE)/results
 # `override` is required: a variable set on the command line normally wins over
 # every assignment in the makefile, so a plain := here would be ignored for
 # exactly the case that needs it.
+# Kept for the diagnostic below: $(abspath) splits on whitespace, so after the
+# override a spaced path is no longer printable as the user typed it.
+RAW_DATA    := $(DATA)
+RAW_RESULTS := $(RESULTS)
+
 override DATA    := $(abspath $(DATA))
 override RESULTS := $(abspath $(RESULTS))
+# ---------------------------------------------------------------------------
+# Paths containing spaces
+#
+# GNU make separates targets and prerequisites by whitespace and offers no
+# reliable escaping, so a results folder called "my data" silently becomes two
+# targets and the build does the wrong thing quietly. Nothing else in the
+# pipeline minds spaces - MATLAB, the Python port and check_data.sh all handle
+# them - so this is a limitation of this one front end. Fail immediately and
+# say what to do instead.
+# ---------------------------------------------------------------------------
+define SPACE_IN_PATH_HELP
+
+  A path contains a space, which GNU make cannot handle:
+
+    repository : $(REPO_ROOT)
+    data       : $(RAW_DATA)
+    results    : $(RAW_RESULTS)
+
+  Make separates targets by whitespace, so such a path becomes two targets and
+  the build misbehaves quietly. Only make has this limit; the pipeline itself
+  does not.
+
+  Either drive it from MATLAB, which has no such limit and takes the same
+  targets:
+
+      cd $(SCRIPTS)
+      make figures            % or: make, make rebuild, make status
+
+  or give make a path without spaces, e.g. via a symlink:
+
+      ln -s "$(RAW_RESULTS)" ~/mvt-results
+      make figures RESULTS=~/mvt-results
+
+endef
+
+ifneq ($(words $(REPO_ROOT) $(RAW_DATA) $(RAW_RESULTS)),3)
+$(error $(SPACE_IN_PATH_HELP))
+endif
+
 STATE     := $(RESULTS)/.mvt
 STAMPS    := $(STATE)/stamps
 
@@ -102,19 +146,19 @@ car_files = $(wildcard $(DATA)/cars/cars_gps/circles_v2_1_car*.csv) \
 # $(call run_stage,STAGE,DAY) - one MATLAB process for a stage
 define run_stage
 $(Q)printf '[make] %-8s 2022-11-%s  ->  %s\n' "$(1)" "$(2)" "$(RESULTS)"
-$(Q)cd $(SCRIPTS) && $(MATLAB) $(MATLAB_FLAGS) "mvt.build('$(1)', $(2))"
+$(Q)cd "$(SCRIPTS)" && "$(MATLAB)" $(MATLAB_FLAGS) "mvt.build('$(1)', $(2))"
 endef
 
 # $(call run_sharded,STAGE,DAY) - SHARDS MATLAB processes over the 24 segments
 define run_sharded
 @if [ "$(SHARDS)" -le 1 ]; then \
-  cd $(SCRIPTS) && $(MATLAB) $(MATLAB_FLAGS) "mvt.build('$(1)', $(2))"; \
+  cd "$(SCRIPTS)" && "$(MATLAB)" $(MATLAB_FLAGS) "mvt.build('$(1)', $(2))"; \
 else \
   printf '[make] %-8s 2022-11-%s  ->  %s  (%s shards)\n' "$(1)" "$(2)" "$(RESULTS)" "$(SHARDS)"; \
   pids=""; \
   for k in $$(seq 1 $(SHARDS)); do \
-    ( cd $(SCRIPTS) && MVT_SHARD=$$k/$(SHARDS) \
-      $(MATLAB) $(MATLAB_FLAGS) "mvt.build('$(1)', $(2))" ) & \
+    ( cd "$(SCRIPTS)" && MVT_SHARD=$$k/$(SHARDS) \
+      "$(MATLAB)" $(MATLAB_FLAGS) "mvt.build('$(1)', $(2))" ) & \
     pids="$$pids $$!"; \
   done; \
   status=0; \
@@ -326,14 +370,14 @@ $(foreach d,16 17 18,$(eval $(call figure_from_mat_rules,$(d))))
 
 # Cross-day: needs every requested day's samples first.
 $(STAMPS)/av: $(SRC_av) $(foreach d,$(DAYS),$(call samples_mat,$(d))) | $(STAMPS)
-	cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) "mvt.build('av', [])"
+	cd "$(SCRIPTS)" && MVT_DAYS="$(DAYS)" "$(MATLAB)" $(MATLAB_FLAGS) "mvt.build('av', [])"
 	@touch $@
 
 # ---------------------------------------------------------------------------
 # Inspection
 # ---------------------------------------------------------------------------
 status:
-	@cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) "mvt.status()"
+	@cd "$(SCRIPTS)" && MVT_DAYS="$(DAYS)" "$(MATLAB)" $(MATLAB_FLAGS) "mvt.status()"
 
 # ---------------------------------------------------------------------------
 # Output verification
@@ -352,16 +396,16 @@ status:
 PYTHON ?= python3
 .PHONY: verify verify-update verify-against
 verify:
-	@cd $(REPO_ROOT)/python && $(PYTHON) -m mvtpy verify \
+	@cd "$(REPO_ROOT)/python" && $(PYTHON) -m mvtpy verify \
 	  $(foreach d,$(DAYS),--day $(d)) --results-dir "$(RESULTS)"
 
 verify-against:
-	@cd $(REPO_ROOT)/python && $(PYTHON) -m mvtpy verify \
+	@cd "$(REPO_ROOT)/python" && $(PYTHON) -m mvtpy verify \
 	  $(foreach d,$(DAYS),--day $(d)) --results-dir "$(RESULTS)" \
 	  --reference "$(WORKSPACE)/results"
 
 verify-update:
-	@cd $(REPO_ROOT)/python && $(PYTHON) -m mvtpy verify \
+	@cd "$(REPO_ROOT)/python" && $(PYTHON) -m mvtpy verify \
 	  $(foreach d,$(DAYS),--day $(d)) --results-dir "$(RESULTS)" --update
 
 # Live progress of a run in flight. Start this in a second terminal while
@@ -370,10 +414,10 @@ verify-update:
 # `make watch-once` prints a single snapshot, which is what you want in a log.
 .PHONY: watch watch-once
 watch:
-	@cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) "mvt.watch()"
+	@cd "$(SCRIPTS)" && MVT_DAYS="$(DAYS)" "$(MATLAB)" $(MATLAB_FLAGS) "mvt.watch()"
 
 watch-once:
-	@cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) \
+	@cd "$(SCRIPTS)" && MVT_DAYS="$(DAYS)" "$(MATLAB)" $(MATLAB_FLAGS) \
 	  "mvt.watch('Once', true)"
 
 # Check the data are laid out where the pipeline expects them.
@@ -414,7 +458,7 @@ accept-verified:
 # results. Verify first by rebuilding into a separate tree and comparing:
 #   make RESULTS=$(WORKSPACE)/results_verify slim-16 && md5 <old> <new>
 accept:
-	@cd $(SCRIPTS) && MVT_DAYS="$(DAYS)" $(MATLAB) $(MATLAB_FLAGS) \
+	@cd "$(SCRIPTS)" && MVT_DAYS="$(DAYS)" "$(MATLAB)" $(MATLAB_FLAGS) \
 	  "files = mvt.accept(); fprintf('accepted %d files\n', numel(files));"
 	@mkdir -p $(STAMPS)
 	@echo "[make] stamps refreshed; 'make' will not revisit accepted stages"
@@ -431,7 +475,7 @@ config:
 
 # Fast suite: temporary files only, no data tree needed. Seconds to run.
 test:
-	@cd $(SCRIPTS) && $(MATLAB) $(MATLAB_FLAGS) \
+	@cd "$(SCRIPTS)" && "$(MATLAB)" $(MATLAB_FLAGS) \
 	  "r = runtests('$(REPO_ROOT)/tests'); \
 	   fprintf('\n%d passed, %d failed (%.1f s)\n', sum([r.Passed]), sum([r.Failed]), sum([r.Duration])); \
 	   if any([r.Failed]), exit(1); end"
@@ -440,7 +484,7 @@ test:
 .PHONY: verify-full manifests
 verify-full:
 	@for d in $(DAYS); do \
-	  cd $(SCRIPTS) && $(MATLAB) $(MATLAB_FLAGS) \
+	  cd "$(SCRIPTS)" && "$(MATLAB)" $(MATLAB_FLAGS) \
 	    "addpath('$(REPO_ROOT)/tests'); verify_outputs($$d)" || exit 1; \
 	done
 
@@ -448,7 +492,7 @@ verify-full:
 #   make RESULTS=$(WORKSPACE)/results_groundtruth manifests
 manifests:
 	@for d in $(DAYS); do \
-	  cd $(SCRIPTS) && $(MATLAB) $(MATLAB_FLAGS) \
+	  cd "$(SCRIPTS)" && "$(MATLAB)" $(MATLAB_FLAGS) \
 	    "addpath('$(REPO_ROOT)/tests'); generate_manifest($$d)" || exit 1; \
 	done
 
