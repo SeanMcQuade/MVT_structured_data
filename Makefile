@@ -536,8 +536,7 @@ clean-relspeed-$(1):
 	rm -f $(RESULTS)/analysis/2022-11-$(1)/relspeed_data_$(1).mat
 	rm -f $(STAMPS)/relspeed-$(1)
 clean-relspeedplot-$(1):
-	rm -f "$(RESULTS)/figures/Relative speed histogram, day $(1) for files j = "*.pdf
-	rm -f "$(RESULTS)/figures/Relative speeds behind AV, day $(1).pdf"
+	rm -f $(RESULTS)/figures/2022-11-$(1)/fig_relspeed_*_202211$(1).pdf
 	rm -f $(STAMPS)/relspeedplot-$(1)
 endef
 $(foreach d,16 17 18,$(eval $(call clean_aliases,$(d))))

@@ -173,7 +173,7 @@ switch lower(char(stage))
         infoDir = fullfile(p.resultsDir, 'analysis');
         dataDir = mvt.dayDir('analysis', day);
         product = 'derived analysis intermediates';
-    case {'lcplot', 'macro', 'micro'}
+    case {'lcplot', 'relspeedplot', 'macro', 'micro'}
         % 'relspeed' is handled with the cross-day products: it writes to the
         % figures root, not a day folder.
         if isempty(day)
@@ -182,9 +182,9 @@ switch lower(char(stage))
         infoDir = fullfile(p.resultsDir, 'figures');
         dataDir = mvt.dayDir('figures', day);
         product = 'generated figures';
-    case {'av', 'relspeedplot'}
-        % Written straight into results/figures with no day folder, so `day`
-        % is empty here (plot_AV_analysis) or simply unused (relspeed).
+    case 'av'
+        % Cross-day: plot_AV_analysis writes into results/figures itself, with
+        % no day folder, so `day` is empty here by design.
         infoDir = fullfile(p.resultsDir, 'figures');
         dataDir = infoDir;
         product = 'figures and analysis products (cross-day)';

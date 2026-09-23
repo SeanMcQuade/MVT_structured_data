@@ -78,17 +78,10 @@ switch lower(stage)
         outputs = {fullfile(analysisDir, sprintf('relspeed_data_%d.mat', day))};
 
     case 'relspeedplot'
-        % These sit at the figures root, not in a day folder, and keep the
-        % spaces in their names: the paper already cites them that way. The
-        % segment range is a tunable of the data stage, so the first is matched
-        % as a glob the way the other figure stages are.
-        p = mvt.paths();
-        figuresRoot = fullfile(p.resultsDir, 'figures');
+        % Order matters: plot_relative_speed saves against this list by index.
         outputs = { ...
-            fullfile(figuresRoot, sprintf( ...
-                'Relative speed histogram, day %d for files j = * to *.pdf', day)), ...
-            fullfile(figuresRoot, sprintf( ...
-                'Relative speeds behind AV, day %d.pdf', day))};
+            fullfile(figuresDir, sprintf('fig_relspeed_histogram_%s.pdf', dateTag)), ...
+            fullfile(figuresDir, sprintf('fig_relspeed_behind_av_%s.pdf', dateTag))};
 
     case 'lcplot'
         % Order matters: plotting_LC_analysis saves its four figures against

@@ -13,10 +13,9 @@ function [] = plot_relative_speed(processingDay, varargin)
 %                  Force, Clean, DryRun, Verbose
 %
 % Outputs
-%   <results>/figures/
-%     Relative speed histogram, day DD for files j = 1 to 24.pdf
-%     Relative speeds behind AV, day DD.pdf
-%   The names, spaces included, are the ones the paper already cites.
+%   <results>/figures/2022-11-DD/
+%     fig_relspeed_histogram_<yyyyMMdd>.pdf   distribution of relative speeds
+%     fig_relspeed_behind_av_<yyyyMMdd>.pdf   mean/median by distance behind AV
 %
 % Notes
 %   Needs the Statistics and Machine Learning Toolbox (prctile). Figures are
@@ -49,12 +48,9 @@ figRes = [700 420];
 % Initialize
 %========================================================================
 outputs = mvt.expectedOutputs('relspeedplot', processingDay, opts);
-% outputs{1} is declared as a glob, because the segment range is part of the
-% name and is a tunable of the data stage. The concrete name is built below,
-% once the pooled samples have said which segments they cover.
+histogramFile = outputs{1};
 binnedFile = outputs{2};
-figuresRoot = fileparts(binnedFile);
-mvt.ensureDir(figuresRoot)
+mvt.ensureDir(fileparts(binnedFile))
 
 dataFile = mvt.expectedOutputs('relspeed', processingDay, opts);
 dataFile = dataFile{1};
@@ -76,17 +72,16 @@ if opts.DryRun
     return
 end
 
+% j_start and j_end are in the file too, as provenance of how the samples were
+% pooled. They are loaded here because the commented-out title variants below
+% quote them; nothing active uses them.
 pooled = load(dataFile, 'filtered_dist_all_files', 'filtered_speed_all_files', ...
     'j_start', 'j_end');
 filtered_dist_all_files = pooled.filtered_dist_all_files;
 filtered_speed_all_files = pooled.filtered_speed_all_files;
-j_start = pooled.j_start;
-j_end = pooled.j_end;
+j_start = pooled.j_start; %#ok<NASGU>
+j_end = pooled.j_end;     %#ok<NASGU>
 day = processingDay;
-
-histogramFile = fullfile(figuresRoot, sprintf( ...
-    'Relative speed histogram, day %d for files j = %d to %d.pdf', ...
-    processingDay, j_start, j_end));
 
 number_of_data_all_files = length(filtered_speed_all_files);
 mean_all_fil_rel_speed = mean(filtered_speed_all_files,'omitnan');
