@@ -53,6 +53,10 @@ filenameLoad = fullfile(mvt.dayDir('analysis', processingDay), ...
 gpsFile = fullfile(p.resultsDir, 'gps', ...
     ['CIRCLES_GPS_10Hz_2022-11-' num2str(processingDay) '.json']);
 
+% Say plainly what is missing and what it costs, rather than letting `load`
+% fail with "Unable to find file", which reads like a broken installation.
+mvt.requireInputs('lcplot', {filenameLoad, gpsFile}, opts)
+
 [stale, staleReason] = mvt.isStale(outputs, {filenameLoad, gpsFile}, ...
     mvt.sources('plotting_LC_analysis', opts), opts);
 if ~stale

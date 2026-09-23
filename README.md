@@ -126,8 +126,17 @@ make rebuild RESULTS=/path/to/results_new
 `make status` says what every stage would do and why, and builds nothing. Start
 there.
 
-A stage whose inputs are missing names the file it wanted; check it against the
-download table for your route.
+A stage reported as **`needs`** is not broken — an input for it simply is not in
+your download. `make status` names the file, and the stages that do not depend
+on it build normally. If you hit it mid-run, `make -k` lets the rest finish:
+
+```
+lcplot   17     needs   needs results/analysis/2022-11-17/LC_data_17.mat
+```
+
+If you run such a stage directly it says the same thing at more length,
+including what the missing file would have produced and the cheapest way to
+get it.
 
 If a stage says a script **"is newer than"** a file you downloaded, that is the
 one confusing case. Freshness is decided by modification time, and an archive

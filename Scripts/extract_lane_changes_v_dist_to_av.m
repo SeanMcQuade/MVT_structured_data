@@ -74,6 +74,8 @@ for iSeg = 1:numel(slimFiles)
     segmentNames{iSeg} = [segName segExt];
 end
 
+mvt.requireInputs('lc', [slimFiles, laneFiles], opts)
+
 outputFile = mvt.expectedOutputs('lc', processingDay, opts);
 outputFile = outputFile{1};
 [stale, staleReason] = mvt.isStale(outputFile, [slimFiles, laneFiles], ...
@@ -98,16 +100,7 @@ reportProgress = mvt.progress(numel(slimFiles), ...
     sprintf('lc 2022-11-%d', processingDay), 'Opts', opts);
 for fileNr = 1:numel(slimFiles)
     filenameLoad = slimFiles{fileNr};
-    if ~isfile(filenameLoad)
-        error('mvt:extract_lane_changes:missingSlim', ...
-            'Missing slim segment %s. Run `make slim-%d` first.', ...
-            filenameLoad, processingDay);
-    end
-    if ~isfile(laneFiles{fileNr})
-        error('mvt:extract_lane_changes:missingSidecar', ...
-            'Missing lane sidecar %s. Run `make lanes-%d` first.', ...
-            laneFiles{fileNr}, processingDay);
-    end
+    mvt.requireInputs('lc', {filenameLoad, laneFiles{fileNr}}, opts)
     fprintf('Loading and decoding MOTION data file, %d/%d ... ', ...
         fileNr, numel(slimFiles)); tic
     dataTemp = jsondecode(fileread(filenameLoad));

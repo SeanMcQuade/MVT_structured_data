@@ -42,16 +42,27 @@ stages = { ...
     'macro',   'plot_macroscopic_fields'; ...
     'micro',   'plot_microscopic_trajectories'};
 
-report = struct('stage', {}, 'day', {}, 'stale', {}, 'optional', {}, 'reason', {});
+report = struct('stage', {}, 'day', {}, 'stale', {}, 'optional', {}, ...
+    'blocked', {}, 'reason', {});
 for day = opts.Days
     for iStage = 1:size(stages, 1)
         stage = stages{iStage, 1};
         fcn = stages{iStage, 2};
         optional = false;
+        blocked = false;
         try
             outputs = mvt.expectedOutputs(stage, day, opts);
-            [stale, reason] = mvt.isStale(outputs, stageInputs(stage, day, p), ...
+            inputs = stageInputs(stage, day, p);
+            [stale, reason] = mvt.isStale(outputs, inputs, ...
                 mvt.sources(fcn, opts), opts);
+            % A stage whose inputs are simply absent is not "stale": there is
+            % nothing it could do. Saying so, and naming the file, is what tells
+            % someone their download is incomplete rather than broken.
+            absent = missingInputs(inputs);
+            if stale && ~isempty(absent)
+                blocked = true;
+                reason = sprintf('needs %s', strjoin(absent, ', '));
+            end
             % `full` is not part of `all` in either make implementation, so a
             % missing `full` tree is the normal state, not work that is pending.
             % Reporting it as BUILD alongside stages that `all` really does
@@ -64,10 +75,20 @@ for day = opts.Days
             end
         catch err
             stale = true;
-            reason = sprintf('cannot evaluate (%s)', err.message);
+            switch err.identifier
+                case {'mvt:expectedOutputs:noManifestNoProduct', ...
+                        'mvt:manifest:noRawFolder'}
+                    % No raw recordings and no product to describe instead:
+                    % this stage is simply not available on this download.
+                    blocked = true;
+                    reason = 'needs the raw I-24 MOTION recordings';
+                otherwise
+                    reason = sprintf('cannot evaluate (%s)', err.message);
+            end
         end
         report(end+1) = struct('stage', stage, 'day', day, ...
-            'stale', stale, 'optional', optional, 'reason', reason); %#ok<AGROW>
+            'stale', stale, 'optional', optional, 'blocked', blocked, ...
+            'reason', reason); %#ok<AGROW>
     end
 end
 
@@ -83,7 +104,7 @@ catch err
     reason = sprintf('cannot evaluate (%s)', err.message);
 end
 report(end+1) = struct('stage', 'av', 'day', NaN, 'stale', stale, ...
-    'optional', false, 'reason', reason);
+    'optional', false, 'blocked', false, 'reason', reason);
 
 if nargout == 0
     fprintf('%-8s %-6s %-7s %s\n', 'STAGE', 'DAY', 'STATE', 'REASON');
@@ -95,6 +116,8 @@ if nargout == 0
         end
         if report(iRow).optional
             state = 'opt-in';
+        elseif report(iRow).blocked
+            state = 'needs';
         elseif report(iRow).stale
             state = 'BUILD';
         else
@@ -102,6 +125,11 @@ if nargout == 0
         end
         fprintf('%-8s %-6s %-7s %s\n', report(iRow).stage, dayStr, state, ...
             report(iRow).reason);
+    end
+    if any([report.blocked])
+        fprintf(['\n''needs'' means an input is not in this download, not that ', ...
+            'anything is broken.\nThose stages will be skipped; the rest build ', ...
+            'normally (use `make -k`).\nSee the download routes in README.md.\n']);
     end
     clear report
 end
@@ -140,5 +168,31 @@ switch stage
             sprintf('fields_motion_2022-11-%d.mat', day)), gpsFile};
     otherwise
         inputs = {};
+end
+end
+
+% ---------------------------------------------------------------------------
+function absent = missingInputs(inputs)
+% Declared inputs that are not on disk. Globs count as present when they match
+% anything, because a stage that reads "the day's segments" needs some, not a
+% particular one.
+absent = {};
+p = mvt.paths();
+for iSpec = 1:numel(inputs)
+    spec = inputs{iSpec};
+    if contains(spec, '*')
+        listing = dir(spec);
+        found = ~isempty(listing(~[listing.isdir]));
+    else
+        found = isfile(spec);
+    end
+    if ~found
+        short = spec;
+        prefix = [p.dataRoot, filesep];
+        if startsWith(short, prefix)
+            short = short(numel(prefix)+1:end);
+        end
+        absent{end+1} = short; %#ok<AGROW>
+    end
 end
 end

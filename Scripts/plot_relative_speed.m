@@ -58,10 +58,7 @@ mvt.ensureDir(figuresRoot)
 
 dataFile = mvt.expectedOutputs('relspeed', processingDay, opts);
 dataFile = dataFile{1};
-if ~isfile(dataFile)
-    error('mvt:plot_relative_speed:missingData', ...
-        'Missing %s. Run `make relspeed-%d` first.', dataFile, processingDay);
-end
+mvt.requireInputs('relspeedplot', dataFile, opts)
 
 [stale, staleReason] = mvt.isStale(outputs, dataFile, ...
     mvt.sources('plot_relative_speed', opts), opts);
