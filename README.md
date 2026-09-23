@@ -25,9 +25,14 @@ start, not by which figures you want.
 
 | | You want to | You download | You run |
 |---|---|---|---|
-| **Route 1** | plot the figures | the analysis files + GPS, **~5 GB** | `make figures` |
-| **Route 2** | rebuild the analysis files from the processed trajectories, then plot | \+ `slim/`, **51 GB** | `make` |
-| **Route 3** | rebuild the processed trajectories from the raw recordings, then everything above | \+ `data/`, **59 GB** | `make rebuild` |
+| **Route 1** | plot the figures | the analysis files + GPS, **~6 GB** | `make figures` |
+| **Route 2** | rebuild the analysis files from the processed trajectories, then plot | \+ `slim/`, **55 GB** | `make` |
+| **Route 3** | rebuild the processed trajectories from the raw recordings, then everything above | \+ `data/`, **63 GB** | `make rebuild` |
+
+Sizes are as a download reports them (decimal GB). `du -h` shows about 7%
+less, because it counts in GiB. `results/full/` — the eastbound and reference
+trajectories, another 87 GB — is not part of any route: nothing downstream
+reads it, and it is built only on request with `make full`.
 
 Route 1 produces every figure except the microscopic trajectory plots, which
 need the trajectories themselves.
@@ -79,11 +84,11 @@ Download into `results/`:
 
 | What | Into | Size |
 |---|---|---|
-| the three GPS files | `results/gps/` | 821 MB |
-| `fields_motion_2022-11-DD.mat` | `results/analysis/2022-11-DD/` | 46 MB |
-| `LC_data_DD.mat` | `results/analysis/2022-11-DD/` | 40 MB |
-| `relspeed_data_DD.mat` | `results/analysis/2022-11-DD/` | 690 MB |
-| `samples_for_distance_analysis_DD.mat` | `results/analysis/2022-11-DD/` | 3.9 GB |
+| the three GPS files | `results/gps/` | 0.9 GB |
+| `fields_motion_2022-11-DD.mat` | `results/analysis/2022-11-DD/` | 0.05 GB |
+| `LC_data_DD.mat` | `results/analysis/2022-11-DD/` | 0.04 GB |
+| `relspeed_data_DD.mat` | `results/analysis/2022-11-DD/` | 0.7 GB |
+| `samples_for_distance_analysis_DD.mat` | `results/analysis/2022-11-DD/` | 4.2 GB |
 
 Then:
 
@@ -91,7 +96,14 @@ Then:
 make figures
 ```
 
-About 10 minutes per day. The figures land in `results/figures/`.
+The figures land in `results/figures/`. Budget roughly **25 minutes for all
+three days** with `make -j3` on a 10-core machine, or about half an hour per day
+run serially; `lcplot` is most of it. Add `-j3 -k` to build the three days at
+once and let the rest finish if one stage stops:
+
+```bash
+make -j3 -k figures
+```
 
 Two notes. The cross-day fuel figures need **all three days** present, so a
 single-day download will build everything else and then stop on that one; add
@@ -107,8 +119,9 @@ analysis files are regenerated rather than downloaded:
 make
 ```
 
-Allow a few hours for all three days. This also produces the microscopic
-trajectory plots, which route 1 cannot.
+Allow a few hours for all three days — the trajectory plots alone are about
+20 minutes per day, and `samples` and `fields` each decode the whole day. This
+route also produces the microscopic trajectory plots, which route 1 cannot.
 
 **One thing must still be downloaded.** The lane sidecars
 (`*_orig_dist_lane.mat`, 3.6 MB for all three days) are derived from the *raw*

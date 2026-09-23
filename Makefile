@@ -178,7 +178,7 @@ endef
 
 # `make` does the figures that need only the small .mat intermediates first, so
 # that a results-only download produces output before anything reaches for the
-# 51 GB slim tree. See docs/DOWNLOADS.md.
+# 51 GB slim tree. See the download routes in README.md.
 all: figures micro
 
 # `lanes` and `lc` are part of the data set but not yet of `all`: the figures

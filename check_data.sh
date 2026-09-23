@@ -5,7 +5,8 @@
 # data/ and results/ folders. This script reports what it finds and tells you
 # which workflows can run:
 #
-#   - PLOT / ANALYZE from processed data   needs results/slim and results/gps
+#   - PLOT the figures                     needs results/analysis and results/gps
+#   - REBUILD the analysis files           needs results/slim and results/gps
 #   - BOOTSTRAP from raw data              needs data/cars and data/i24motion
 #
 # Usage:
@@ -50,12 +51,33 @@ if [ -d "$RESULTS" ]; then green "results/ exists"; else red "results/ not found
 echo
 
 # ---------------------------------------------------------------------------
-# Processed data (for plotting / analysis) : results/slim + results/gps
+# Analysis files (route 1: plot the figures) : results/analysis + results/gps
+#
+# This route needs no trajectory data at all, which is why it is checked first
+# and separately: a download that has it is ready to make most of the figures
+# even though results/slim is empty.
 # ---------------------------------------------------------------------------
-echo "Processed data (plot / analyze)"
-plot_ok=1
+echo "Analysis files (plot the figures)"
+figs_ok=1
 gps_n=$(count_glob "$RESULTS/gps/CIRCLES_GPS_10Hz_2022-11-*.json")
-if [ "$gps_n" -ge 1 ]; then green "results/gps: $gps_n assembled GPS file(s)"; else red "results/gps: no CIRCLES_GPS_10Hz_*.json"; plot_ok=0; fi
+if [ "$gps_n" -ge 1 ]; then green "results/gps: $gps_n assembled GPS file(s)"; else red "results/gps: no CIRCLES_GPS_10Hz_*.json"; figs_ok=0; fi
+for d in "${DAYS[@]}"; do
+  have=""; miss=""
+  for f in "fields_motion_2022-11-$d.mat" "LC_data_$d.mat" "relspeed_data_$d.mat" \
+           "samples_for_distance_analysis_$d.mat"; do
+    if [ -f "$RESULTS/analysis/2022-11-$d/$f" ]; then have="$have ${f%%_*}"; else miss="$miss ${f%%_*}"; fi
+  done
+  if [ -z "$miss" ]; then green "results/analysis/2022-11-$d: all 4 analysis files"
+  elif [ -n "$have" ]; then info "results/analysis/2022-11-$d: have$have; missing$miss"
+  else red "results/analysis/2022-11-$d: none"; figs_ok=0; fi
+done
+echo
+
+# ---------------------------------------------------------------------------
+# Processed trajectories (route 2: rebuild the analysis files) : results/slim
+# ---------------------------------------------------------------------------
+echo "Processed trajectories (rebuild the analysis files)"
+plot_ok=1
 for d in "${DAYS[@]}"; do
   n=$(count_glob "$RESULTS/slim/2022-11-$d/I-24MOTION_*.json")
   if [ "$n" -ge 24 ]; then green "results/slim/2022-11-$d: $n segments"
@@ -87,8 +109,20 @@ echo
 # ---------------------------------------------------------------------------
 echo "Verdict"
 runnable=0
-if [ "$plot_ok" -eq 1 ]; then green "Ready to PLOT / ANALYZE (make figures / make av-figs, or mvt fields/figures)."; runnable=1; else info "Not ready to plot: processed data incomplete (see above)."; fi
-if [ "$raw_ok" -eq 1 ]; then green "Ready to BOOTSTRAP from raw data (make all, or run_all_scripts)."; runnable=1; else info "Not ready to bootstrap: raw data incomplete (see above)."; fi
+if [ "$figs_ok" -eq 1 ]; then green "Ready to PLOT THE FIGURES (make figures)."; runnable=1; else info "Not ready to plot: analysis files or GPS incomplete (see above)."; fi
+if [ "$plot_ok" -eq 1 ]; then green "Ready to REBUILD THE ANALYSIS FILES from the trajectories (make)."; runnable=1; else info "Not ready to rebuild from trajectories: results/slim incomplete (see above)."; fi
+if [ "$raw_ok" -eq 1 ]; then green "Ready to REBUILD EVERYTHING from raw data (make rebuild)."; runnable=1; else info "Not ready to rebuild from raw: raw data incomplete (see above)."; fi
+
+# The lane sidecars come from the raw recordings, so a trajectories-only
+# download cannot regenerate LC_data and must keep one or the other.
+if [ "$plot_ok" -eq 1 ] && [ "$raw_ok" -eq 0 ]; then
+  for d in "${DAYS[@]}"; do
+    sc=$(count_glob "$RESULTS/analysis/2022-11-$d/I-24MOTION_*_orig_dist_lane.mat")
+    if [ ! -f "$RESULTS/analysis/2022-11-$d/LC_data_$d.mat" ] && [ "$sc" -lt 24 ]; then
+      info "2022-11-$d: no LC_data and no lane sidecars; the lane-change figures need one of them (they derive from the raw data)."
+    fi
+  done
+fi
 
 if [ "$runnable" -eq 0 ]; then
   echo
@@ -97,7 +131,7 @@ if [ "$runnable" -eq 0 ]; then
   info "  $WORKSPACE/"
   info "    MVT_structured_data/   (this repository)"
   info "    data/                  (raw inputs: cars/, i24motion/)"
-  info "    results/               (processed inputs and outputs: slim/, gps/, figures/)"
+  info "    results/               (gps/, analysis/, slim/, figures/)"
   exit 1
 fi
 exit 0
