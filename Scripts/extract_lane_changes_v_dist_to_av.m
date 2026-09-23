@@ -35,7 +35,7 @@ function [] = extract_lane_changes_v_dist_to_av(processingDay, varargin)
 %   deliberately not sharded, so the whole day is one unit of work.
 %
 % Dependencies
-%   mvt.options, mvt.dayDir, mvt.manifest, mvt.expectedOutputs, mvt.isStale,
+%   mvt.options, mvt.dayDir, mvt.expectedOutputs, mvt.isStale,
 %   mvt.sources, mvt.laneSidecarName, mvt.atomicSave, mvt.ensureDir,
 %   mvt.progress, mvt.log
 %
@@ -53,17 +53,25 @@ slimPath = mvt.dayDir('slim', processingDay);
 outputPath = mvt.dayDir('analysis', processingDay);
 mvt.ensureDir(outputPath)
 
-% Segment order comes from the manifest rather than from dir(), so the slim
-% JSON and its lane sidecar are paired by name instead of by both listings
-% happening to sort the same way.
-segments = mvt.manifest(processingDay, opts);
-if numel(segments) < 24
+% Both lists come from mvt.expectedOutputs rather than mvt.manifest. This stage
+% reads the slim trajectories and their sidecars, never the raw data, so it must
+% work for a reader who downloaded those two and has no raw segments to build a
+% manifest from.
+slimFiles = mvt.expectedOutputs('slim', processingDay, opts);
+laneFiles = mvt.expectedOutputs('lanes', processingDay, opts);
+if numel(slimFiles) < 24
     error('I24 base files for the day: %d, Nov. 2022 are missing or incomplete.', processingDay)
 end
-laneFiles = mvt.expectedOutputs('lanes', processingDay, opts);
-slimFiles = cell(1, numel(segments));
-for iSeg = 1:numel(segments)
-    slimFiles{iSeg} = fullfile(slimPath, segments(iSeg).outputName);
+if numel(laneFiles) ~= numel(slimFiles)
+    error('mvt:extract_lane_changes:sidecarCount', ...
+        ['2022-11-%d has %d slim segments but %d lane sidecars. Run ', ...
+        '`make lanes-%d` to rebuild them.'], processingDay, numel(slimFiles), ...
+        numel(laneFiles), processingDay);
+end
+segmentNames = cell(1, numel(slimFiles));
+for iSeg = 1:numel(slimFiles)
+    [~, segName, segExt] = fileparts(slimFiles{iSeg});
+    segmentNames{iSeg} = [segName segExt];
 end
 
 outputFile = mvt.expectedOutputs('lc', processingDay, opts);
@@ -83,12 +91,12 @@ if opts.DryRun
 end
 
 % Use cell arrays to store results from each file
-all_start_cell = cell(numel(segments), 1);
-all_end_cell = cell(numel(segments), 1);
+all_start_cell = cell(numel(slimFiles), 1);
+all_end_cell = cell(numel(slimFiles), 1);
 
-reportProgress = mvt.progress(numel(segments), ...
+reportProgress = mvt.progress(numel(slimFiles), ...
     sprintf('lc 2022-11-%d', processingDay), 'Opts', opts);
-for fileNr = 1:numel(segments)
+for fileNr = 1:numel(slimFiles)
     filenameLoad = slimFiles{fileNr};
     if ~isfile(filenameLoad)
         error('mvt:extract_lane_changes:missingSlim', ...
@@ -101,7 +109,7 @@ for fileNr = 1:numel(segments)
             laneFiles{fileNr}, processingDay);
     end
     fprintf('Loading and decoding MOTION data file, %d/%d ... ', ...
-        fileNr, numel(segments)); tic
+        fileNr, numel(slimFiles)); tic
     dataTemp = jsondecode(fileread(filenameLoad));
     fprintf('Done (%0.0fsec).\n',toc)
 
@@ -116,8 +124,8 @@ for fileNr = 1:numel(segments)
         error('mvt:extract_lane_changes:sidecarMismatch', ...
             ['%s has %d trajectories but %s has %d. They must come from the ', ...
             'same build; re-run `make lanes-%d` (or FORCE=1) and try again.'], ...
-            segments(fileNr).outputName, numel(dataTemp), ...
-            mvt.laneSidecarName(segments(fileNr).outputName), numel(lanes_od), ...
+            segmentNames{fileNr}, numel(dataTemp), ...
+            mvt.laneSidecarName(segmentNames{fileNr}), numel(lanes_od), ...
             processingDay);
     end
 
@@ -235,7 +243,7 @@ for fileNr = 1:numel(segments)
         all_end_cell{fileNr} = end_capt;
     end
     clear dataTemp lanes_od lane_changes_data
-    reportProgress(fileNr, segments(fileNr).outputName);
+    reportProgress(fileNr, segmentNames{fileNr});
 end
 reportProgress();
 

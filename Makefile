@@ -222,6 +222,16 @@ $$(RESULTS)/gps/CIRCLES_GPS_10Hz_2022-11-$(1).json:
 endef
 $(foreach d,16 17 18,$(eval $(call derived_inputs,$(d))))
 
+# What a stage that reads another stage's output should depend on: the files
+# themselves when they are already there, and the producing stage's stamp only
+# when they are not. A results-only download has the files but can never run the
+# producing stage - slim and lanes both read the raw data - so depending on the
+# stamp unconditionally made those trees unbuildable.
+slim_files  = $(wildcard $(RESULTS)/slim/2022-11-$(1)/I-24MOTION_*.json)
+lane_files  = $(wildcard $(RESULTS)/analysis/2022-11-$(1)/I-24MOTION_*_orig_dist_lane.mat)
+slim_dep    = $(if $(call slim_files,$(1)),$(call slim_files,$(1)),$(STAMPS)/slim-$(1))
+lanes_dep   = $(if $(call lane_files,$(1)),$(call lane_files,$(1)),$(STAMPS)/lanes-$(1))
+
 # Shorthands for the per-day derived inputs
 fields_mat  = $(RESULTS)/analysis/2022-11-$(1)/fields_motion_2022-11-$(1).mat
 samples_mat = $(RESULTS)/analysis/2022-11-$(1)/samples_for_distance_analysis_$(1).mat
@@ -254,31 +264,46 @@ $(STAMPS)/lanes-%: $(SRC_lanes) | $(STAMPS)
 	$(call run_sharded,lanes,$*)
 	@touch $@
 
-$(STAMPS)/lc-%: $(SRC_lc) $(STAMPS)/slim-% $(STAMPS)/lanes-% | $(STAMPS)
-	$(call run_stage,lc,$*)
-	@touch $@
 
 
 
-$(STAMPS)/relspeed-%: $(SRC_relspeed) $(STAMPS)/slim-% | $(STAMPS)
-	$(call run_stage,relspeed,$*)
-	@touch $@
 
 
 
-$(STAMPS)/samples-%: $(SRC_samples) $(STAMPS)/slim-% | $(STAMPS)
-	$(call run_stage,samples,$*)
-	@touch $@
-
-$(STAMPS)/fields-%: $(SRC_fields) $(STAMPS)/slim-% | $(STAMPS)
-	$(call run_stage,fields,$*)
-	@touch $@
 
 
 
-$(STAMPS)/micro-%: $(SRC_micro) $(STAMPS)/slim-% | $(STAMPS)
-	$(call run_stage,micro,$*)
-	@touch $@
+
+
+
+
+
+
+
+# Stages that read the slim trajectories, and lc which also reads the lane
+# sidecars. Written per day so each can depend on the files it actually needs.
+define slim_reader_rules
+$$(STAMPS)/lc-$(1): $$(SRC_lc) $(call slim_dep,$(1)) $(call lanes_dep,$(1)) | $$(STAMPS)
+	$$(call run_stage,lc,$(1))
+	@touch $$@
+
+$$(STAMPS)/relspeed-$(1): $$(SRC_relspeed) $(call slim_dep,$(1)) | $$(STAMPS)
+	$$(call run_stage,relspeed,$(1))
+	@touch $$@
+
+$$(STAMPS)/samples-$(1): $$(SRC_samples) $(call slim_dep,$(1)) | $$(STAMPS)
+	$$(call run_stage,samples,$(1))
+	@touch $$@
+
+$$(STAMPS)/fields-$(1): $$(SRC_fields) $(call slim_dep,$(1)) | $$(STAMPS)
+	$$(call run_stage,fields,$(1))
+	@touch $$@
+
+$$(STAMPS)/micro-$(1): $$(SRC_micro) $(call slim_dep,$(1)) | $$(STAMPS)
+	$$(call run_stage,micro,$(1))
+	@touch $$@
+endef
+$(foreach d,16 17 18,$(eval $(call slim_reader_rules,$(d))))
 
 # Figures built from the derived .mat files. These depend on the files, so a
 # results-only tree builds them without touching gps or slim.

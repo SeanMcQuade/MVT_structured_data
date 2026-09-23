@@ -56,12 +56,8 @@ switch lower(stage)
             sprintf('CIRCLES_GPS_10Hz_2022-11-%d.json', day))};
 
     case {'slim', 'full'}
-        segments = mvt.manifest(day, opts);
         outDir = mvt.dayDir(lower(stage), day);
-        outputs = cell(1, numel(segments));
-        for iSeg = 1:numel(segments)
-            outputs{iSeg} = fullfile(outDir, segments(iSeg).outputName);
-        end
+        outputs = segmentOutputs(outDir, day, opts, '');
 
     case 'lanes'
         % One sidecar per raw segment, named after the slim file it pairs with
@@ -71,12 +67,7 @@ switch lower(stage)
         % These live under analysis/ rather than beside the slim JSON they
         % describe: slim/ is the released data set, and a per-segment
         % intermediate of a downstream analysis does not belong in it.
-        segments = mvt.manifest(day, opts);
-        outputs = cell(1, numel(segments));
-        for iSeg = 1:numel(segments)
-            outputs{iSeg} = fullfile(analysisDir, ...
-                mvt.laneSidecarName(segments(iSeg).outputName));
-        end
+        outputs = segmentOutputs(analysisDir, day, opts, 'sidecar');
 
     case 'lc'
         outputs = {fullfile(analysisDir, sprintf('LC_data_%d.mat', day))};
@@ -141,5 +132,52 @@ switch lower(stage)
             ['Unknown stage ''%s''. Expected one of: gps, slim, full, ', ...
             'lanes, lc, lcplot, relspeed, relspeedplot, samples, fields, macro, ', ...
             'micro, av.'], stage);
+end
+end
+
+% ---------------------------------------------------------------------------
+function outputs = segmentOutputs(outDir, day, opts, kind)
+% The 24 per-segment filenames, from the raw manifest when the raw data is
+% present and from the product folder itself when it is not.
+%
+% Someone who downloaded the released trajectories without the raw inputs has
+% no manifest and cannot build one: it is derived from the raw segments. Asking
+% the folder what it holds lets such a tree still be described, accepted and
+% reasoned about. The trade-off is that a *missing* segment cannot be noticed
+% this way - but it could not be rebuilt either, so there is nothing to report.
+try
+    segments = mvt.manifest(day, opts);
+    outputs = cell(1, numel(segments));
+    for iSeg = 1:numel(segments)
+        name = segments(iSeg).outputName;
+        if strcmp(kind, 'sidecar')
+            name = mvt.laneSidecarName(name);
+        end
+        outputs{iSeg} = fullfile(outDir, name);
+    end
+    return
+catch err
+    if ~strcmp(err.identifier, 'mvt:manifest:noRawFolder') && ...
+            ~contains(err.message, 'Raw MOTION folder does not exist')
+        rethrow(err)
+    end
+end
+
+if strcmp(kind, 'sidecar')
+    pattern = 'I-24MOTION_*_orig_dist_lane.mat';
+else
+    pattern = 'I-24MOTION_*.json';
+end
+listing = dir(fullfile(outDir, pattern));
+listing = listing(~startsWith({listing.name}, '.'));
+if isempty(listing)
+    error('mvt:expectedOutputs:noManifestNoProduct', ...
+        ['Cannot list the expected segments for 2022-11-%d: the raw data is ', ...
+         'absent, so no manifest can be built, and %s holds no matching ', ...
+         'files to describe instead.'], day, outDir);
+end
+outputs = cell(1, numel(listing));
+for iFile = 1:numel(listing)
+    outputs{iFile} = fullfile(outDir, listing(iFile).name);
 end
 end

@@ -34,7 +34,7 @@ function [] = relative_speed_histogram(processingDay, varargin)
 %   Needs the Statistics and Machine Learning Toolbox (prctile, adtest).
 %
 % Dependencies
-%   mvt.options, mvt.dayDir, mvt.manifest, mvt.expectedOutputs, mvt.isStale,
+%   mvt.options, mvt.dayDir, mvt.expectedOutputs, mvt.isStale,
 %   mvt.sources, mvt.atomicSave, mvt.ensureDir, mvt.progress, mvt.log
 %
 if nargin < 1
@@ -62,12 +62,11 @@ outputs = mvt.expectedOutputs('relspeed', processingDay, opts);
 outputFile = outputs{1};
 mvt.ensureDir(fileparts(outputFile))
 
-segments = mvt.manifest(processingDay, opts);
-slimPath = mvt.dayDir('slim', processingDay);
-slimFiles = cell(1, numel(segments));
-for iSeg = 1:numel(segments)
-    slimFiles{iSeg} = fullfile(slimPath, segments(iSeg).outputName);
-end
+% The segment list comes from mvt.expectedOutputs rather than mvt.manifest.
+% This stage reads only the slim trajectories, so it must not require the raw
+% data: a reader who downloaded the released trajectories has no raw segments
+% and cannot build a manifest, and asking for one here failed the whole stage.
+slimFiles = mvt.expectedOutputs('slim', processingDay, opts);
 
 [stale, staleReason] = mvt.isStale(outputs, slimFiles, ...
     mvt.sources('relative_speed_histogram', opts), opts);
@@ -91,12 +90,13 @@ filtered_dist_all_files = [];
 filtered_speed_all_files = [];
 all_av_dist = [];
 
-% Segment order comes from the manifest rather than dir(), so j indexes the
-% same segment every run regardless of how the folder happens to sort.
+% Segment order is fixed for a given tree, so j indexes the same segment every
+% run regardless of how the folder happens to sort.
 reportProgress = mvt.progress(j_end - j_start + 1, ...
     sprintf('relspeed 2022-11-%d', processingDay), 'Opts', opts);
 for j=j_start:j_end
-        filename = segments(j).outputName;
+        [~, segName, segExt] = fileparts(slimFiles{j});
+        filename = [segName segExt];
         fprintf('Loading %s ...',filename), tic
         data = jsondecode(fileread(slimFiles{j}));
         fprintf(' Done (%0.0fsec).\n',toc)
