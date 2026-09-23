@@ -168,6 +168,11 @@ make accept-verified     # checks the published checksums, then marks them curre
 
 This only saves time; it is not required.
 
+If `make` stops saying **a path contains a space**, that is a limit of GNU make
+alone, not of the pipeline. Run the same target from MATLAB
+(`cd MVT_structured_data/Scripts`, then `make figures`), or give make a
+space-free symlink. See [Before you start](#before-you-start).
+
 For the full list of stages, targets and options, see
 [`docs/MAKE_TARGETS.md`](docs/MAKE_TARGETS.md).
 
