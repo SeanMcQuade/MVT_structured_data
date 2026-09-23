@@ -2,10 +2,15 @@ function [] = plotting_LC_analysis(processingDay, varargin)
 % PLOTTING_LC_ANALYSIS  Lane-change rates and exposure relative to engaged AVs.
 %
 % Purpose
-%   Turns one day of extracted lane-change events (the 'lc' stage) into the
-%   paper's lane-change figures: how long traffic was exposed to an engaged AV
-%   at each relative distance, the rate of merging out of a lane at that
-%   distance, and the cumulative excess of merges over the far-field baseline.
+%   Processes AV-induced lane-changing event data to calculate the excess
+%   merge-out rate and the cumulative disturbance footprint, and generates the
+%   relevant figures.
+%
+%   Concretely: turns one day of extracted lane-change events (the 'lc' stage)
+%   into the paper's lane-change figures - how long traffic was exposed to an
+%   engaged AV at each relative distance, the rate of merging out of a lane at
+%   that distance, and the cumulative excess of merges over the far-field
+%   baseline.
 %
 % Inputs
 %   processingDay  16, 17, or 18 (November 2022)
