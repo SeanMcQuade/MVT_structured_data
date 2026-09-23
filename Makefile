@@ -135,21 +135,23 @@ endef
 # `make` does the figures that need only the small .mat intermediates first, so
 # that a results-only download produces output before anything reaches for the
 # 51 GB slim tree. See docs/DOWNLOADS.md.
-all: figures-from-mat figures-from-slim
+all: figures micro
 
 # `lanes` and `lc` are part of the data set but not yet of `all`: the figures
 # that consume LC_data (plotting_LC_analysis) are not wired in yet, so nothing
 # downstream of them would be built.
 data: gps slim lanes lc relspeed samples fields
 
-figures: figures-from-mat figures-from-slim
+# Everything that can be built from results/gps plus the .mat analysis files -
+# no slim tree required. This is what a figures-only download can make.
+figures: macro lcplot av relspeedplot
 
-# Buildable from results/gps plus the .mat intermediates (fields_*, samples_*,
-# LC_data_*) - no slim tree required.
-figures-from-mat: macro lcplot av relspeedplot
+# The trajectory plots read the slim JSON (via the reduced plotting caches
+# derived from it), so they need one of the larger downloads. `micro` is already
+# a per-day aggregate target; `make all` builds it after `figures`.
 
-# These read the slim JSON, or (for micro) the reduced plotting caches derived
-# from it, so they need one of the larger downloads.
+# Older names, kept so existing scripts and docs keep working.
+figures-from-mat: figures
 figures-from-slim: micro
 
 gps:     $(foreach d,$(DAYS),$(STAMPS)/gps-$(d))
@@ -388,11 +390,12 @@ check-data:
 # results untouched:
 #   make DATA=/path/to/data RESULTS=/path/to/new_results -j3 rebuild
 #
-# Covers the released products (gps, slim, lanes, lc, samples, fields) and the
-# figures. `full` is opt-in as always: add `make ... FORCE=1 full` for it.
+# Covers the released products (gps, slim, lanes, lc, relspeed, samples,
+# fields), the figures built from them, and the trajectory plots. `full` is
+# opt-in as always: add `make ... FORCE=1 full` for it.
 .PHONY: rebuild
 rebuild:
-	$(MAKE) FORCE=1 data figures av
+	$(MAKE) FORCE=1 data figures micro
 
 # Accept existing outputs as current, but only once their checksums prove they
 # are the expected bytes: md5 decides, not the clock. This is the safe answer

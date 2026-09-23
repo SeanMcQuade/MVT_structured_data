@@ -11,8 +11,8 @@ function make(varargin)
 %   make                       % everything out of date, all three days
 %   make all                   % same
 %   make data                  % gps, slim, lanes, lc, samples, fields
-%   make figures               % macro, lcplot, av, micro, relspeed
-%   make figures-from-mat      % only the figures that need no slim tree
+%   make figures               % the figures built from the .mat analysis files
+%   make micro                 % the trajectory plots (these need slim)
 %   make slim                  % one stage, all three days
 %   make slim Days 18          % one stage, one day
 %   make all Days 18 Workers 6 % one day, slim/full across 6 processes
@@ -236,10 +236,10 @@ switch target
     case 'data'
         stages = {'gps', 'slim', 'lanes', 'lc', 'relspeed', 'samples', 'fields'};
     case 'figures'
-        stages = {'macro', 'lcplot', 'av', 'relspeedplot', 'micro'};
-    case 'figures-from-mat'
         stages = {'macro', 'lcplot', 'av', 'relspeedplot'};
-    case 'figures-from-slim'
+    case 'figures-from-mat'    % older name for 'figures'
+        stages = {'macro', 'lcplot', 'av', 'relspeedplot'};
+    case 'figures-from-slim'   % older name for 'micro'
         stages = {'micro'};
     case {'gps', 'slim', 'full', 'lanes', 'lc', 'lcplot', 'relspeed', ...
             'relspeedplot', 'samples', 'fields', 'macro', 'micro', 'av'}
