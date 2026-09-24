@@ -199,6 +199,7 @@ For the full list of stages, targets and options, see
 | [`docs/MATLAB_JSON_FORMAT.md`](docs/MATLAB_JSON_FORMAT.md) | How MATLAB's `jsonencode` formats numbers, needed for byte-identical output. |
 | [`docs/DATA_CHANGELOG.md`](docs/DATA_CHANGELOG.md) | Versions of the released data set, what changed in each, and how to tell which version a folder holds. |
 | [`docs/REPRODUCIBLE_QUADRATURE.md`](docs/REPRODUCIBLE_QUADRATURE.md) | Why the fuel quadrature was made platform-independent, and the size of the difference. |
+| [`docs/pseudocode/`](docs/pseudocode/) | One file per pipeline stage, describing what it does in structured English — between the prose of ALGORITHMS.md and the MATLAB itself. |
 | [`docs/MAKE_TARGETS.md`](docs/MAKE_TARGETS.md) | Every stage and every `make` target, the options they take, sharding, and the other ways to drive the pipeline. |
 | [`docs/LANE_CHANGE_STAGES.md`](docs/LANE_CHANGE_STAGES.md) | The lane-change and relative-speed stages: how to run and test them. |
 | [`docs/DATA_RELEASE.md`](docs/DATA_RELEASE.md) | What to publish and how to lay it out, across the raw, derived and analysis layers. |

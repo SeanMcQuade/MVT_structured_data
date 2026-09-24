@@ -1,5 +1,9 @@
 # MVT pipeline algorithms
 
+For a stage-by-stage walkthrough in structured English, see
+[`pseudocode/`](pseudocode/) — one file per script, at a level between this
+document and the MATLAB.
+
 What each stage computes, at a level a reviewer can check against the paper and
 a reimplementer can follow. Exact field lists and units are in
 `DATA_DICTIONARY.md`; number formatting is in `MATLAB_JSON_FORMAT.md`. The
