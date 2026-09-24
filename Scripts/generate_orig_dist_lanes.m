@@ -98,6 +98,13 @@ mvt.ensureDir(outputPath)
 
 % Map each raw segment to the file it produces, without decoding it. This is
 % what lets the staleness check below run before the expensive jsondecode.
+% This stage reads the raw recordings, which most downloads do not include.
+% Say so clearly rather than failing inside the manifest lookup.
+rawDir = mvt.dayDir('raw', processingDay);
+if ~isfolder(rawDir)
+    mvt.requireInputs('lanes', fullfile(rawDir, '(raw I-24 MOTION segments)'), opts)
+end
+
 segments = mvt.manifest(processingDay, opts);
 outputs = mvt.expectedOutputs('lanes', processingDay, opts);
 sourceFiles = mvt.sources('generate_orig_dist_lanes', opts);

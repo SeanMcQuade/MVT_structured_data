@@ -25,7 +25,7 @@ fields + gps                   ── plot_macroscopic_fields ─▶ fig_field_*
 results/slim (or full)         ── plot_microscopic_trajectories ▶ fig_motion_trajectories_*.png
 all three days' samples        ── plot_AV_analysis ───────▶ fig_2_*, fig_3_*, fig_SM2_*  (Fig. 2, SM2, SM3)
 LC_data + gps                  ── plotting_LC_analysis ───▶ fig_lc_*.png                 (4/day)
-relspeed_data                  ── plot_relative_speed ────▶ Relative speed*.pdf          (2/day)
+relspeed_data                  ── plot_relative_speed ────▶ fig_relspeed_*.pdf           (2/day)
 ```
 
 The derived `.mat` intermediates live under `results/analysis/`, apart from the

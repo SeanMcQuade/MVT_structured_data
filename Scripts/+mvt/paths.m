@@ -35,7 +35,8 @@ function p = paths()
 %                    Use it to generate a second copy of the outputs for
 %                    comparison against an existing run:
 %                      MVT_RESULTS_DIR=/path/results_new make slim-16
-%                    A relative value is taken relative to the workspace root.
+%                    A relative value is taken relative to the current
+%                    working directory, as with any other command-line tool.
 %   MVT_DATA_DIR     read raw inputs from somewhere other than <dataRoot>/data
 %
 % Dependencies

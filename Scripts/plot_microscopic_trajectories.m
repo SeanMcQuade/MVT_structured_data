@@ -6,6 +6,11 @@ function [] = plot_microscopic_trajectories(processingDay, varargin)
 %   trajectory as a patch whose vertical extension precisely represents the
 %   vehicle's position and length. Also produces an example zoom window,
 %   both added to the full trajectory plot, and zoomed in.
+%
+%   The *_zoom_lowres.png output deliberately has no axes, labels or colour
+%   bar, and a black background: it is an inset panel, meant to be placed
+%   inside the *_zoomwin_lowres.png figure, which draws the box showing where
+%   it came from. On its own it looks unfinished, and is supposed to.
 %   The code can produce low resolution (1600 figure rows) and high
 %   resolution versions of the figure, which are of the following sizes,
 %   which can then be downscaled post-hoc as needed:
@@ -350,6 +355,8 @@ if flag_zoom_plot
     xlim(zoom_t), ylim(zoom_x/1000)
     set(hb,'LineWidth',10)
     set(gcf,'Color',[0,0,0],'Position',[10 50 fig_res(1)*fac fig_res(2)])
+    % Axes off and the plot box filling the figure: this output is an inset to
+    % be placed in the _zoomwin figure, not a standalone plot.
     set(gca,'Visible','off','Position',[0 0 1 1])
     fprintf(' Done (%0.0fsec).\n',toc)
     % Save figure

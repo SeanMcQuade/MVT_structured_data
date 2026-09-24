@@ -228,7 +228,7 @@ function stages = expandTarget(target)
 % download can build everything it is able to before anything reaches for the
 % slim tree: 'figures-from-mat' needs only results/gps and the .mat
 % intermediates, 'figures-from-slim' needs the slim JSON (or, for micro, the
-% reduced plotting caches derived from it). See docs/DOWNLOADS.md.
+% reduced plotting caches derived from it). See the download routes in README.md.
 switch target
     case 'all'
         stages = {'gps', 'slim', 'lanes', 'lc', 'relspeed', 'samples', ...

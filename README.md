@@ -25,9 +25,14 @@ start, not by which figures you want.
 
 | | You want to | You download | You run |
 |---|---|---|---|
-| **Route 1** | plot the figures | the analysis files + GPS, **~5 GB** | `make figures` |
-| **Route 2** | rebuild the analysis files from the processed trajectories, then plot | \+ `slim/`, **51 GB** | `make` |
-| **Route 3** | rebuild the processed trajectories from the raw recordings, then everything above | \+ `data/`, **59 GB** | `make rebuild` |
+| **Route 1** | plot the figures | the analysis files + GPS, **~6 GB** | `make figures` |
+| **Route 2** | rebuild the analysis files from the processed trajectories, then plot | \+ `slim/`, **55 GB** | `make` |
+| **Route 3** | rebuild the processed trajectories from the raw recordings, then everything above | \+ `data/`, **63 GB** | `make rebuild` |
+
+Sizes are as a download reports them (decimal GB). `du -h` shows about 7%
+less, because it counts in GiB. `results/full/` — the eastbound and reference
+trajectories, another 87 GB — is not part of any route: nothing downstream
+reads it, and it is built only on request with `make full`.
 
 Route 1 produces every figure except the microscopic trajectory plots, which
 need the trajectories themselves.
@@ -55,17 +60,35 @@ Machine Learning Toolbox. No Parallel Computing Toolbox is used anywhere. A
 Python implementation of the released-data stages lives in `python/`; see
 [`python/README.md`](python/README.md).
 
+**If your path contains a space** — `/Users/me/My Data/results` — everything
+here handles it except GNU make, which separates targets by whitespace and
+cannot be made to cope. `make` detects this and stops with an explanation
+rather than misbehaving quietly. Either run the same targets from MATLAB, which
+has no such limit:
+
+```matlab
+cd MVT_structured_data/Scripts
+make figures
+```
+
+or point make at a space-free symlink:
+
+```bash
+ln -s "/Users/me/My Data/results" ~/mvt-results
+make figures RESULTS=~/mvt-results
+```
+
 # Route 1 — plot the figures
 
 Download into `results/`:
 
 | What | Into | Size |
 |---|---|---|
-| the three GPS files | `results/gps/` | 821 MB |
-| `fields_motion_2022-11-DD.mat` | `results/analysis/2022-11-DD/` | 46 MB |
-| `LC_data_DD.mat` | `results/analysis/2022-11-DD/` | 40 MB |
-| `relspeed_data_DD.mat` | `results/analysis/2022-11-DD/` | 690 MB |
-| `samples_for_distance_analysis_DD.mat` | `results/analysis/2022-11-DD/` | 3.9 GB |
+| the three GPS files | `results/gps/` | 0.9 GB |
+| `fields_motion_2022-11-DD.mat` | `results/analysis/2022-11-DD/` | 0.05 GB |
+| `LC_data_DD.mat` | `results/analysis/2022-11-DD/` | 0.04 GB |
+| `relspeed_data_DD.mat` | `results/analysis/2022-11-DD/` | 0.7 GB |
+| `samples_for_distance_analysis_DD.mat` | `results/analysis/2022-11-DD/` | 4.2 GB |
 
 Then:
 
@@ -73,7 +96,14 @@ Then:
 make figures
 ```
 
-About 10 minutes per day. The figures land in `results/figures/`.
+The figures land in `results/figures/`. Budget roughly **25 minutes for all
+three days** with `make -j3` on a 10-core machine, or about half an hour per day
+run serially; `lcplot` is most of it. Add `-j3 -k` to build the three days at
+once and let the rest finish if one stage stops:
+
+```bash
+make -j3 -k figures
+```
 
 Two notes. The cross-day fuel figures need **all three days** present, so a
 single-day download will build everything else and then stop on that one; add
@@ -89,8 +119,9 @@ analysis files are regenerated rather than downloaded:
 make
 ```
 
-Allow a few hours for all three days. This also produces the microscopic
-trajectory plots, which route 1 cannot.
+Allow a few hours for all three days — the trajectory plots alone are about
+20 minutes per day, and `samples` and `fields` each decode the whole day. This
+route also produces the microscopic trajectory plots, which route 1 cannot.
 
 **One thing must still be downloaded.** The lane sidecars
 (`*_orig_dist_lane.mat`, 3.6 MB for all three days) are derived from the *raw*
@@ -126,8 +157,17 @@ make rebuild RESULTS=/path/to/results_new
 `make status` says what every stage would do and why, and builds nothing. Start
 there.
 
-A stage whose inputs are missing names the file it wanted; check it against the
-download table for your route.
+A stage reported as **`needs`** is not broken — an input for it simply is not in
+your download. `make status` names the file, and the stages that do not depend
+on it build normally. If you hit it mid-run, `make -k` lets the rest finish:
+
+```
+lcplot   17     needs   needs results/analysis/2022-11-17/LC_data_17.mat
+```
+
+If you run such a stage directly it says the same thing at more length,
+including what the missing file would have produced and the cheapest way to
+get it.
 
 If a stage says a script **"is newer than"** a file you downloaded, that is the
 one confusing case. Freshness is decided by modification time, and an archive
@@ -140,6 +180,11 @@ make accept-verified     # checks the published checksums, then marks them curre
 ```
 
 This only saves time; it is not required.
+
+If `make` stops saying **a path contains a space**, that is a limit of GNU make
+alone, not of the pipeline. Run the same target from MATLAB
+(`cd MVT_structured_data/Scripts`, then `make figures`), or give make a
+space-free symlink. See [Before you start](#before-you-start).
 
 For the full list of stages, targets and options, see
 [`docs/MAKE_TARGETS.md`](docs/MAKE_TARGETS.md).

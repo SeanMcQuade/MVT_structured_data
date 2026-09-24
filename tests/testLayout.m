@@ -42,20 +42,28 @@ verifyEqual(testCase, p.scriptsDir, fullfile(p.repoRoot, 'Scripts'));
 end
 
 function testResultsOverrideIsHonored(testCase)
-setenv('MVT_RESULTS_DIR', '/tmp/mvt_results_elsewhere');
+% tempdir rather than a literal '/tmp': macOS resolves /tmp through a symlink
+% to /private/tmp, so comparing against the literal fails for a reason that has
+% nothing to do with the override working.
+target = fullfile(tempdir, 'mvt_results_elsewhere');
+setenv('MVT_RESULTS_DIR', target);
 p = mvt.paths();
-verifyEqual(testCase, p.resultsDir, '/tmp/mvt_results_elsewhere');
-verifyEqual(testCase, p.stateDir, fullfile('/tmp/mvt_results_elsewhere', '.mvt'));
+verifyEqual(testCase, p.resultsDir, target);
+verifyEqual(testCase, p.stateDir, fullfile(target, '.mvt'));
 % Derived locations must follow the override, or a comparison run would write
 % its build state into the real tree.
-verifyTrue(testCase, startsWith(p.cacheDir, '/tmp/mvt_results_elsewhere'));
-verifyTrue(testCase, startsWith(p.stampDir, '/tmp/mvt_results_elsewhere'));
+verifyTrue(testCase, startsWith(p.cacheDir, target));
+verifyTrue(testCase, startsWith(p.stampDir, target));
 end
 
-function testRelativeOverrideResolvesAgainstWorkspace(testCase)
+function testRelativeOverrideResolvesAgainstWorkingDirectory(testCase)
+% A relative override follows the caller's working directory, as every other
+% command-line tool does, and as the Python CLI does with the same string. It
+% used to resolve against the workspace root; this test asserted that older
+% behaviour and outlived it.
 setenv('MVT_RESULTS_DIR', 'results_verify');
 p = mvt.paths();
-verifyEqual(testCase, p.resultsDir, fullfile(p.dataRoot, 'results_verify'));
+verifyEqual(testCase, p.resultsDir, fullfile(pwd, 'results_verify'));
 end
 
 function testDayFolders(testCase)
